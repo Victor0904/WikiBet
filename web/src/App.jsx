@@ -68,7 +68,7 @@ function Game({ api, engine }) {
   const known = useRef(null); // statut de chaque pari au chargement précédent, pour fêter les gains
   const refresh = useCallback(async () => {
     try {
-      const [m, b, l, i] = await Promise.all([api.me(), api.myBets(s.k - 30), api.leaderboard(), api.inventoryOf(api.uid).catch(() => [])]);
+      const [m, b, l, i] = await Promise.all([api.me(), api.myBets(s.k - 30), api.leaderboard().catch(() => []), api.inventoryOf(api.uid).catch(() => [])]); // classement et QG : facultatifs, le jeu tourne sans
       const prev = known.current, won = prev ? b.filter(x => x.status === "won" && prev.get(x.id) === "open") : [];
       known.current = new Map(b.map(x => [x.id, x.status]));
       setMe(m); setBets(b); setBoard(l); setInv(Object.fromEntries(i.map(r => [r.item_id, r])));
