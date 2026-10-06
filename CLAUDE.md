@@ -32,7 +32,7 @@ Deux versions cohabitent :
 - `tests/` : `npm test` lance la vraie migration dans PGlite (horloge, cours, liquidation, règlement, RLS, pause).
 - Pas de bots : le classement réunit les vrais joueurs.
 - **Marché Crypto, le marché principal** (choisi par Victor : « le plus vrai et réel ») : migration `20261008000000_crypto.sql`, fonction `supabase/functions/crypto`, front `src/crypto.js` et `src/CryptoUI.jsx`.
-  - Prix réels de Coinbase, paires en euros, 14 actifs (BTC, ETH, SOL, XRP, DOGE, ADA, AVAX, LINK, DOT, LTC, SHIB, UNI, ATOM, BCH).
+  - Prix réels de Coinbase, **paires en dollars** (migration `20261008120000_crypto_usd.sql`). Mesuré : en euros, la plupart des cryptos restaient figées (0 à 3 échanges en 30 s) ; en dollars, Bitcoin bouge environ 3 fois par seconde. 14 actifs : BTC, ETH, SOL, XRP, DOGE, ADA, AVAX, LINK, LTC, BCH, SUI, UNI, XLM, TIA. DOT, SHIB et ATOM sont désactivés (`crypto_assets.active`), mais gardés pour l'historique. Avant d'ajouter une crypto, mesurer son activité sur le flux Coinbase en dollars.
   - **Le prix d'un ordre vient du serveur**, jamais du joueur. La fonction `crypto` (actions `open` et `close`, avec le jeton du joueur) lit le ticker Coinbase, puis appelle `crypto_open` / `crypto_close`, que seule la clé serveur peut exécuter.
   - Frais de 0,1 % du montant engagé (mise × levier) à l'ouverture et à la clôture, d'où un avantage maison. Pas de clôture automatique.
   - Liquidation vérifiée chaque minute (action `poll` lancée par pg_cron) sur les vrais plus bas et plus hauts des bougies d'une minute (`crypto_candles`, 2 jours gardés).

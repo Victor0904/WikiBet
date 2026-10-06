@@ -10,7 +10,7 @@ import { normBet, normStream, normMarket, normBoard } from "./api.js";
 const UID = "00000000-0000-4000-8000-000000000001";
 
 export async function demoApi(engine) {
-  const db = new PGlite("idb://wikibourse-demo-5"); // changer le numéro quand la migration change
+  const db = new PGlite("idb://wikibourse-demo-6"); // changer le numéro quand la migration change
   const ready = (await db.query("select to_regclass('public.bets') is not null as ok")).rows[0].ok;
   if (!ready) {
     await db.exec(stub);

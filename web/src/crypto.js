@@ -4,18 +4,21 @@ import { useEffect, useState } from "react";
 
 export const CB = "https://api.exchange.coinbase.com";
 export const FEE = 0.001; // 0,1 % du montant engagé, à l'ouverture et à la clôture
+// Paires en dollars : en euros, la plupart s'échangeaient trop peu pour que le prix bouge (mesuré sur Coinbase).
 export const ASSETS = [
   ["BTC", "Bitcoin", "#F7931A"], ["ETH", "Ethereum", "#8A92B2"], ["SOL", "Solana", "#9945FF"], ["XRP", "XRP", "#3B82F6"],
   ["DOGE", "Dogecoin", "#C2A633"], ["ADA", "Cardano", "#2A6CF0"], ["AVAX", "Avalanche", "#E84142"], ["LINK", "Chainlink", "#2A5ADA"],
-  ["DOT", "Polkadot", "#E6007A"], ["LTC", "Litecoin", "#A6A9AA"], ["SHIB", "Shiba Inu", "#E0602E"], ["UNI", "Uniswap", "#FF007A"],
-  ["ATOM", "Cosmos", "#6F7390"], ["BCH", "Bitcoin Cash", "#8DC351"],
-].map(([sym, name, color]) => ({ sym, name, color, pair: `${sym}-EUR` }));
-export const BY_SYM = Object.fromEntries(ASSETS.map(a => [a.sym, a]));
+  ["LTC", "Litecoin", "#A6A9AA"], ["BCH", "Bitcoin Cash", "#8DC351"], ["SUI", "Sui", "#4DA2FF"], ["UNI", "Uniswap", "#FF007A"],
+  ["XLM", "Stellar", "#7D8CA3"], ["TIA", "Celestia", "#7B2BF9"],
+].map(([sym, name, color]) => ({ sym, name, color, pair: `${sym}-USD` }));
+// Cryptos retirées de la liste, gardées pour afficher les anciens paris.
+const RETIRED = [["DOT", "Polkadot", "#E6007A"], ["SHIB", "Shiba Inu", "#E0602E"], ["ATOM", "Cosmos", "#6F7390"]].map(([sym, name, color]) => ({ sym, name, color, pair: `${sym}-USD` }));
+export const BY_SYM = Object.fromEntries([...ASSETS, ...RETIRED].map(a => [a.sym, a]));
 
-// Prix en euros : 2 décimales au-dessus de 1 €, 4 chiffres significatifs en dessous (SHIB vaut quelques millionièmes).
+// Prix en dollars : 2 décimales au-dessus de 1 $, 4 chiffres significatifs en dessous.
 const big = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const small = new Intl.NumberFormat("fr-FR", { maximumSignificantDigits: 4 });
-export const eur = v => v == null || isNaN(v) ? "—" : (v >= 1 ? big : small).format(v) + " €";
+export const usd = v => v == null || isNaN(v) ? "—" : (v >= 1 ? big : small).format(v) + " $";
 
 export function useCrypto() {
   const [quotes, setQuotes] = useState({}), [candles, setCandles] = useState({}), [live, setLive] = useState(false);

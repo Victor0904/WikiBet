@@ -1,6 +1,6 @@
 // Marché crypto : liste en direct, fiche détaillée avec bougies, carte de position.
 import { useEffect, useRef, useState } from "react";
-import { ASSETS, BY_SYM, eur, fetchCandles, FEE } from "./crypto.js";
+import { ASSETS, BY_SYM, usd, fetchCandles, FEE } from "./crypto.js";
 import { W, sW, nf0, clock, pct, cls } from "./format.js";
 import { tradeValue, liqPrice } from "./engine.js";
 import { Spark, PositionChart } from "./charts.jsx";
@@ -23,7 +23,7 @@ export function CryptoMarket({ quotes, candles, live, bets, onPick, onDetail }) 
   }
   return (
     <section>
-      <div className="feed-info"><i className={"pulse" + (live ? "" : " off")} aria-hidden="true" />{live ? "Prix réels Coinbase en direct, en euros" : "Connexion au flux de prix…"} · ouvert 24 h/24</div>
+      <div className="feed-info"><i className={"pulse" + (live ? "" : " off")} aria-hidden="true" />{live ? "Prix réels Coinbase en direct, en dollars" : "Connexion au flux de prix…"} · ouvert 24 h/24</div>
       <div className="market">
         <div className="mrow head"><span>Crypto</span><span /><span className="r">Prix · 24 h</span><span /></div>
         {ASSETS.map(a => {
@@ -34,7 +34,7 @@ export function CryptoMarket({ quotes, candles, live, bets, onPick, onDetail }) 
                 <CoinIcon sym={a.sym} /><span><b>{a.name}</b><small>{a.sym} · voir le graphique</small></span>
               </button>
               {v.length > 1 ? <Spark path={v} t={v.length - 1} /> : <span />}
-              <span className="r mono"><b key={q?.price} className={"flash " + (moves[a.sym] ?? "")}>{q ? eur(q.price) : "…"}</b><small className={cls(c)}>{q ? pct(c) : ""}</small></span>
+              <span className="r mono"><b key={q?.price} className={"flash " + (moves[a.sym] ?? "")}>{q ? usd(q.price) : "…"}</b><small className={cls(c)}>{q ? pct(c) : ""}</small></span>
               <span className="act">
                 <button type="button" className="buy" disabled={!q} onClick={() => onPick(a.sym, "up")} aria-label={`Hausse sur ${a.name}`}>▲</button>
                 <button type="button" className="sell" disabled={!q} onClick={() => onPick(a.sym, "down")} aria-label={`Baisse sur ${a.name}`}>▼</button>
@@ -43,7 +43,7 @@ export function CryptoMarket({ quotes, candles, live, bets, onPick, onDetail }) 
           );
         })}
       </div>
-      <p className="fine">Prix réels de Coinbase (paires en euros). Le prix d'un ordre est celui que le serveur relève chez Coinbase au moment où il le reçoit. Frais de 0,1 % du montant engagé à l'ouverture et à la clôture. Les W restent une monnaie fictive : rien ne s'achète ni ne se retire.</p>
+      <p className="fine">Prix réels de Coinbase, en dollars (la monnaie de référence de la crypto, où les échanges sont les plus nombreux). Le prix d'un ordre est celui que le serveur relève chez Coinbase au moment où il le reçoit. Frais de 0,1 % du montant engagé à l'ouverture et à la clôture. Les W restent une monnaie fictive : rien ne s'achète ni ne se retire.</p>
     </section>
   );
 }
@@ -66,9 +66,9 @@ function Candles({ cs, price }) {
         })}
         <line x1="0" x2="100" y1={Y(last)} y2={Y(last)} stroke="var(--accent)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
       </svg>
-      <span className="ax ax-hi mono">{eur(hi)}</span>
-      <span className="ax ax-lo mono">{eur(lo)}</span>
-      <span className="ax last mono" style={{ top: `calc(10px + (100% - 32px) * ${Y(last) / 100})` }}>{eur(last)}</span>
+      <span className="ax ax-hi mono">{usd(hi)}</span>
+      <span className="ax ax-lo mono">{usd(lo)}</span>
+      <span className="ax last mono" style={{ top: `calc(10px + (100% - 32px) * ${Y(last) / 100})` }}>{usd(last)}</span>
       <span className="ax t0 mono">{clock(cs[0].t)}</span>
       <span className="ax t1 mono">{clock(cs[cs.length - 1].t)}</span>
     </div>
@@ -85,15 +85,15 @@ export function CryptoDetail({ sym, quotes, onPick, onClose }) {
     <div className="scrim" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet detail" role="dialog" aria-modal="true" aria-label={a.name}>
         <div className="sheet-h">
-          <span className="who"><CoinIcon sym={sym} size={38} /><span><b className="detail-name">{a.name}</b><small className="muted">{a.sym} / EUR</small></span></span>
+          <span className="who"><CoinIcon sym={sym} size={38} /><span><b className="detail-name">{a.name}</b><small className="muted">{a.sym} / USD</small></span></span>
           <button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button>
         </div>
-        <div className="detail-price"><b className="mono">{q ? eur(q.price) : "…"}</b><span className={"mono " + cls(c)}>{q ? `${pct(c)} sur 24 h` : ""}</span></div>
+        <div className="detail-price"><b className="mono">{q ? usd(q.price) : "…"}</b><span className={"mono " + cls(c)}>{q ? `${pct(c)} sur 24 h` : ""}</span></div>
         <div className="seg" role="group" aria-label="Unité de temps">{FRAMES.map(([g, l]) => <button key={g} type="button" aria-pressed={gran === g} onClick={() => setGran(g)}>{l}</button>)}</div>
         <Candles cs={cs} price={q?.price} />
         {q && <div className="rows mono">
-          <div className="row"><span>Plus haut 24 h</span><b>{eur(q.high24)}</b></div>
-          <div className="row"><span>Plus bas 24 h</span><b>{eur(q.low24)}</b></div>
+          <div className="row"><span>Plus haut 24 h</span><b>{usd(q.high24)}</b></div>
+          <div className="row"><span>Plus bas 24 h</span><b>{usd(q.low24)}</b></div>
           <div className="row"><span>Volume 24 h</span><b>{nf0.format(q.vol24)} {a.sym}</b></div>
         </div>}
         <div className="qbtns">
@@ -130,9 +130,9 @@ export function CryptoCard({ b, q, cs, now, onClose, Facts }) {
       <Facts items={[
         ["Mise", `${W(b.stake)} · ×${b.lev}`],
         ["Valeur (frais déduits)", W(x.value), cls(x.net)],
-        ["Entrée", `${eur(b.entry)} · ${clock(t0)}`],
-        ["Prix", `${eur(x.px)} (${pct(x.px / b.entry - 1)})`, cls((x.px / b.entry - 1) * (b.dir === "up" ? 1 : -1))],
-        ["Liquidation", `${eur(x.lq)} (${pct(d)})`, Math.abs(d) < .03 ? "down warn" : ""],
+        ["Entrée", `${usd(b.entry)} · ${clock(t0)}`],
+        ["Prix", `${usd(x.px)} (${pct(x.px / b.entry - 1)})`, cls((x.px / b.entry - 1) * (b.dir === "up" ? 1 : -1))],
+        ["Liquidation", `${usd(x.lq)} (${pct(d)})`, Math.abs(d) < .03 ? "down warn" : ""],
         ["Frais", `${W(b.fees)} payés + ${W(x.closeFee)}`],
         ["Ouverte depuis", since(now - t0)],
         ["Clôture", "quand tu veux"],

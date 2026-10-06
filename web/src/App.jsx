@@ -4,7 +4,7 @@ import { createEngine, tradeValue, liqPrice, LEVS, BK_LIMIT, CAP0, EPOCH, CYCLE_
 import { connect } from "./api.js";
 import { TradeChart, PositionChart, Spark } from "./charts.jsx";
 import { nf0, nf2, W, sW, clock, pct, cls, HOME_NAMES, THEMES, DEFAULT_ACCENT } from "./format.js";
-import { useCrypto, BY_SYM, eur, FEE } from "./crypto.js";
+import { useCrypto, BY_SYM, usd, FEE } from "./crypto.js";
 import { CryptoMarket, CryptoDetail, CryptoCard, cryptoLive, CoinIcon } from "./CryptoUI.jsx";
 import { Dock, Segmented, SubHeader } from "./nav.jsx";
 import { MoreMenu, HowTo, Account, Legal } from "./pages.jsx";
@@ -216,7 +216,7 @@ function Game({ api, engine }) {
       {ticket && <Ticket engine={engine} crypto={crypto} s={s} now={now} byLogin={byLogin} me={me} ticket={ticket} pref={pref} setPref={setPref} onClose={() => setTicket(null)}
         onSubmit={async args => {
           const opened = b => `Position ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} ouverte · ${W(b.stake)}`;
-          const r = ticket.kind === "crypto" ? await run(() => api.cryptoOrder({ action: "open", ...args }), b => `${opened(b)} à ${eur(b.entry)} (frais ${W(b.fees)})`)
+          const r = ticket.kind === "crypto" ? await run(() => api.cryptoOrder({ action: "open", ...args }), b => `${opened(b)} à ${usd(b.entry)} (frais ${W(b.fees)})`)
             : ticket.kind === "trade" ? await run(() => api.openTrade(args), opened)
             : ticket.kind === "stream" ? await run(() => api.openStream(args), opened)
             : ticket.kind === "question" ? await run(() => api.betQuestion(args), b => `Pari validé : ${b.side === "yes" ? "Oui" : "Non"} à ${nf2.format(b.odds)} · ${W(b.stake)}`)
@@ -543,7 +543,7 @@ function History({ engine, byLogin, bets }) {
           : (() => { const d = engine.makeDuels(b.day).find(x => x.id === b.duel_id); return `${engine.BY[b.side === "a" ? d.a : d.b].name} (duel)` })();
         if (b.kind === "crypto") return (
           <div key={b.id} className="hrow">
-            <span><b>{BY_SYM[b.sym]?.name ?? b.sym} {b.dir === "up" ? "▲" : "▼"} ×{b.lev}</b><small>{clock(Date.parse(b.created_at))} → {b.exit_at ? clock(Date.parse(b.exit_at)) : "—"} · {eur(b.entry)} → {b.exit != null ? eur(b.exit) : "—"} · frais {W(b.fees)}{b.payout === 0 ? " · liquidée" : ""}{b.insured ? " · assurée" : ""}</small></span>
+            <span><b>{BY_SYM[b.sym]?.name ?? b.sym} {b.dir === "up" ? "▲" : "▼"} ×{b.lev}</b><small>{clock(Date.parse(b.created_at))} → {b.exit_at ? clock(Date.parse(b.exit_at)) : "—"} · {usd(b.entry)} → {b.exit != null ? usd(b.exit) : "—"} · frais {W(b.fees)}{b.payout === 0 ? " · liquidée" : ""}{b.insured ? " · assurée" : ""}</small></span>
             <span className="r mono"><b className={cls(net - b.stake * b.lev * FEE)}>{sW(net - b.stake * b.lev * FEE)}</b><small>mise {W(b.stake)}</small></span>
           </div>
         );
@@ -624,10 +624,10 @@ function Ticket({ engine, crypto, s, now, byLogin, me, ticket, pref, setPref, on
       <label>Levier</label>
       <div className="seg" role="group" aria-label="Levier">{LEVS.map(v => <button key={v} type="button" aria-pressed={pref.lev === v} onClick={() => set({ lev: v })}>×{v}</button>)}</div>
       <div className="rows mono">
-        <div className="row"><span>Prix actuel (indicatif)</span><b>{eur(px)}</b></div>
+        <div className="row"><span>Prix actuel (indicatif)</span><b>{usd(px)}</b></div>
         <div className="row"><span>1 % de variation</span><b>±{W(stake * pref.lev / 100)}</b></div>
         <div className="row"><span>Frais d'ouverture (0,1 %)</span><b>{W(fee)}</b></div>
-        <div className="row"><span>Liquidation à</span><b>{eur(liqPrice(b))}</b></div>
+        <div className="row"><span>Liquidation à</span><b>{usd(liqPrice(b))}</b></div>
       </div>
       <p className="muted small">Le prix retenu est celui de Coinbase quand le serveur reçoit l'ordre. Mêmes frais à la clôture. La position reste ouverte jusqu'à ce que tu la clôtures, ou jusqu'à la liquidation.</p>
     </>;
