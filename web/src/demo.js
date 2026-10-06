@@ -5,12 +5,12 @@ import stub from "./demo-stub.sql?raw";
 // Toutes les migrations, dans l'ordre de leur nom (horodaté).
 const migrations = Object.entries(import.meta.glob("../supabase/migrations/*.sql", { query: "?raw", import: "default", eager: true })).sort(([a], [b]) => a.localeCompare(b)).map(([, sql]) => sql);
 import { seedRows } from "./seed.js";
-import { normBet, normStream, normMarket } from "./api.js";
+import { normBet, normStream, normMarket, normBoard } from "./api.js";
 
 const UID = "00000000-0000-4000-8000-000000000001";
 
 export async function demoApi(engine) {
-  const db = new PGlite("idb://wikibourse-demo-3"); // changer le numéro quand la migration change
+  const db = new PGlite("idb://wikibourse-demo-4"); // changer le numéro quand la migration change
   const ready = (await db.query("select to_regclass('public.bets') is not null as ok")).rows[0].ok;
   if (!ready) {
     await db.exec(stub);
@@ -41,7 +41,15 @@ export async function demoApi(engine) {
     restart: () => act("select * from restart()"),
     settle: async () => (await all("select settle() as n"))[0].n,
     myBets: async min => (await all("select * from bets where user_id = $1 and (status = 'open' or session >= $2) order by id desc", [UID, min])).map(normBet),
-    leaderboard: () => all("select id, pseudo, cash, bankruptcies from profiles order by cash desc limit 50"),
+    leaderboard: async () => (await all("select * from leaderboard()")).map(normBoard),
+    shopItems: () => all("select * from shop_items order by sort"),
+    inventoryOf: user => all("select item_id, qty, equipped from inventory where user_id = $1 and qty > 0", [user]),
+    profileOf: async user => (await all("select id, pseudo, cash, bankruptcies from profiles where id = $1", [user]))[0] ?? null,
+    buyItem: id => act("select * from buy_item($1)", [id]),
+    sellItem: async id => (await act("select sell_item($1) as v", [id])).v,
+    equipItem: id => act("select equip_item($1)", [id]),
+    unequip: category => act("select unequip($1)", [category]),
+    useBonus: id => act("select * from use_bonus($1)", [id]),
     onChange(cb) { listeners.add(cb); return () => listeners.delete(cb) },
   };
 }

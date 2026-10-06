@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 // Les identifiants bigint et les cotes numeric arrivent parfois en texte : on normalise une fois ici.
 export const normBet = b => ({ ...b, id: Number(b.id), odds: b.odds == null ? null : Number(b.odds) });
 export const normMarket = m => ({ ...m, id: Number(m.id), closes_at: new Date(m.closes_at).toISOString(), p_yes: Number(m.p_yes), odds_yes: Number(m.odds_yes), odds_no: Number(m.odds_no) });
+export const normBoard = r => ({ ...r, cash: Number(r.cash), patrimoine: Number(r.patrimoine) });
 export const normStream = s => ({ ...s, ts: (s.ts || []).map(Number), vs: (s.vs || []).map(Number) });
 
 export async function connect(engine) {
@@ -40,11 +41,20 @@ export async function connect(engine) {
     restart: () => rpc("restart"),
     settle: () => rpc("settle"),
     myBets: async minSession => (await rows(sb.from("bets").select("*").eq("user_id", uid).or(`status.eq.open,session.gte.${minSession}`).order("id", { ascending: false }))).map(normBet),
-    leaderboard: () => rows(sb.from("profiles").select("id,pseudo,cash,bankruptcies").order("cash", { ascending: false }).limit(50)),
+    leaderboard: async () => (await rpc("leaderboard")).map(normBoard),
+    shopItems: () => rows(sb.from("shop_items").select("*").order("sort")),
+    inventoryOf: user => rows(sb.from("inventory").select("item_id,qty,equipped").eq("user_id", user).gt("qty", 0)),
+    profileOf: async user => (await rows(sb.from("profiles").select("id,pseudo,cash,bankruptcies").eq("id", user).maybeSingle())) ?? null,
+    buyItem: id => rpc("buy_item", { p_item: id }),
+    sellItem: id => rpc("sell_item", { p_item: id }),
+    equipItem: id => rpc("equip_item", { p_item: id }),
+    unequip: category => rpc("unequip", { p_category: category }),
+    useBonus: id => rpc("use_bonus", { p_item: id }),
     onChange(cb) {
       const ch = sb.channel("wikibourse")
         .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, cb)
         .on("postgres_changes", { event: "*", schema: "public", table: "bets", filter: `user_id=eq.${uid}` }, cb)
+        .on("postgres_changes", { event: "*", schema: "public", table: "inventory", filter: `user_id=eq.${uid}` }, cb)
         .subscribe();
       return () => sb.removeChannel(ch);
     },

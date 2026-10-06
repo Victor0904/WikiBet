@@ -1,21 +1,18 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, lazy, Suspense } from "react";
 import data from "./pageviews.json";
 import { createEngine, tradeValue, liqPrice, LEVS, BK_LIMIT, CAP0, EPOCH, CYCLE_MS } from "./engine.js";
 import { connect } from "./api.js";
 import { TradeChart, PositionChart, Spark } from "./charts.jsx";
+import { nf0, nf2, W, sW, clock, HOME_NAMES, THEMES, DEFAULT_ACCENT } from "./format.js";
+const QG = lazy(() => import("./QG.jsx")); // Three.js n'est chargé qu'à l'ouverture du QG
 
 /* ===== Formats ===== */
-const nf0 = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
-const nf2 = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const W = v => nf0.format(Math.round(v)) + " W";
-const sW = v => (v >= 0 ? "+" : "−") + W(Math.abs(v));
 const pct = v => (v > 0 ? "+" : v < 0 ? "−" : "") + nf2.format(Math.abs(v * 100)) + " %";
 const cls = v => v > 1e-9 ? "up" : v < -1e-9 ? "down" : "flat";
 const hhmm = t => { const m = 540 + t; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0") };
 // Une séance se nomme par son heure de début réelle (« séance de 14:32 »), plus parlante que son numéro.
 const sessName = k => { const d = new Date(EPOCH + k * CYCLE_MS), t = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   return d.toDateString() === new Date().toDateString() ? `séance de ${t}` : `séance du ${d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} à ${t}` };
-const clock = ms => new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 const STREAM_H = { "15": "15 min", "60": "1 h", live: "fin du live" };
 const mmss = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0") };
 
@@ -66,10 +63,16 @@ function Game({ api, engine }) {
   const say = useCallback((text, tone) => { setToast({ text, tone, at: Date.now() }) }, []);
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 2600); return () => clearTimeout(id) }, [toast]);
 
+  const [catalog, setCatalog] = useState([]), [inv, setInv] = useState({}), [rain, setRain] = useState(0), [visit, setVisit] = useState(null);
+  useEffect(() => { api.shopItems().then(setCatalog).catch(() => {}) }, [api]);
+  const known = useRef(null); // statut de chaque pari au chargement précédent, pour fêter les gains
   const refresh = useCallback(async () => {
     try {
-      const [m, b, l] = await Promise.all([api.me(), api.myBets(s.k - 30), api.leaderboard()]);
-      setMe(m); setBets(b); setBoard(l);
+      const [m, b, l, i] = await Promise.all([api.me(), api.myBets(s.k - 30), api.leaderboard(), api.inventoryOf(api.uid).catch(() => [])]);
+      const prev = known.current, won = prev ? b.filter(x => x.status === "won" && prev.get(x.id) === "open") : [];
+      known.current = new Map(b.map(x => [x.id, x.status]));
+      setMe(m); setBets(b); setBoard(l); setInv(Object.fromEntries(i.map(r => [r.item_id, r])));
+      if (won.length) { setToast({ text: `Gagné : ${sW(won.reduce((a, x) => a + x.payout - x.stake, 0))}`, tone: "up", at: Date.now() }); setRain(Date.now()) }
     } catch (e) { say(e.message, "down") }
   }, [api, s.k, say]);
   useEffect(() => { refresh(); return api.onChange(refresh) }, [api, refresh]);
@@ -95,6 +98,17 @@ function Game({ api, engine }) {
 
   const run = async (fn, ok) => { try { const r = await fn(); if (ok) say(ok(r), "up"); await refresh(); return r } catch (e) { say(e.message, "down") } };
   const open = bets.filter(b => b.status === "open");
+  const equipped = cat => catalog.find(i => i.category === cat && inv[i.id]?.equipped);
+  const accent = THEMES[equipped("theme")?.id] ?? DEFAULT_ACCENT, myTitle = equipped("title")?.name, effect = equipped("effect")?.id;
+  useEffect(() => { document.documentElement.style.setProperty("--accent", accent) }, [accent]);
+  const openStake = open.reduce((a, b) => a + b.stake, 0);
+  const objectsValue = catalog.filter(i => i.kind !== "bonus" && (inv[i.id]?.qty ?? 0) > 0).reduce((a, i) => a + Math.floor(i.price * .6), 0);
+  const positions = open.filter(b => b.kind === "trade" || b.kind === "stream");
+  const pnl = positions.length ? Math.round(positions.reduce((a, b) => a + (b.kind === "trade" ? liveTrade(engine, b, s) : liveStream(b, byLogin[b.login], now)).value - b.stake, 0)) : null;
+  const visitQG = async row => {
+    if (row.id === me.id) { setVisit(null); setTab("qg"); return }
+    try { const rows = await api.inventoryOf(row.id); setVisit({ row, inv: Object.fromEntries(rows.map(r => [r.item_id, r])) }); setTab("qg") } catch (e) { say(e.message, "down") }
+  };
 
   if (me === undefined) return <div className="center"><p className="muted">Chargement…</p></div>;
   if (me === null) return <Onboarding api={api} onDone={refresh} />;
@@ -104,7 +118,7 @@ function Game({ api, engine }) {
       <header className="top">
         <span className="logo">wiki<b>·</b>bourse</span>
         {api.mode === "demo" && <span className="tag">démo locale</span>}
-        <span className="me">{me.pseudo}</span>
+        <span className="me">{me.pseudo}{myTitle && <small>{myTitle}</small>}</span>
         <span className="cash mono">{W(me.cash)}</span>
       </header>
 
@@ -119,14 +133,21 @@ function Game({ api, engine }) {
 
         <main className="main">
           <nav className="tabs" aria-label="Sections">
-            {[["market", "Marché"], ["streams", "Streamers"], ["duels", "Duels"], ["history", "Historique"], ["board", "Classement"]].map(([k, l]) =>
+            {[["market", "Marché"], ["streams", "Streamers"], ["duels", "Duels"], ["qg", "QG"], ["history", "Historique"], ["board", "Classement"]].map(([k, l]) =>
               <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}>{l}</button>)}
           </nav>
           {tab === "market" && <Market engine={engine} s={s} bets={open} onPick={(tk, dir) => setTicket({ kind: "trade", tk, dir })} />}
           {tab === "streams" && <Streams streams={streams} markets={markets} mode={api.mode} bets={open} now={now} onPick={(market, side) => setTicket({ kind: "question", market, side })} />}
           {tab === "duels" && <Duels engine={engine} s={s} onPick={(duel, side) => setTicket({ kind: "duel", duel, side })} />}
           {tab === "history" && <History engine={engine} byLogin={byLogin} bets={bets.filter(b => b.status !== "open")} />}
-          {tab === "board" && <Board board={board} me={me} open={open} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} />}
+          {tab === "board" && <Board board={board} me={me} open={open} onVisit={visitQG} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} />}
+          {tab === "qg" && <Suspense fallback={<p className="muted pad">Chargement du QG…</p>}>
+            {visit
+              ? <QG api={api} catalog={catalog} inv={visit.inv} owner={visit.row} self={false} patrimoine={visit.row.patrimoine} pnl={null}
+                  accent={THEMES[catalog.find(i => i.category === "theme" && visit.inv[i.id]?.equipped)?.id] ?? DEFAULT_ACCENT} onBack={() => setVisit(null)} />
+              : <QG api={api} catalog={catalog} inv={inv} me={me} owner={{ pseudo: me.pseudo, title: myTitle }} self patrimoine={me.cash + openStake + objectsValue}
+                  openStake={openStake} pnl={pnl} accent={accent} act={run} />}
+          </Suspense>}
           <p className="fine">
             Séances rejouées sur les vues réelles de Wikipédia en français (API Wikimedia, du {engine.dateOf(0).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" })} au {engine.dateOf(engine.END).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}, licence CC0).
             Les clôtures et les duels sont réels. Le mouvement minute par minute entre deux clôtures est simulé, identique pour tous les joueurs. Monnaie fictive, impossible à acheter.
@@ -145,6 +166,7 @@ function Game({ api, engine }) {
           if (r) setTicket(null);
         }} />}
       {toast && <div className={"toast " + (toast.tone || "")} role="status">{toast.text}</div>}
+      {effect && <Rain kind={effect} at={rain} />}
     </div>
   );
 }
@@ -417,25 +439,39 @@ function History({ engine, byLogin, bets }) {
   );
 }
 
-function Board({ board, me, open, onRestart }) {
+function Board({ board, me, open, onRestart, onVisit }) {
   const total = me.cash + open.reduce((a, b) => a + b.stake, 0);
   return (
     <section>
       <div className="board">
         {board.map((p, i) => (
-          <div key={p.id} className={"brow" + (p.id === me.id ? " me" : "")}>
+          <button type="button" key={p.id} className={"brow" + (p.id === me.id ? " me" : "")} onClick={() => onVisit(p)} aria-label={`Voir le QG de ${p.pseudo}`}>
             <span className="rk mono">{i + 1}</span>
-            <span><b>{p.pseudo}</b>{p.bankruptcies > 0 && <small>{p.bankruptcies} faillite{p.bankruptcies > 1 ? "s" : ""}</small>}</span>
-            <span className="r mono">{W(p.cash)}</span>
-          </div>
+            <span><b>{p.pseudo}</b><small>{[p.title, HOME_NAMES[p.home ?? 0], p.bankruptcies > 0 && `${p.bankruptcies} faillite${p.bankruptcies > 1 ? "s" : ""}`].filter(Boolean).join(" · ")}</small></span>
+            <span className="r mono">{W(p.patrimoine ?? p.cash)}<small>solde {W(p.cash)}</small></span>
+          </button>
         ))}
       </div>
       <div className="panel bk">
-        <p><b>Faillite</b> Sous {W(BK_LIMIT)} (solde et mises en cours), tu peux repartir à {W(CAP0)}. Le compteur s'affiche dans le classement.</p>
+        <p><b>Faillite</b> Sous {W(BK_LIMIT)} (solde et mises en cours), tu peux repartir à {W(CAP0)}. Tes objets restent à toi. Le compteur s'affiche dans le classement.</p>
         <button type="button" className="btn" disabled={total >= BK_LIMIT} onClick={onRestart}>Repartir</button>
       </div>
-      <p className="fine">Salaire de 500 W à la fin de chaque séance où tu as parié. Classement au solde disponible.</p>
+      <p className="fine">Classement au patrimoine : solde, mises en cours et 60 % du prix des objets du QG. Touche un joueur pour visiter son QG. Salaire de 500 W à la fin de chaque séance où tu as parié.</p>
     </section>
+  );
+}
+
+// Pluie de confettis ou de billets quand un pari est gagné (cosmétique « effet de victoire »).
+function Rain({ kind, at }) {
+  const [on, setOn] = useState(false);
+  useEffect(() => { if (!at) return; setOn(true); const id = setTimeout(() => setOn(false), 2800); return () => clearTimeout(id) }, [at]);
+  if (!on) return null;
+  const bills = kind === "effet_billets";
+  return (
+    <div className="rain" aria-hidden="true">
+      {Array.from({ length: 36 }, (_, i) => <i key={i} className={bills ? "bill" : "conf"}
+        style={{ left: `${(i * 37) % 100}%`, animationDelay: `${(i % 9) * .13}s`, background: bills ? undefined : ["var(--accent)", "var(--up)", "#4be0ff", "#f472b6"][i % 4] }}>{bills ? "W" : ""}</i>)}
+    </div>
   );
 }
 

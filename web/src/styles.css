@@ -168,6 +168,44 @@ h2 .muted { font: 400 12.5px var(--f-body) }
 .bk p { margin: 0; font-size: 13.5px; color: var(--muted) }
 .bk p b { display: block; color: var(--ink); font-weight: 600 }
 
+/* QG et boutique */
+.qg { display: flex; flex-direction: column; gap: 10px }
+.qg-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px }
+.qg-head h2 { font-size: 22px; justify-content: flex-start; gap: 10px }
+.qg-head .big-num { font-size: 20px; font-weight: 600 }
+.qg-head small { font-size: 12px; color: var(--faint) }
+.title-tag, .accent { color: var(--accent); margin: 2px 0 0; font-size: 13px; font-weight: 600 }
+.small-btn { padding: 5px 10px; font-size: 13px; margin-bottom: 6px }
+.qg-scene { position: relative; height: 340px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 35%, #1a2036 0%, var(--panel) 70%) }
+.qg-scene canvas { display: block; width: 100% !important; height: 100% !important; touch-action: pan-y }
+.qg-badges { display: flex; flex-wrap: wrap; gap: 6px }
+.badge { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px }
+.badge.done { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600 }
+.next-home { display: flex; justify-content: space-between; align-items: center; gap: 12px }
+.next-home > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px }
+.next-home p { margin: 0 }
+.next-home .bar { height: 4px; background: var(--panel2); border-radius: 2px; overflow: hidden }
+.next-home .bar i { display: block; height: 100%; background: var(--accent) }
+.shop { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px }
+.item { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0 }
+.item.owned { border-color: var(--accent) }
+.item.locked { opacity: .55 }
+.item-h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline }
+.item-h b { font: 700 16px var(--f-cond) }
+.item p { margin: 0 }
+.item .btn { margin-top: auto }
+.item-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto }
+.item-acts .btn { flex: 1; margin: 0 }
+.me small { display: block; font-size: 11px; color: var(--accent); text-align: right }
+button.brow { width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); color: inherit; font: inherit; cursor: pointer }
+button.brow:hover { background: var(--panel2) }
+.brow .r small { display: block; font-size: 11px; color: var(--faint) }
+.rain { position: fixed; inset: 0; pointer-events: none; z-index: 70; overflow: hidden }
+.rain i { position: absolute; top: -30px; width: 8px; height: 13px; border-radius: 2px; animation: fall 2.4s linear forwards }
+.rain i.bill { width: 30px; height: 16px; background: #1fcb8b; color: #04140d; font: 700 10px/16px var(--f-mono); text-align: center }
+@keyframes fall { to { transform: translateY(110vh) rotate(520deg) } }
+
 /* Boutons, ticket d'ordre */
 .btn { border: 1px solid var(--line); background: var(--panel2); border-radius: 8px; padding: 9px 14px; font-weight: 600; font-size: 14px }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink) }
