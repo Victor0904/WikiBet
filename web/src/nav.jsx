@@ -10,8 +10,10 @@ export const Icon = ({ name }) => <svg viewBox="0 0 24 24" fill="none" stroke="c
 
 export function Dock({ tab, setTab, badge }) {
   const items = [["market", "Marché"], ["live", "Live"], ["positions", "Positions"], ["qg", "QG"], ["more", "Plus"]];
+  const i = items.findIndex(([k]) => k === tab);
   return (
     <nav className="dock" aria-label="Sections">
+      {i >= 0 && <span className="lens" style={{ "--i": i }} aria-hidden="true" />}
       {items.map(([k, l]) => (
         <button key={k} type="button" aria-current={tab === k ? "page" : undefined} onClick={() => setTab(k)}>
           <Icon name={k} /><span>{l}</span>
@@ -24,7 +26,8 @@ export function Dock({ tab, setTab, badge }) {
 
 export function Segmented({ value, onChange, options, label }) {
   return (
-    <div className="seg top-seg" role="tablist" aria-label={label}>
+    <div className="seg top-seg" role="tablist" aria-label={label} style={{ "--n": options.length }}>
+      <span className="lens" style={{ "--i": Math.max(0, options.findIndex(([k]) => k === value)) }} aria-hidden="true" />
       {options.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={value === k} aria-pressed={value === k} onClick={() => onChange(k)}>{l}</button>)}
     </div>
   );

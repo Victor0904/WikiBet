@@ -18,9 +18,10 @@ export async function freshDb() {
   return db;
 }
 
-// Place l'horloge du jeu dans la séance k, à la minute de jeu t (au milieu de la minute).
+// Place l'horloge du jeu dans la séance k, au tout début de la minute de jeu t : il reste ainsi plus d'une seconde
+// avant la minute suivante (une minute de jeu dure environ 1,18 s), assez pour les appels lents de PGlite.
 export async function setClock(db, k, t) {
-  const off = t >= T ? PLAY_MS + 30_000 : Math.floor((t + 0.5) * PLAY_MS / T);
+  const off = t >= T ? PLAY_MS + 30_000 : Math.ceil((t + 0.02) * PLAY_MS / T);
   const { rows: [{ now }] } = await db.query("select extract(epoch from now()) * 1000 as now");
   await db.query("update game_config set epoch = to_timestamp($1 / 1000.0)", [Number(now) - k * CYCLE_MS - off]);
 }

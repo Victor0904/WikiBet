@@ -21,7 +21,8 @@ export function MoreMenu({ go, me, title }) {
 }
 
 const STEPS = [
-  ["Le principe", "Chaque article Wikipédia, chaque live Twitch et chaque jeu Steam a un chiffre qui bouge : ses vues, ses spectateurs ou ses joueurs. Tu paries sur ce chiffre avec des W, une monnaie fictive. Tu commences avec " + CAP0_TXT + "."],
+  ["Le principe", "Tu trades avec des W, une monnaie fictive, sur des chiffres réels : le prix des cryptos, les vues de Wikipédia, les spectateurs Twitch, les joueurs Steam. Tu commences avec " + CAP0_TXT + "."],
+  ["La crypto, le marché principal", "Bitcoin, Ethereum, Solana… au vrai prix de Coinbase, en direct, 24 h/24. Prends position à la hausse ou à la baisse avec un levier. Le prix retenu est celui du serveur au moment de l'ordre. Des frais de 0,1 % du montant engagé sont prélevés à l'ouverture et à la clôture. La position reste ouverte jusqu'à ce que tu la clôtures, ou jusqu'à la liquidation."],
   ["Les séances du Marché", "Le Marché Wikipédia vit par séances : 10 minutes de jeu, 1 minute de pause, en continu. Tout le monde voit les mêmes cours au même moment. L'horloge « marché » (9:00 → 17:30) est un décor : une séance rejoue une vraie journée de vues en 10 minutes."],
   ["Prendre position", "▲ si tu penses que le cours va monter, ▼ s'il va baisser. Ton gain suit la variation, multipliée par le levier : à ×5, +2 % de cours font +10 % sur ta mise. Clôture quand tu veux, sinon la position se ferme au coup de sifflet final. Si elle perd toute sa mise, elle est liquidée."],
   ["Les duels", "Deux articles d'audience proche : lequel fera le plus de vues ? Tu paries à cote fixe, réglé à la fin de la séance sur les vraies vues du jour."],
@@ -71,6 +72,7 @@ export function Legal({ engine, onBack }) {
     <section className="legal">
       <SubHeader title="Sources des données" onBack={onBack} />
       <div className="panel prose">
+        <p><b>Crypto.</b> Prix réels de Coinbase (paires en euros), en direct. Le prix d'un ordre est relevé par le serveur au moment où il le reçoit ; la liquidation est vérifiée chaque minute sur les vrais plus hauts et plus bas.</p>
         <p><b>Marché Wikipédia.</b> Vues quotidiennes réelles de Wikipédia en français (API Wikimedia Pageviews, du {d(0)} au {d(engine.END, true)}, licence CC0). Les clôtures et les duels sont réels. Le mouvement minute par minute entre deux clôtures est simulé, identique pour tous les joueurs.</p>
         <p><b>Twitch.</b> Spectateurs réels des lives francophones (API Twitch), relevés chaque minute. Twitch met ses chiffres à jour toutes les 1 à 3 minutes.</p>
         <p><b>Steam.</b> Joueurs connectés réels (API publique de Steam), relevés chaque minute.</p>

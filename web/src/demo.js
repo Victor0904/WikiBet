@@ -10,7 +10,7 @@ import { normBet, normStream, normMarket, normBoard } from "./api.js";
 const UID = "00000000-0000-4000-8000-000000000001";
 
 export async function demoApi(engine) {
-  const db = new PGlite("idb://wikibourse-demo-4"); // changer le numéro quand la migration change
+  const db = new PGlite("idb://wikibourse-demo-5"); // changer le numéro quand la migration change
   const ready = (await db.query("select to_regclass('public.bets') is not null as ok")).rows[0].ok;
   if (!ready) {
     await db.exec(stub);
@@ -38,6 +38,15 @@ export async function demoApi(engine) {
     streamBoard: async () => (await all("select * from stream_board(120)")).map(normStream),
     openMarkets: async () => (await all("select * from open_markets()")).map(normMarket),
     betQuestion: ({ market, side, stake }) => act("select * from bet_question($1, $2, $3)", [market, side, stake]),
+    // Démo : pas de serveur, le prix est relevé chez Coinbase par le navigateur.
+    cryptoOrder: async body => {
+      const [{ pair }] = body.action === "open" ? await all("select pair from crypto_assets where sym = $1", [body.sym])
+        : await all("select a.pair from bets b join crypto_assets a on a.sym = b.sym where b.id = $1", [body.id]);
+      const px = +(await (await fetch(`https://api.exchange.coinbase.com/products/${pair}/ticker`)).json()).price;
+      return normBet(body.action === "open"
+        ? await act("select * from crypto_open($1, $2, $3, $4, $5, $6)", [UID, body.sym, body.dir, body.lev, body.stake, px])
+        : await act("select * from crypto_close($1, $2, $3)", [UID, body.id, px]));
+    },
     restart: () => act("select * from restart()"),
     settle: async () => (await all("select settle() as n"))[0].n,
     myBets: async min => (await all("select * from bets where user_id = $1 and (status = 'open' or session >= $2) order by id desc", [UID, min])).map(normBet),

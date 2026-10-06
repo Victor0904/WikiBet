@@ -76,6 +76,22 @@ h2 .muted { font: 400 12.5px var(--f-body) }
 .tchart svg, .spark { display: block; width: 100%; height: 100%; overflow: visible }
 .dot { position: absolute; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--panel2); transform: translate(-50%, -50%) }
 
+/* Crypto */
+.coin-icon { flex: none; display: grid; place-items: center; border-radius: 50%; color: #fff; font: 700 11px var(--f-mono); letter-spacing: -.02em; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .18) }
+.as-link { background: none; border: 0; padding: 0; color: inherit; text-align: left; cursor: pointer }
+.pulse.off { background: var(--faint); animation: none }
+.detail { gap: 10px }
+.detail-name { font: 700 22px var(--f-cond); display: block }
+.detail-price { display: flex; align-items: baseline; justify-content: space-between; gap: 10px }
+.detail-price b { font-size: 28px; font-weight: 600 }
+.candles { position: relative; height: 240px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 70px 22px 8px }
+.candles svg { width: 100%; height: 100%; display: block; overflow: visible }
+.candles.empty { display: grid; place-items: center; padding: 0 }
+.candles .ax { position: absolute; font-size: 10.5px; color: var(--faint); right: 8px }
+.candles .ax-hi { top: 8px } .candles .ax-lo { bottom: 24px } /* pas « top » : classe déjà prise par l'en-tête */
+.candles .ax.last { color: var(--accent-ink); background: var(--accent); padding: 1px 4px; border-radius: 4px; transform: translateY(-50%) } /* aligné sur la zone du graphique (marges 10 px en haut, 22 px en bas) */
+.candles .ax.t0 { left: 8px; right: auto; bottom: 4px } .candles .ax.t1 { right: 70px; bottom: 4px }
+
 /* Détails d'un pari et barre de temps */
 .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 12px; margin: 2px 0 0 }
 .facts div { min-width: 0 }
@@ -250,6 +266,66 @@ button.brow:hover { background: var(--panel2) }
 @keyframes drop { from { transform: translate(-50%, -10px); opacity: 0 } }
 @keyframes rise { from { transform: translate(-50%, 10px); opacity: 0 } }
 @keyframes up { from { transform: translateY(24px); opacity: .5 } }
+
+/* ===== Animations et liquid glass ===== */
+:root { --spring: cubic-bezier(.34, 1.45, .55, 1); --ease-out: cubic-bezier(.2, .8, .2, 1) }
+
+/* Barre du bas : entrée, reflet qui balaie le verre, lentille qui glisse sous l'onglet actif */
+.dock { animation: dock-in .7s var(--spring) both; overflow: hidden; isolation: isolate }
+.dock::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, .10) 45%, rgba(255, 255, 255, .02) 55%, transparent 70%) 0 0 / 250% 100%;
+  animation: sheen 9s ease-in-out infinite }
+.dock::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
+  background: radial-gradient(120% 60% at 50% -10%, rgba(255, 255, 255, .18), transparent 60%) }
+.dock button { z-index: 1; background: none !important; box-shadow: none !important; transition: color .25s, transform .25s var(--spring) }
+.dock button svg { transition: transform .35s var(--spring), filter .3s }
+.dock button[aria-current="page"] svg { transform: translateY(-1px) scale(1.08); filter: drop-shadow(0 2px 6px color-mix(in srgb, var(--accent) 55%, transparent)) }
+.lens { position: absolute; z-index: 0; pointer-events: none; border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .24), rgba(255, 255, 255, .07) 60%, rgba(255, 255, 255, .12));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), inset 0 -1px 1px rgba(255, 255, 255, .1), inset 0 0 12px rgba(255, 255, 255, .06), 0 6px 18px -6px rgba(0, 0, 0, .55);
+  -webkit-backdrop-filter: blur(2px) saturate(220%) brightness(1.15); backdrop-filter: blur(2px) saturate(220%) brightness(1.15);
+  transition: transform .55s var(--spring) }
+.dock .lens { top: 6px; bottom: 6px; left: 6px; width: calc((100% - 12px - 8px) / 5); transform: translateX(calc(var(--i) * (100% + 2px))) }
+
+/* Contrôles segmentés : même lentille */
+.top-seg { position: relative; isolation: isolate }
+.top-seg .lens { top: 4px; bottom: 4px; left: 4px; border-radius: 9px; width: calc((100% - 8px - (var(--n) - 1) * 4px) / var(--n)); transform: translateX(calc(var(--i) * (100% + 4px))) }
+.top-seg button { position: relative; z-index: 1; background: none !important; box-shadow: none !important; transition: color .25s }
+
+/* Contenu : fondu glissé au changement d'onglet */
+.view-anim { animation: view-in .32s var(--ease-out) both }
+
+/* Feuilles : montée en ressort, fond qui se fond */
+.scrim { animation: fade-in .25s ease-out both; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px) }
+.sheet { animation: sheet-in .5s var(--spring) both }
+@media (min-width: 1024px) { .sheet { animation-name: pop-in } }
+
+/* Appui : léger enfoncement */
+button { transition: transform .18s var(--spring), background-color .2s, border-color .2s, color .2s, opacity .2s }
+button:active:not(:disabled) { transform: scale(.96) }
+.dock button:active { transform: scale(.9) }
+.mrow, .qcard, .item, .pos { transition: border-color .3s, box-shadow .3s, transform .3s var(--ease-out) }
+@media (hover: hover) { .qcard:hover, .item:hover, .pos:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -14px rgba(0, 0, 0, .8) } }
+
+/* Toast en verre, qui rebondit */
+.toast { background: rgba(22, 25, 34, .7); -webkit-backdrop-filter: blur(18px) saturate(170%); backdrop-filter: blur(18px) saturate(170%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 14px 34px -12px rgba(0, 0, 0, .8); animation: toast-in .5s var(--spring) both }
+
+/* Prix crypto qui change : flash bref */
+.flash { border-radius: 4px; padding: 0 3px; margin-right: -3px }
+.flash.f-up { animation: flash-up .9s ease-out }
+.flash.f-down { animation: flash-down .9s ease-out }
+
+@keyframes dock-in { from { transform: translate(-50%, 140%); opacity: 0 } }
+@keyframes sheen { 0%, 100% { background-position: 120% 0 } 50% { background-position: -20% 0 } }
+@keyframes view-in { from { opacity: 0; transform: translateY(8px) } }
+@keyframes fade-in { from { opacity: 0 } }
+@keyframes sheet-in { from { transform: translateY(100%) } }
+@keyframes pop-in { from { transform: translateY(24px) scale(.96); opacity: 0 } }
+@keyframes toast-in { from { transform: translate(-50%, 30px) scale(.9); opacity: 0 } }
+@keyframes flash-up { from { background: rgba(31, 203, 139, .35) } }
+@keyframes flash-down { from { background: rgba(240, 75, 92, .35) } }
+
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }
 
 /* ===== Mobile d'abord : en-tête et séance compacts, barre d'onglets en verre ===== */
@@ -343,3 +419,9 @@ button.brow:hover { background: var(--panel2) }
   .scrim { align-items: center }
   .sheet { border-radius: 14px; border-bottom: 1px solid var(--line) }
 }
+
+/* Sous-onglet : le contenu sous le contrôle segmenté se fond, la lentille glisse sans être recréée */
+.top-seg ~ section, .top-seg ~ .empty-state, .top-seg ~ .history, .top-seg ~ .pos-list, .top-seg ~ .duels { animation: view-in .3s var(--ease-out) both }
+
+/* Icône crypto : la règle générale .who > span (colonne) ne doit pas la déformer */
+.who > .coin-icon { display: grid; place-items: center; flex-direction: initial }

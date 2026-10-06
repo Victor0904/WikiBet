@@ -38,6 +38,13 @@ export async function connect(engine) {
     streamBoard: async () => (await rpc("stream_board", { p_minutes: 120 })).map(normStream),
     openMarkets: async () => (await rpc("open_markets")).map(normMarket),
     betQuestion: ({ market, side, stake }) => rpc("bet_question", { p_market: market, p_side: side, p_stake: stake }),
+    // Ordres crypto : la fonction serveur lit le vrai prix chez Coinbase au moment de l'ordre.
+    cryptoOrder: async body => {
+      const { data, error } = await sb.functions.invoke("crypto", { body });
+      if (error) { let msg = error.message; try { msg = (await error.context.json()).error ?? msg } catch { } throw new Error(msg) }
+      if (data?.error) throw new Error(data.error);
+      return normBet(data);
+    },
     restart: () => rpc("restart"),
     settle: () => rpc("settle"),
     myBets: async minSession => (await rows(sb.from("bets").select("*").eq("user_id", uid).or(`status.eq.open,session.gte.${minSession}`).order("id", { ascending: false }))).map(normBet),

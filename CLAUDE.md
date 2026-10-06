@@ -31,6 +31,14 @@ Deux versions cohabitent :
 - `src/api.js` : Supabase (connexion anonyme + pseudo, temps réel sur `profiles` et sur mes `bets`, décalage d'horloge corrigé avec `server_time()`). `src/demo.js` : même interface sur PGlite.
 - `tests/` : `npm test` lance la vraie migration dans PGlite (horloge, cours, liquidation, règlement, RLS, pause).
 - Pas de bots : le classement réunit les vrais joueurs.
+- **Marché Crypto, le marché principal** (choisi par Victor : « le plus vrai et réel ») : migration `20261008000000_crypto.sql`, fonction `supabase/functions/crypto`, front `src/crypto.js` et `src/CryptoUI.jsx`.
+  - Prix réels de Coinbase, paires en euros, 14 actifs (BTC, ETH, SOL, XRP, DOGE, ADA, AVAX, LINK, DOT, LTC, SHIB, UNI, ATOM, BCH).
+  - **Le prix d'un ordre vient du serveur**, jamais du joueur. La fonction `crypto` (actions `open` et `close`, avec le jeton du joueur) lit le ticker Coinbase, puis appelle `crypto_open` / `crypto_close`, que seule la clé serveur peut exécuter.
+  - Frais de 0,1 % du montant engagé (mise × levier) à l'ouverture et à la clôture, d'où un avantage maison. Pas de clôture automatique.
+  - Liquidation vérifiée chaque minute (action `poll` lancée par pg_cron) sur les vrais plus bas et plus hauts des bougies d'une minute (`crypto_candles`, 2 jours gardés).
+  - L'écran lit les prix en direct par le WebSocket public Coinbase, rafraîchi toutes les 0,5 s, et les bougies par l'API REST. Fiche détaillée avec bougies de 1 min à 1 h.
+  - En démo, le navigateur relève le prix lui-même.
+  - Les simulateurs de trading en monnaie fictive sont un format courant ; rester sans achat de W, sans lots de valeur et sans promotion de courtier.
 - **Marché Steam** (migration `20261007120000_steam.sql`, fonction `supabase/functions/steam-poll`) : joueurs connectés sur 29 jeux, relevés chaque minute par l'API publique de Steam, sans clé. Un jeu est un sujet `steam:<appid>` dans `streamers` / `stream_ticks`, donc les questions Oui / Non s'appliquent telles quelles (onglet Steam = le même écran que Streamers, avec la source `steam`). `streamers_to_watch()` et le garde-fou de `twitch-poll` ignorent `steam:%`. Le seuil des questions est arrondi selon l'écart visé (puissance de 10 sous cet écart) et non plus selon la taille du nombre : sinon, 1,3 M de joueurs donnait un seuil 4 % au-dessus. Déploiement : `npx supabase functions deploy steam-poll --use-api`, puis `npx supabase db push`, lançables depuis cette machine.
 - **QG du trader** (migration `20261007000000_qg.sql`, `src/QG.jsx`, `src/qg/scene.js`) : la boutique où dépenser ses W, choisie par Victor pour donner envie de dépenser.
   - Catalogue dans `shop_items`, inscrit dans la migration : 4 logements par paliers (studio, open space, loft, penthouse ; la chambre est offerte), 18 objets de déco, des cosmétiques (thème de couleur, titre sous le pseudo, effet de victoire, un seul équipé par catégorie) et 3 bonus consommables.
@@ -52,6 +60,12 @@ Noir bleuté `#08090D`, panneaux `#0F1117`/`#161922`, filets `#222634`. Gain `#1
 - « Comment jouer » s'ouvre tout seul à la première visite (clé `wb-howto` dans le localStorage).
 - **Rien ne doit bouger sous le doigt.** L'ordre du marché est figé au coup d'envoi ou au changement de tri, avec un bouton « Retrier ». Celui du Live est figé par échéance. Seuls les prix se mettent à jour sur place.
 - Sur mobile, une bande compacte des paris en cours s'affiche en haut du Marché et du Live. Sur grand écran, la colonne des positions reste à gauche.
+- Animations (`/* ===== Animations et liquid glass ===== */` dans styles.css) :
+  - une « lentille » de verre glisse avec un ressort sous l'onglet actif, dans la barre du bas et dans les contrôles segmentés. Le contrôle segmenté ne doit pas être recréé au changement de sous-onglet, sinon la lentille saute ;
+  - un reflet balaie la barre en verre ;
+  - les feuilles montent en ressort, et le contenu fait un fondu glissé au changement d'onglet ;
+  - les boutons s'enfoncent à l'appui, et les prix crypto flashent vert ou rouge quand ils changent ;
+  - tout est coupé par `prefers-reduced-motion`.
 - Montants avec espace insécable (`W()` dans `src/format.js`).
 
 Les graphiques suivent le skill dataviz : traits de 2 px, pointillé pour le cours d'entrée, zone verte du côté gagnant et rouge du côté perdant.
