@@ -85,7 +85,8 @@ h2 .muted { font: 400 12.5px var(--f-body) }
 
 /* Onglets et filtres */
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 12px; overflow-x: auto; scrollbar-width: none }
-.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 12px; font-weight: 600; font-size: 14px; color: var(--muted); white-space: nowrap }
+.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 9px; font-weight: 600; font-size: 13.5px; color: var(--muted); white-space: nowrap }
+@media (min-width: 420px) { .tabs button { padding: 10px 12px; font-size: 14px } }
 .tabs button[aria-pressed="true"] { color: var(--ink); border-bottom-color: var(--accent) }
 .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-bottom: 10px }
 .chips button { flex: none; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 11px; font-size: 13px; color: var(--muted) }
