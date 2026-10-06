@@ -31,7 +31,7 @@ export async function demoApi(engine) {
     now: () => Date.now(),
     me: async () => (await all("select * from profiles where id = $1", [UID]))[0] ?? null,
     createProfile: p => act("select * from create_profile($1)", [p]),
-    openTrade: ({ tk, dir, lev, stake, horizon }) => act("select * from open_trade($1, $2, $3, $4, $5)", [tk, dir, lev, stake, horizon]),
+    openTrade: ({ tk, dir, lev, stake }) => act("select * from open_trade($1, $2, $3, $4, 'close')", [tk, dir, lev, stake]),
     closeTrade: id => act("select * from close_trade($1)", [id]),
     betDuel: ({ duel, side, stake }) => act("select * from bet_duel($1, $2, $3)", [duel, side, stake]),
     openStream: ({ login, dir, lev, stake, horizon }) => act("select * from open_stream($1, $2, $3, $4, $5)", [login, dir, lev, stake, horizon]),

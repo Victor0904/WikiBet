@@ -9,13 +9,11 @@ export const CYCLE_MS = PLAY_MS + PAUSE_MS;
 export const EPOCH = Date.UTC(2026, 0, 1);    // séance 0
 export const CAP0 = 10000, SALARY = 500, BK_LIMIT = 2000, MARGIN = 0.93;
 export const LEVS = [1, 5, 10];
-export const HORIZONS = { "15": "15 min", "60": "1 h", close: "fin de séance" };
 
 const hashStr = s => { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) } return h >>> 0 };
 const rngOf = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296 };
 const gauss = r => { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v) };
 export const toOdds = p => Math.max(1.08, Math.round(MARGIN / p * 100) / 100);
-export const endTick = (h, t) => h === "close" ? T : Math.min(T, t + +h);
 
 // Valeur d'une position : mise × (1 + levier × sens × variation), jamais sous 0.
 export const tradeValue = (b, px) => Math.max(0, b.stake * (1 + b.lev * (b.dir === "up" ? 1 : -1) * (px / b.entry - 1)));

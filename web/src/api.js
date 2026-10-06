@@ -30,7 +30,7 @@ export async function connect(engine) {
     now: () => Date.now() + offset,
     me: async () => (await rows(sb.from("profiles").select("*").eq("id", uid).maybeSingle())) ?? null,
     createProfile: pseudo => rpc("create_profile", { p_pseudo: pseudo }),
-    openTrade: ({ tk, dir, lev, stake, horizon }) => rpc("open_trade", { p_tk: tk, p_dir: dir, p_lev: lev, p_stake: stake, p_horizon: horizon }),
+    openTrade: ({ tk, dir, lev, stake }) => rpc("open_trade", { p_tk: tk, p_dir: dir, p_lev: lev, p_stake: stake, p_horizon: "close" }), // ouverte jusqu'à la fin de séance
     closeTrade: id => rpc("close_trade", { p_id: id }),
     betDuel: ({ duel, side, stake }) => rpc("bet_duel", { p_duel: duel, p_side: side, p_stake: stake }),
     openStream: ({ login, dir, lev, stake, horizon }) => rpc("open_stream", { p_login: login, p_dir: dir, p_lev: lev, p_stake: stake, p_horizon: horizon }),

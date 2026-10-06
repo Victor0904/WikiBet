@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import data from "./pageviews.json";
-import { createEngine, tradeValue, liqPrice, endTick, LEVS, HORIZONS, BK_LIMIT, CAP0, EPOCH, CYCLE_MS } from "./engine.js";
+import { createEngine, tradeValue, liqPrice, LEVS, BK_LIMIT, CAP0, EPOCH, CYCLE_MS } from "./engine.js";
 import { connect } from "./api.js";
 import { TradeChart, PositionChart, Spark } from "./charts.jsx";
 
@@ -62,7 +62,7 @@ function Game({ api, engine }) {
 
   const [me, setMe] = useState(undefined), [bets, setBets] = useState([]), [board, setBoard] = useState([]);
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
-  const [pref, setPref] = useState({ lev: 5, horizon: "15", shorizon: "15", stake: 500 });
+  const [pref, setPref] = useState({ lev: 5, shorizon: "15", stake: 500 });
   const say = useCallback((text, tone) => { setToast({ text, tone, at: Date.now() }) }, []);
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 2600); return () => clearTimeout(id) }, [toast]);
 
@@ -209,7 +209,7 @@ function TradeCard({ engine, s, b, onClose }) {
       <div className="pos-x mono">
         <span>{hhmm(b.start_tick)} · entrée {nf2.format(b.entry)}</span>
         <span>{st.liquidated ? "liquidée" : `${hhmm(st.upto)} · ${nf2.format(st.px)}`}</span>
-        <span>fin {hhmm(b.end_tick)}</span>
+        <span>fin de séance</span>
       </div>
       {st.due
         ? <p className="muted small">{st.liquidated ? "Liquidée, règlement en cours…" : "Échéance atteinte, règlement en cours…"}</p>
@@ -460,13 +460,12 @@ function Ticket({ engine, s, now, byLogin, me, ticket, pref, setPref, onClose, o
       </div>
       <label>Levier</label>
       <div className="seg" role="group" aria-label="Levier">{LEVS.map(v => <button key={v} type="button" aria-pressed={pref.lev === v} onClick={() => set({ lev: v })}>×{v}</button>)}</div>
-      <label>Échéance</label>
-      <div className="seg" role="group" aria-label="Échéance">{Object.entries(HORIZONS).map(([k, l]) => <button key={k} type="button" aria-pressed={pref.horizon === k} onClick={() => set({ horizon: k })}>{l}</button>)}</div>
+      <p className="muted small">La position reste ouverte jusqu'à ce que tu la clôtures, au plus tard au coup de sifflet final.</p>
       <div className="rows mono">
         <div className="row"><span>Cours actuel</span><b>{nf2.format(px)}</b></div>
         <div className="row"><span>1 % de variation</span><b>±{W(stake * pref.lev / 100)}</b></div>
         <div className="row"><span>Liquidation si le cours atteint</span><b>{nf2.format(liqPrice(b))}</b></div>
-        <div className="row"><span>Fermeture automatique</span><b>{hhmm(endTick(pref.horizon, s.t))}</b></div>
+        <div className="row"><span>Fermeture automatique</span><b>fin de séance, dans {mmss(s.endsAt - now)}</b></div>
       </div>
     </>;
   } else if (isQ) {
@@ -517,7 +516,7 @@ function Ticket({ engine, s, now, byLogin, me, ticket, pref, setPref, onClose, o
     <div className="scrim" onClick={e => e.target === e.currentTarget && onClose()}>
       <form className="sheet" role="dialog" aria-modal="true" aria-label={title} onSubmit={async e => {
         e.preventDefault(); if (!ok) return; setBusy(true); set({ stake });
-        await onSubmit(isTrade ? { tk: ticket.tk, dir, lev: pref.lev, stake, horizon: pref.horizon }
+        await onSubmit(isTrade ? { tk: ticket.tk, dir, lev: pref.lev, stake }
           : isStream ? { login: ticket.login, dir, lev: pref.lev, stake, horizon: pref.shorizon }
           : isQ ? { market: ticket.market.id, side, stake }
           : { duel: ticket.duel.id, side: ticket.side, stake });
