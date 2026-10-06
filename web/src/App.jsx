@@ -64,7 +64,7 @@ function Game({ api, engine }) {
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 2600); return () => clearTimeout(id) }, [toast]);
 
   const [catalog, setCatalog] = useState([]), [inv, setInv] = useState({}), [rain, setRain] = useState(0), [visit, setVisit] = useState(null);
-  useEffect(() => { api.shopItems().then(setCatalog).catch(() => {}) }, [api]);
+  useEffect(() => { if (!catalog.length) api.shopItems().then(setCatalog).catch(() => {}) }, [api, board, catalog.length]); // réessaie à chaque rafraîchissement tant qu'il est vide
   const known = useRef(null); // statut de chaque pari au chargement précédent, pour fêter les gains
   const refresh = useCallback(async () => {
     try {
