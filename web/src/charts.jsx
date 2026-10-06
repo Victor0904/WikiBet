@@ -3,31 +3,37 @@
 const pathD = pts => pts.map(([x, y], k) => `${k ? "L" : "M"}${x.toFixed(2)},${y.toFixed(2)}`).join("");
 const Dot = ({ x, y, h, color }) => <span className="dot" style={{ left: `${x}%`, top: `${y / h * 100}%`, background: color }} />;
 
-// Position : le cours de l'ouverture jusqu'à maintenant, sur toute la fenêtre jusqu'à l'échéance.
-// Pointillé = cours d'entrée ; zone verte du côté gagnant, rouge du côté perdant.
-export function TradeChart({ b, path, upto, h = 64 }) {
-  const a = b.start_tick, z = b.end_tick, n = Math.max(a, Math.min(z, upto));
-  const v = path.slice(a, n + 1), lo = Math.min(b.entry, ...v), r = (Math.max(b.entry, ...v) - lo) || b.entry * .01;
-  const X = i => (i - a) / Math.max(1, z - a) * 100, Y = p => 6 + (1 - (p - lo) / r) * (h - 12), ye = Y(b.entry);
-  const last = v[v.length - 1], win = (b.dir === "up" ? 1 : -1) * (last - b.entry) >= 0, col = win ? "var(--up)" : "var(--down)";
-  const line = pathD(v.map((p, k) => [X(a + k), Y(p)])), area = `${line}L${X(n).toFixed(2)},${ye.toFixed(2)}L0,${ye.toFixed(2)}Z`;
-  const [over, under] = b.dir === "up" ? ["var(--up-soft)", "var(--down-soft)"] : ["var(--down-soft)", "var(--up-soft)"];
-  const id = "c" + b.id;
+// Position : la valeur suivie (cours ou spectateurs) de l'ouverture jusqu'à maintenant, sur toute la fenêtre
+// [x0, x1] jusqu'à l'échéance. Pointillé = valeur d'entrée ; zone verte du côté gagnant, rouge du côté perdant.
+export function PositionChart({ id, entry, dir, pts, x0, x1, h = 64 }) {
+  const v = pts.map(p => p[1]), lo = Math.min(entry, ...v), r = (Math.max(entry, ...v) - lo) || entry * .01;
+  const X = x => (x - x0) / Math.max(1e-9, x1 - x0) * 100, Y = p => 6 + (1 - (p - lo) / r) * (h - 12), ye = Y(entry);
+  const [xn, last] = pts[pts.length - 1], win = (dir === "up" ? 1 : -1) * (last - entry) >= 0, col = win ? "var(--up)" : "var(--down)";
+  const line = pathD(pts.map(([x, p]) => [X(x), Y(p)])), area = `${line}L${X(xn).toFixed(2)},${ye.toFixed(2)}L${X(pts[0][0]).toFixed(2)},${ye.toFixed(2)}Z`;
+  const [over, under] = dir === "up" ? ["var(--up-soft)", "var(--down-soft)"] : ["var(--down-soft)", "var(--up-soft)"];
+  const cid = "c" + id;
   return (
     <div className="tchart" style={{ height: h }}>
       <svg viewBox={`0 0 100 ${h}`} preserveAspectRatio="none" aria-hidden="true">
-        <clipPath id={id + "a"}><rect x="0" y="0" width="100" height={ye} /></clipPath>
-        <clipPath id={id + "b"}><rect x="0" y={ye} width="100" height={h - ye} /></clipPath>
-        <path d={area} fill={over} clipPath={`url(#${id}a)`} />
-        <path d={area} fill={under} clipPath={`url(#${id}b)`} />
+        <clipPath id={cid + "a"}><rect x="0" y="0" width="100" height={ye} /></clipPath>
+        <clipPath id={cid + "b"}><rect x="0" y={ye} width="100" height={h - ye} /></clipPath>
+        <path d={area} fill={over} clipPath={`url(#${cid}a)`} />
+        <path d={area} fill={under} clipPath={`url(#${cid}b)`} />
         <line x1="0" x2="100" y1={ye} y2={ye} stroke="var(--faint)" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
         <path d={line} fill="none" stroke={col} strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       </svg>
-      <Dot x={0} y={ye} h={h} color="var(--muted)" />
-      <Dot x={X(n)} y={Y(last)} h={h} color={col} />
+      <Dot x={X(pts[0][0])} y={ye} h={h} color="var(--muted)" />
+      <Dot x={X(xn)} y={Y(last)} h={h} color={col} />
     </div>
   );
 }
+
+// Position sur un article : minutes de jeu de l'ouverture à l'échéance.
+export const TradeChart = ({ b, path, upto, h }) => {
+  const n = Math.max(b.start_tick, Math.min(b.end_tick, upto)), pts = [];
+  for (let i = b.start_tick; i <= n; i++) pts.push([i, path[i]]);
+  return <PositionChart id={b.id} entry={b.entry} dir={b.dir} pts={pts} x0={b.start_tick} x1={b.end_tick} h={h} />;
+};
 
 // Mini-courbe d'un article sur la séance en cours (ouverture → maintenant), couleur selon la variation.
 export function Spark({ path, t, h = 30 }) {

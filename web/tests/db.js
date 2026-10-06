@@ -1,6 +1,6 @@
 // Base de test : la vraie migration dans PGlite, avec le faux schéma auth du mode démo.
 import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { createEngine, PLAY_MS, T, CYCLE_MS } from "../src/engine.js";
 import { seedRows } from "../src/seed.js";
 
@@ -11,7 +11,7 @@ export const engine = createEngine(data);
 export async function freshDb() {
   const db = new PGlite();
   await db.exec(read("../src/demo-stub.sql"));
-  await db.exec(read("../supabase/migrations/20261006000000_init.sql"));
+  for (const f of readdirSync(new URL("../supabase/migrations/", import.meta.url)).sort()) await db.exec(read("../supabase/migrations/" + f));
   const rows = seedRows(engine);
   for (const t of ["game_config", "articles", "views", "prices", "duels"])
     await db.query(`insert into ${t} select * from json_populate_recordset(null::${t}, $1::json)`, [JSON.stringify(rows[t])]);

@@ -2,18 +2,19 @@
 // Un seul joueur, mêmes règles et mêmes fonctions que sur Supabase.
 import { PGlite } from "@electric-sql/pglite";
 import stub from "./demo-stub.sql?raw";
-import migration from "../supabase/migrations/20261006000000_init.sql?raw";
+// Toutes les migrations, dans l'ordre de leur nom (horodaté).
+const migrations = Object.entries(import.meta.glob("../supabase/migrations/*.sql", { query: "?raw", import: "default", eager: true })).sort(([a], [b]) => a.localeCompare(b)).map(([, sql]) => sql);
 import { seedRows } from "./seed.js";
-import { normBet } from "./api.js";
+import { normBet, normStream } from "./api.js";
 
 const UID = "00000000-0000-4000-8000-000000000001";
 
 export async function demoApi(engine) {
-  const db = new PGlite("idb://wikibourse-demo-1"); // changer le numéro quand la migration change
+  const db = new PGlite("idb://wikibourse-demo-2"); // changer le numéro quand la migration change
   const ready = (await db.query("select to_regclass('public.bets') is not null as ok")).rows[0].ok;
   if (!ready) {
     await db.exec(stub);
-    await db.exec(migration);
+    for (const sql of migrations) await db.exec(sql);
     const rows = seedRows(engine);
     for (const t of ["game_config", "articles", "views", "prices", "duels"])
       await db.query(`insert into ${t} select * from json_populate_recordset(null::${t}, $1::json)`, [JSON.stringify(rows[t])]);
@@ -33,9 +34,11 @@ export async function demoApi(engine) {
     openTrade: ({ tk, dir, lev, stake, horizon }) => act("select * from open_trade($1, $2, $3, $4, $5)", [tk, dir, lev, stake, horizon]),
     closeTrade: id => act("select * from close_trade($1)", [id]),
     betDuel: ({ duel, side, stake }) => act("select * from bet_duel($1, $2, $3)", [duel, side, stake]),
+    openStream: ({ login, dir, lev, stake, horizon }) => act("select * from open_stream($1, $2, $3, $4, $5)", [login, dir, lev, stake, horizon]),
+    streamBoard: async () => (await all("select * from stream_board(120)")).map(normStream),
     restart: () => act("select * from restart()"),
     settle: async () => (await all("select settle() as n"))[0].n,
-    myBets: async min => (await all("select * from bets where user_id = $1 and session >= $2 order by id desc", [UID, min])).map(normBet),
+    myBets: async min => (await all("select * from bets where user_id = $1 and (status = 'open' or session >= $2) order by id desc", [UID, min])).map(normBet),
     leaderboard: () => all("select id, pseudo, cash, bankruptcies from profiles order by cash desc limit 50"),
     onChange(cb) { listeners.add(cb); return () => listeners.delete(cb) },
   };

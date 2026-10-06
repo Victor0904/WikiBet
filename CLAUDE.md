@@ -30,6 +30,7 @@ Deux versions cohabitent :
 - `src/api.js` : Supabase (connexion anonyme + pseudo, temps réel sur `profiles` et sur mes `bets`, décalage d'horloge corrigé avec `server_time()`). `src/demo.js` : même interface sur PGlite.
 - `tests/` : `npm test` lance la vraie migration dans PGlite (horloge, cours, liquidation, règlement, RLS, pause).
 - Pas de bots : le classement réunit les vrais joueurs.
+- **Streamers Twitch** (migration `20261006120000_twitch.sql`, fonction `supabase/functions/twitch-poll`) : pg_cron appelle la fonction chaque minute via pg_net. Elle relève les 40 lives francophones les plus regardés, plus tout streamer qui a un pari ouvert ou était en live il y a moins de 30 min, dans `stream_ticks`. Position = même formule que les articles, avec les spectateurs comme cours. Échéances en temps réel : 15 min, 1 h ou fin du live. Règlement au dernier relevé en live avant l'échéance ou la fin du stream, liquidation au premier relevé qui met la valeur à 0. Ouverture refusée si le dernier relevé date de plus de 3 min. Secrets `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` côté Supabase uniquement. `stream_board()` renvoie une ligne par streamer avec sa courbe (l'API REST plafonne à 1 000 lignes).
 
 ## Design (`web/src/styles.css`)
 

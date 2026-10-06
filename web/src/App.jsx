@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import data from "./pageviews.json";
 import { createEngine, tradeValue, liqPrice, endTick, LEVS, HORIZONS, BK_LIMIT, CAP0, EPOCH, CYCLE_MS } from "./engine.js";
 import { connect } from "./api.js";
-import { TradeChart, Spark } from "./charts.jsx";
+import { TradeChart, PositionChart, Spark } from "./charts.jsx";
 
 /* ===== Formats ===== */
 const nf0 = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
@@ -15,6 +15,8 @@ const hhmm = t => { const m = 540 + t; return String(Math.floor(m / 60)).padStar
 // Une séance se nomme par son heure de début réelle (« séance de 14:32 »), plus parlante que son numéro.
 const sessName = k => { const d = new Date(EPOCH + k * CYCLE_MS), t = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   return d.toDateString() === new Date().toDateString() ? `séance de ${t}` : `séance du ${d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} à ${t}` };
+const clock = ms => new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+const STREAM_H = { "15": "15 min", "60": "1 h", live: "fin du live" };
 const mmss = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0") };
 
 // État d'une position à la minute courante, calculé comme le serveur (liquidation comprise).
@@ -22,6 +24,23 @@ function liveTrade(engine, b, s) {
   const p = engine.pathOf(b.tk, b.day), upto = b.session < s.k || !s.playing ? b.end_tick : Math.min(s.t, b.end_tick);
   for (let i = b.start_tick + 1; i <= upto; i++) if (tradeValue(b, p[i]) <= 0) return { value: 0, px: p[i], upto: i, liquidated: true, due: true };
   return { value: tradeValue(b, p[upto]), px: p[upto], upto, liquidated: false, due: upto >= b.end_tick };
+}
+
+// État d'une position sur un streamer d'après les relevés reçus (le serveur fait foi pour le règlement).
+function liveStream(b, st, now) {
+  const t0 = Date.parse(b.created_at), end = b.end_at ? Date.parse(b.end_at) : null, upto = Math.min(now, end ?? now);
+  const pts = [[t0, b.entry]];
+  if (st) st.ts.forEach((t, i) => { if (t > t0 && t <= upto) pts.push([t, st.vs[i]]) });
+  for (const [, v] of pts.slice(1)) if (tradeValue(b, v) <= 0) return { value: 0, px: v, pts, liquidated: true, due: true };
+  const px = pts[pts.length - 1][1];
+  return { value: tradeValue(b, px), px, pts, liquidated: false, due: (end != null && now >= end) || (!!st && !st.live) };
+}
+// Variation du nombre de spectateurs sur les 15 dernières minutes.
+function chg15(x) {
+  if (!x.live || !x.vs.length) return 0;
+  const lim = Date.parse(x.at) - 15 * 60000; let ref = x.vs[0];
+  x.ts.forEach((t, i) => { if (t <= lim) ref = x.vs[i] });
+  return ref ? x.viewers / ref - 1 : 0;
 }
 
 export default function App() {
@@ -40,7 +59,7 @@ function Game({ api, engine }) {
 
   const [me, setMe] = useState(undefined), [bets, setBets] = useState([]), [board, setBoard] = useState([]);
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
-  const [pref, setPref] = useState({ lev: 5, horizon: "15", stake: 500 });
+  const [pref, setPref] = useState({ lev: 5, horizon: "15", shorizon: "15", stake: 500 });
   const say = useCallback((text, tone) => { setToast({ text, tone, at: Date.now() }) }, []);
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 2600); return () => clearTimeout(id) }, [toast]);
 
@@ -52,8 +71,14 @@ function Game({ api, engine }) {
   }, [api, s.k, say]);
   useEffect(() => { refresh(); return api.onChange(refresh) }, [api, refresh]);
 
+  // Lives Twitch : relevés côté serveur chaque minute, rechargés ici toutes les 20 s.
+  const [streams, setStreams] = useState([]);
+  const loadStreams = useCallback(() => api.streamBoard().then(setStreams).catch(() => {}), [api]);
+  useEffect(() => { loadStreams(); const id = setInterval(loadStreams, 20000); return () => clearInterval(id) }, [loadStreams]);
+  const byLogin = useMemo(() => Object.fromEntries(streams.map(x => [x.login, x])), [streams]);
+
   // Règlement : au changement de phase, quand une position arrive à échéance ou se fait liquider, et toutes les 15 s.
-  const due = bets.filter(b => b.status === "open" && (b.kind === "trade" ? liveTrade(engine, b, s).due : b.session < s.k || !s.playing)).length;
+  const due = bets.filter(b => b.status === "open" && (b.kind === "trade" ? liveTrade(engine, b, s).due : b.kind === "stream" ? liveStream(b, byLogin[b.login], now).due : b.session < s.k || !s.playing)).length;
   const settle = useCallback(() => api.settle().then(refresh).catch(() => {}), [api, refresh]);
   useEffect(() => { if (due) settle() }, [due, settle]);
   useEffect(() => { settle() }, [s.k, s.playing, settle]);
@@ -85,18 +110,19 @@ function Game({ api, engine }) {
 
       <div className="layout">
         <aside className="rail">
-          <Positions engine={engine} s={s} bets={open} onClose={b => run(() => api.closeTrade(b.id), r => `Clôturée : ${sW(r.payout - r.stake)}`)} />
+          <Positions engine={engine} s={s} now={now} byLogin={byLogin} bets={open} onClose={b => run(() => api.closeTrade(b.id), r => `Clôturée : ${sW(r.payout - r.stake)}`)} />
           {!s.playing && <SessionResults engine={engine} s={s} bets={bets} />}
         </aside>
 
         <main className="main">
           <nav className="tabs" aria-label="Sections">
-            {[["market", "Marché"], ["duels", "Duels"], ["history", "Historique"], ["board", "Classement"]].map(([k, l]) =>
+            {[["market", "Marché"], ["streams", "Streamers"], ["duels", "Duels"], ["history", "Historique"], ["board", "Classement"]].map(([k, l]) =>
               <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}>{l}</button>)}
           </nav>
           {tab === "market" && <Market engine={engine} s={s} bets={open} onPick={(tk, dir) => setTicket({ kind: "trade", tk, dir })} />}
+          {tab === "streams" && <Streams streams={streams} mode={api.mode} bets={open} onPick={(login, dir) => setTicket({ kind: "stream", login, dir })} />}
           {tab === "duels" && <Duels engine={engine} s={s} onPick={(duel, side) => setTicket({ kind: "duel", duel, side })} />}
-          {tab === "history" && <History engine={engine} bets={bets.filter(b => b.status !== "open")} />}
+          {tab === "history" && <History engine={engine} byLogin={byLogin} bets={bets.filter(b => b.status !== "open")} />}
           {tab === "board" && <Board board={board} me={me} open={open} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} />}
           <p className="fine">
             Séances rejouées sur les vues réelles de Wikipédia en français (API Wikimedia, du {engine.dateOf(0).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" })} au {engine.dateOf(engine.END).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}, licence CC0).
@@ -105,11 +131,13 @@ function Game({ api, engine }) {
         </main>
       </div>
 
-      {ticket && <Ticket engine={engine} s={s} me={me} ticket={ticket} pref={pref} setPref={setPref} onClose={() => setTicket(null)}
+      {ticket && <Ticket engine={engine} s={s} now={now} byLogin={byLogin} me={me} ticket={ticket} pref={pref} setPref={setPref} onClose={() => setTicket(null)}
         onSubmit={async args => {
-          const r = ticket.kind === "trade"
-            ? await run(() => api.openTrade(args), b => `Position ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} ouverte · ${W(b.stake)}`)
+          const opened = b => `Position ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} ouverte · ${W(b.stake)}`;
+          const r = ticket.kind === "trade" ? await run(() => api.openTrade(args), opened)
+            : ticket.kind === "stream" ? await run(() => api.openStream(args), opened)
             : await run(() => api.betDuel(args), b => `Pari validé · ${W(b.stake)}`);
+          if (ticket.kind === "stream") loadStreams();
           if (r) setTicket(null);
         }} />}
       {toast && <div className={"toast " + (toast.tone || "")} role="status">{toast.text}</div>}
@@ -147,14 +175,16 @@ function SessionBar({ s, now, engine }) {
 }
 
 /* Mes positions en direct : toujours visibles, en tête sur mobile et dans la colonne de gauche sur grand écran. */
-function Positions({ engine, s, bets, onClose }) {
+function Positions({ engine, s, now, byLogin, bets, onClose }) {
   if (!bets.length) return <div className="panel empty-pos"><h2>Mes positions</h2><p className="muted">Aucune position ouverte. Choisis un article et prends position à la hausse ou à la baisse.</p></div>;
-  const list = [...bets].sort((a, b) => (b.kind === "trade") - (a.kind === "trade") || b.id - a.id);
+  const list = [...bets].sort((a, b) => (b.kind !== "duel") - (a.kind !== "duel") || b.id - a.id);
   return (
     <section className="panel">
       <h2>Mes positions <span className="muted">{bets.length} en cours</span></h2>
       <div className="pos-list">
-        {list.map(b => b.kind === "trade" ? <TradeCard key={b.id} engine={engine} s={s} b={b} onClose={onClose} /> : <DuelCard key={b.id} engine={engine} b={b} />)}
+        {list.map(b => b.kind === "trade" ? <TradeCard key={b.id} engine={engine} s={s} b={b} onClose={onClose} />
+          : b.kind === "stream" ? <StreamCard key={b.id} b={b} st={byLogin[b.login]} now={now} onClose={onClose} />
+          : <DuelCard key={b.id} engine={engine} b={b} />)}
       </div>
     </section>
   );
@@ -180,6 +210,64 @@ function TradeCard({ engine, s, b, onClose }) {
         ? <p className="muted small">{st.liquidated ? "Liquidée, règlement en cours…" : "Échéance atteinte, règlement en cours…"}</p>
         : <button type="button" className="btn primary" disabled={busy} onClick={async () => { setBusy(true); await onClose(b); setBusy(false) }}>Clôturer · {W(st.value)}</button>}
     </article>
+  );
+}
+
+function StreamCard({ b, st, now, onClose }) {
+  const x = liveStream(b, st, now), net = x.value - b.stake, t0 = Date.parse(b.created_at);
+  const end = b.end_at ? Date.parse(b.end_at) : Math.max(now, t0 + 30 * 60000);
+  const [busy, setBusy] = useState(false);
+  return (
+    <article className={"pos " + (net >= 0 ? "gain" : "loss")}>
+      <div className="pos-h">
+        <b className="who">{st?.avatar && <img className="avatar sm" src={st.avatar} alt="" />}{st?.display_name ?? b.login}</b>
+        <span className={"side " + b.dir}>{b.dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×{b.lev}</span>
+      </div>
+      <div className="pos-pnl mono"><span className={cls(net)}>{sW(net)}</span><span className={cls(net)}>{pct(net / b.stake)}</span></div>
+      <PositionChart id={b.id} entry={b.entry} dir={b.dir} pts={x.pts} x0={t0} x1={end} />
+      <div className="pos-x mono">
+        <span>{clock(t0)} · {nf0.format(b.entry)} spect.</span>
+        <span>{x.liquidated ? "liquidée" : `${clock(x.pts[x.pts.length - 1][0])} · ${nf0.format(x.px)}`}</span>
+        <span>{b.end_at ? `fin ${clock(end)}` : "fin du live"}</span>
+      </div>
+      {x.due
+        ? <p className="muted small">{x.liquidated ? "Liquidée, règlement en cours…" : st && !st.live ? "Live terminé, règlement en cours…" : "Échéance atteinte, règlement en cours…"}</p>
+        : <button type="button" className="btn primary" disabled={busy} onClick={async () => { setBusy(true); await onClose(b); setBusy(false) }}>Clôturer · {W(x.value)}</button>}
+    </article>
+  );
+}
+
+function Streams({ streams, mode, bets, onPick }) {
+  if (!streams.length) return <p className="muted pad">{mode === "demo"
+    ? "Les streamers Twitch ne sont disponibles qu'en ligne : la démo locale n'a pas accès à Twitch."
+    : "Aucun relevé Twitch pour l'instant. La relève tourne chaque minute, reviens dans un instant."}</p>;
+  const mine = login => bets.some(b => b.kind === "stream" && b.login === login);
+  const list = [...streams].sort((a, b) => mine(b.login) - mine(a.login) || b.live - a.live || b.viewers - a.viewers);
+  return (
+    <section>
+      <p className="muted small">Lives Twitch francophones les plus regardés, relevés chaque minute. Prends position sur la hausse ou la baisse du nombre de spectateurs : jusqu'à 15 min, 1 h ou la fin du live.</p>
+      <div className="market">
+        <div className="mrow head"><span>Streamer</span><span /><span className="r">Spectateurs · 15 min</span><span /></div>
+        {list.map(x => {
+          const c = chg15(x), fresh = Date.now() - Date.parse(x.at) < 180000, can = x.live && fresh;
+          return (
+            <div key={x.login} className={"mrow" + (mine(x.login) ? " mine" : "") + (x.live ? "" : " off")}>
+              <span className="name who">
+                {x.avatar ? <img className="avatar" src={x.avatar} alt="" loading="lazy" /> : <span className="avatar" />}
+                <span><b>{x.display_name}</b><small title={x.title || ""}>{x.live ? (x.game || "en live") : "hors ligne"}</small></span>
+              </span>
+              {x.vs.length > 1 ? <Spark path={x.vs} t={x.vs.length - 1} /> : <span />}
+              <span className="r mono"><b>{x.live ? nf0.format(x.viewers) : "—"}</b><small className={cls(c)}>{x.live ? pct(c) : ""}</small></span>
+              <span className="act">
+                <button type="button" className="buy" disabled={!can} onClick={() => onPick(x.login, "up")} aria-label={`Hausse des spectateurs de ${x.display_name}`}>▲</button>
+                <button type="button" className="sell" disabled={!can} onClick={() => onPick(x.login, "down")} aria-label={`Baisse des spectateurs de ${x.display_name}`}>▼</button>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="fine">Spectateurs Twitch réels (API Twitch). Un relevé par minute : une position se règle sur le dernier relevé avant l'échéance, ou avant la fin du live.</p>
+    </section>
   );
 }
 
@@ -265,13 +353,21 @@ function Duels({ engine, s, onPick }) {
   );
 }
 
-function History({ engine, bets }) {
+function History({ engine, byLogin, bets }) {
   if (!bets.length) return <p className="muted pad">Tes paris réglés apparaîtront ici.</p>;
   return (
     <div className="history">
       {bets.map(b => {
         const net = b.payout - b.stake;
-        const label = b.kind === "trade" ? `${engine.BY[b.tk].name} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev}` : (() => { const d = engine.makeDuels(b.day).find(x => x.id === b.duel_id); return `${engine.BY[b.side === "a" ? d.a : d.b].name} (duel)` })();
+        const label = b.kind === "trade" ? `${engine.BY[b.tk].name} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev}`
+          : b.kind === "stream" ? `${byLogin[b.login]?.display_name ?? b.login} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} · Twitch`
+          : (() => { const d = engine.makeDuels(b.day).find(x => x.id === b.duel_id); return `${engine.BY[b.side === "a" ? d.a : d.b].name} (duel)` })();
+        if (b.kind === "stream") return (
+          <div key={b.id} className="hrow">
+            <span><b>{label}</b><small>{clock(Date.parse(b.created_at))} → {b.exit_at ? clock(Date.parse(b.exit_at)) : "—"} · {nf0.format(b.entry)} → {b.exit != null ? nf0.format(b.exit) : "—"} spectateurs{b.payout === 0 ? " · liquidée" : ""}</small></span>
+            <span className="r mono"><b className={cls(net)}>{sW(net)}</b><small>mise {W(b.stake)}</small></span>
+          </div>
+        );
         return (
           <div key={b.id} className="hrow">
             <span><b>{label}</b><small>{sessName(b.session)}{b.kind === "trade" ? ` · ${hhmm(b.start_tick)} → ${hhmm(b.closed_tick ?? b.end_tick)}${b.payout === 0 ? " · liquidée" : ""}` : ` · cote ${nf2.format(b.odds)}`}</small></span>
@@ -305,12 +401,14 @@ function Board({ board, me, open, onRestart }) {
   );
 }
 
-function Ticket({ engine, s, me, ticket, pref, setPref, onClose, onSubmit }) {
+function Ticket({ engine, s, now, byLogin, me, ticket, pref, setPref, onClose, onSubmit }) {
   const [stake, setStake] = useState(pref.stake), [busy, setBusy] = useState(false), [dir, setDir] = useState(ticket.dir);
-  const isTrade = ticket.kind === "trade";
+  const isTrade = ticket.kind === "trade", isStream = ticket.kind === "stream", isPos = isTrade || isStream;
+  const st = isStream ? byLogin[ticket.login] : null;
   const set = p => setPref(x => ({ ...x, ...p }));
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
-  const ok = stake > 0 && stake <= me.cash && s.playing;
+  const open = isStream ? !!st?.live : s.playing;
+  const ok = stake > 0 && stake <= me.cash && open;
   let body, title, cta;
   if (isTrade) {
     const x = engine.BY[ticket.tk], px = engine.price(ticket.tk, s.d, s.t), b = { entry: px, lev: pref.lev, dir, stake };
@@ -332,6 +430,27 @@ function Ticket({ engine, s, me, ticket, pref, setPref, onClose, onSubmit }) {
         <div className="row"><span>Fermeture automatique</span><b>{hhmm(endTick(pref.horizon, s.t))}</b></div>
       </div>
     </>;
+  } else if (isStream) {
+    const px = st?.viewers ?? 0, b = { entry: px, lev: pref.lev, dir, stake };
+    title = st?.display_name ?? ticket.login;
+    cta = `${dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×${pref.lev} · ${W(stake)}`;
+    body = <>
+      {st?.title && <p className="muted small clip" title={st.title}>{st.game ? `${st.game} · ` : ""}{st.title}</p>}
+      <div className="seg" role="group" aria-label="Sens">
+        <button type="button" aria-pressed={dir === "up"} className="buy" onClick={() => setDir("up")}>▲ Hausse</button>
+        <button type="button" aria-pressed={dir === "down"} className="sell" onClick={() => setDir("down")}>▼ Baisse</button>
+      </div>
+      <label>Levier</label>
+      <div className="seg" role="group" aria-label="Levier">{LEVS.map(v => <button key={v} type="button" aria-pressed={pref.lev === v} onClick={() => set({ lev: v })}>×{v}</button>)}</div>
+      <label>Échéance</label>
+      <div className="seg" role="group" aria-label="Échéance">{Object.entries(STREAM_H).map(([k, l]) => <button key={k} type="button" aria-pressed={pref.shorizon === k} onClick={() => set({ shorizon: k })}>{l}</button>)}</div>
+      <div className="rows mono">
+        <div className="row"><span>Spectateurs (dernier relevé)</span><b>{nf0.format(px)}</b></div>
+        <div className="row"><span>1 % de variation</span><b>±{W(stake * pref.lev / 100)}</b></div>
+        <div className="row"><span>Liquidation à</span><b>{nf0.format(Math.round(liqPrice(b)))} spectateurs</b></div>
+        <div className="row"><span>Fermeture automatique</span><b>{pref.shorizon === "live" ? "fin du live" : clock(now + +pref.shorizon * 60000)}</b></div>
+      </div>
+    </>;
   } else {
     const d = ticket.duel, x = engine.BY[d[ticket.side]], y = engine.BY[d[ticket.side === "a" ? "b" : "a"]], o = d["o" + ticket.side];
     title = `${x.name} bat ${y.name}`;
@@ -342,7 +461,9 @@ function Ticket({ engine, s, me, ticket, pref, setPref, onClose, onSubmit }) {
     <div className="scrim" onClick={e => e.target === e.currentTarget && onClose()}>
       <form className="sheet" role="dialog" aria-modal="true" aria-label={title} onSubmit={async e => {
         e.preventDefault(); if (!ok) return; setBusy(true); set({ stake });
-        await onSubmit(isTrade ? { tk: ticket.tk, dir, lev: pref.lev, stake, horizon: pref.horizon } : { duel: ticket.duel.id, side: ticket.side, stake });
+        await onSubmit(isTrade ? { tk: ticket.tk, dir, lev: pref.lev, stake, horizon: pref.horizon }
+          : isStream ? { login: ticket.login, dir, lev: pref.lev, stake, horizon: pref.shorizon }
+          : { duel: ticket.duel.id, side: ticket.side, stake });
         setBusy(false);
       }}>
         <div className="sheet-h"><h2>{title}</h2><button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button></div>
@@ -350,9 +471,9 @@ function Ticket({ engine, s, me, ticket, pref, setPref, onClose, onSubmit }) {
         <label htmlFor="stake">Mise</label>
         <div className="stake"><input id="stake" className="mono" type="number" inputMode="numeric" min="1" step="1" value={stake} onChange={e => setStake(Math.max(0, Math.floor(+e.target.value || 0)))} /><span>W</span></div>
         <div className="chips">{[100, 500, 1000].map(v => <button key={v} type="button" onClick={() => setStake(v)}>{nf0.format(v)}</button>)}<button type="button" onClick={() => setStake(Math.floor(me.cash))}>Max</button></div>
-        {!s.playing && <p className="error small">Séance fermée, reprise dans quelques secondes.</p>}
+        {!open && <p className="error small">{isStream ? "Ce streamer n'est plus en live." : "Séance fermée, reprise dans quelques secondes."}</p>}
         {stake > me.cash && <p className="error small">Solde insuffisant : il te manque {W(stake - me.cash)}.</p>}
-        <button type="submit" className={"btn big " + (isTrade ? (dir === "up" ? "buy" : "sell") : "primary")} disabled={!ok || busy}>{cta}</button>
+        <button type="submit" className={"btn big " + (isPos ? (dir === "up" ? "buy" : "sell") : "primary")} disabled={!ok || busy}>{cta}</button>
       </form>
     </div>
   );

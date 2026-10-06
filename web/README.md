@@ -22,6 +22,18 @@ Sans clés Supabase, le jeu tourne en **mode démo locale** : la vraie base SQL 
 
 Ne mets jamais la clé `service_role` dans Vercel ni dans le code du front : elle contourne toutes les règles d'accès.
 
+### Streamers Twitch
+
+Il faut une application sur dev.twitch.tv (Client ID et Client Secret), puis, depuis `web/` avec le projet lié (`npx supabase link`) :
+
+```bash
+npx supabase secrets set TWITCH_CLIENT_ID=… TWITCH_CLIENT_SECRET=…
+npx supabase functions deploy twitch-poll
+npx supabase db push
+```
+
+La migration planifie l'appel de `twitch-poll` chaque minute (pg_cron + pg_net). Le Client Secret ne quitte jamais Supabase.
+
 ## Comment c'est construit
 
 - `src/engine.js` : le moteur, partagé par le front, le seed et les tests. Il calcule l'horloge des séances, les cours minute par minute (pont brownien seedé) et les duels. Tout est déterministe.

@@ -111,6 +111,17 @@ h2 .muted { font: 400 12.5px var(--f-body) }
 .buy { background: var(--up-soft); color: var(--up) } .sell { background: var(--down-soft); color: var(--down) }
 .buy:not(:disabled):hover { background: var(--up); color: #04140D } .sell:not(:disabled):hover { background: var(--down); color: #fff }
 
+/* Streamers */
+.who { display: flex; align-items: center; gap: 10px; min-width: 0 }
+.mrow .name.who { flex-direction: row }
+.who > span { display: flex; flex-direction: column; min-width: 0 }
+.who b, .who small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.avatar { width: 34px; height: 34px; border-radius: 50%; flex: none; background: var(--panel2); object-fit: cover }
+.avatar.sm { width: 22px; height: 22px }
+.pos-h .who { gap: 8px }
+.mrow.off { opacity: .55 }
+.clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+
 /* Duels */
 .duels { display: flex; flex-direction: column; gap: 10px }
 .duel { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
