@@ -1,0 +1,58 @@
+# Wiki-Bourse — contexte pour Claude Code
+
+## Le projet
+
+Jeu web viral inspiré de WikiMasters : chaque article de Wikipédia en français a un cours qui suit son audience. Le joueur prend position à la hausse ou à la baisse avec un levier, comme un trade crypto, et parie sur des duels du jour (« qui fera le plus de vues ? »).
+
+Deux versions cohabitent :
+
+- **`web/` : la version en ligne, celle sur laquelle on travaille.** React + Vite, base Supabase (Postgres), déploiement Vercel. Tous les joueurs voient les mêmes cours au même moment. Sans clés Supabase, elle tourne en mode démo locale (PGlite dans le navigateur). Voir `web/README.md`.
+- Racine (`index.html`, `style.css`, `app.js`, `data/pageviews.js`) : l'ancien prototype solo, statique, ouvrable par double-clic. Gardé comme référence tant que `web/` n'est pas en ligne ; ne plus le faire évoluer.
+
+## Décisions validées par Victor
+
+- Version en ligne sur **Supabase + Vercel**, React avec Vite (étape de build acceptée).
+- Rythme : **10 min de jeu + 1 min de pause**, en continu. La séance k commence à `EPOCH + k × 11 min` (EPOCH = 1er janvier 2026 UTC). On voit en direct le coup d'envoi de la séance suivante.
+- Style **mode trader, plus sombre** (choisi en octobre 2026, il remplace le thème nuit violette du prototype). Il avait rejeté plus tôt un « terminal de bourse » trop dense, pas mobile et fade : rester lisible sur téléphone, des cartes et des listes aérées, pas un tableau de bord surchargé.
+- Gains comme un trade : valeur = `mise × (1 + levier × sens × variation)`, plancher 0, levier ×1/×5/×10, liquidation à 0. Les duels gardent des cotes.
+- Priorité au suivi en direct de ses positions : toujours visibles en tête (mobile) ou dans la colonne de gauche (grand écran), avec graphique et bouton « Clôturer ».
+- Économie : 10 000 W au départ, salaire de 500 W par séance **où le joueur a parié** (sinon les absents s'enrichiraient à 130 séances par jour), faillite sous 2 000 W (retour à 10 000 W, compteur visible). **Pas d'achat de monnaie** (risque juridique type loot box) ; monétiser par du cosmétique ou des ligues privées pour streamers. Parrainage pas encore porté dans `web/`.
+- Il accepte que l'intraday soit simulé tant que les clôtures et les duels sont réels.
+
+## Architecture de `web/`
+
+- `src/engine.js` : moteur partagé (front, seed, tests), sans dépendance.
+  - Clôture du jour d : `√(vues[d]) ÷ 2`.
+  - `pathOf(tk, d)` : cours minute par minute (T = 510 minutes de jeu) de la clôture d à d+1. Pont brownien seedé (`hashStr(tk) + d*9973`). Si |variation réelle| > 0,25 en log, 75 % du mouvement arrive d'un coup.
+  - `session(now)` : séance k, jour de données `START + k mod 30`, minute de jeu `floor(off × T / PLAY_MS)`. Même calcul que `game_now()` en SQL : ne modifier l'un qu'avec l'autre.
+  - Duels : paires d'audience proche (ratio < 3), probabilité selon `vues^0.85`, cote = 0,93 / p (min 1,08), premier duel boosté ×1,4 sur l'outsider, réglés sur `vues[d+1]`.
+- `supabase/migrations/20261006000000_init.sql` : **la base fait foi.** Les cours sont stockés par `npm run seed` (tableau de 511 points par article et par jour, calculés par le moteur). Les joueurs n'écrivent rien directement (RLS). Tout passe par des fonctions `security definer` : `open_trade`, `close_trade`, `bet_duel`, `restart`, `create_profile`, `settle`. `settle()` tourne chaque minute (pg_cron) et à la demande des clients. Chaque règlement verrouille la ligne, donc pas de double paiement.
+- `src/api.js` : Supabase (connexion anonyme + pseudo, temps réel sur `profiles` et sur mes `bets`, décalage d'horloge corrigé avec `server_time()`). `src/demo.js` : même interface sur PGlite.
+- `tests/` : `npm test` lance la vraie migration dans PGlite (horloge, cours, liquidation, règlement, RLS, pause).
+- Pas de bots : le classement réunit les vrais joueurs.
+
+## Design (`web/src/styles.css`)
+
+Noir bleuté `#08090D`, panneaux `#0F1117`/`#161922`, filets `#222634`. Gain `#1FCB8B`, perte `#F04B5C` (toujours doublés d'un signe ou d'une flèche ▲▼), action principale ambre `#F5B83D`. IBM Plex Sans (texte), Plex Sans Condensed (titres, noms), Plex Mono (chiffres). Mobile : positions en tête puis onglets Marché / Duels / Historique / Classement. À partir de 1024 px : positions en colonne gauche collante.
+
+Les graphiques suivent le skill dataviz : traits de 2 px, pointillé pour le cours d'entrée, zone verte du côté gagnant et rouge du côté perdant.
+
+## Données
+
+`scripts/fetch_pageviews.py` (stdlib) récupère les vues quotidiennes (agent `user`) pour `scripts/articles.json` et écrit `web/src/pageviews.json` (et `data/pageviews.js` pour le prototype). Ensuite `npm run seed` dans `web/` pousse tout en base. L'API Wikimedia limite le débit : garder la pause entre requêtes.
+
+Attention au biais actuel : une partie des articles a été choisie dans le top des plus vus du dernier jour, ce qui rend certaines séances explosives (+100 % en une séance). Pour la suite, choisir les articles sans regarder la fin de la période.
+
+## Pistes suivantes
+
+1. Coter tout Wikipédia : une tâche planifiée récupère chaque matin le top 1 000 des articles du jour (`/metrics/pageviews/top/...`) et recalcule les cours, au lieu de rejouer 30 jours en boucle.
+2. Données plus fines : vues horaires (dumps.wikimedia.org/other/pageviews) pour un intraday réel ; EventStreams (`https://stream.wikimedia.org/v2/stream/recentchange`) comme signal d'agitation.
+3. Comptes durables (lier la connexion anonyme à un e-mail), parrainage, ligues privées pour streamers.
+4. Frais d'ouverture sur les positions : sans eux, la maison n'a aucun avantage.
+5. Partage du résultat en image.
+
+## Règles de travail
+
+- Tout texte affiché en français, phrases courtes.
+- Ne pas présenter des données simulées comme réelles : la mention en bas de l'écran doit rester à jour.
+- Toute règle de jeu se code d'abord en SQL (la base fait foi), puis se reflète dans le front pour l'affichage en direct. Ajouter un test dans `web/tests/` à chaque règle.

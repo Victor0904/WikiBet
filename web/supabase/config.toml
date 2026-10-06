@@ -1,0 +1,3 @@
+# Configuration Supabase minimale. L'intégration GitHub de Supabase applique les fichiers de migrations/
+# à chaque push sur main (dossier Supabase à indiquer dans le tableau de bord : web/supabase).
+project_id = "wikibet"

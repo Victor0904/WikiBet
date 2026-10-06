@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Wiki-Bourse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;1,800&family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="appbar">
+    <a class="logo" href="#direct" aria-label="Wiki-Bourse">wiki<span>·</span>bourse</a>
+    <div class="wallet" id="wallet"><span class="coin" aria-hidden="true">W</span><b id="cash">10 000</b></div>
+  </header>
+
+  <nav class="nav-side" aria-label="Sections" id="navSide"></nav>
+
+  <main class="main">
+    <section class="session" id="session" aria-live="polite">
+      <span class="live-badge" id="liveBadge"><i></i><span id="liveTxt">Avant-match</span></span>
+      <span class="clock" id="clock">09:00</span>
+      <button class="kick" id="kick" type="button">Coup d'envoi</button>
+      <div class="speed" id="speed" role="group" aria-label="Vitesse" hidden>
+        <button type="button" data-speed="1" aria-pressed="true">×1</button>
+        <button type="button" data-speed="3" aria-pressed="false">×3</button>
+        <button type="button" data-speed="10" aria-pressed="false">×10</button>
+      </div>
+      <span class="sub" id="sessSub">—</span>
+      <span class="bar"><i id="prog"></i></span>
+    </section>
+
+    <!-- Direct -->
+    <div id="view-direct" class="view">
+      <div id="liveBets"></div>
+      <div class="hz" role="group" aria-label="Échéance des paris">
+        <button type="button" data-h="15" aria-pressed="true">Dans 15 min</button>
+        <button type="button" data-h="60" aria-pressed="false">Dans 1 h</button>
+        <button type="button" data-h="close" aria-pressed="false">À 17 h 30</button>
+      </div>
+      <div class="hz" role="group" aria-label="Levier">
+        <span class="hz-l">Levier</span>
+        <button type="button" data-lev="1" aria-pressed="false">×1</button>
+        <button type="button" data-lev="5" aria-pressed="true">×5</button>
+        <button type="button" data-lev="10" aria-pressed="false">×10</button>
+      </div>
+      <div class="scroller" id="sectors" role="group" aria-label="Catégories"></div>
+      <div id="boostWrap"></div>
+      <div class="sec-title"><h2>En direct</h2><span id="liveCount">29 articles</span></div>
+      <div class="feed" id="feed"></div>
+    </div>
+
+    <!-- Duels -->
+    <div id="view-duels" class="view" hidden>
+      <div class="sec-title"><h2>Les duels du jour</h2><span>Réglés sur les vraies vues</span></div>
+      <div class="feed one" id="duels"></div>
+      <p class="fine">Un duel se règle à 17 h 30 sur le nombre réel de vues Wikipédia de la journée. Celui qui en fait le plus l'emporte.</p>
+    </div>
+
+    <!-- Mes paris -->
+    <div id="view-bets" class="view" hidden>
+      <div class="sec-title"><h2>Mes paris</h2><span id="betStats">—</span></div>
+      <div class="feed one" id="bets"></div>
+    </div>
+
+    <!-- Ligue -->
+    <div id="view-league" class="view" hidden>
+      <div class="sec-title"><h2>La ligue</h2><span>Mise à jour à chaque clôture</span></div>
+      <div class="league" id="league"></div>
+      <p class="fine">Les cinq autres joueurs sont des bots de démonstration au style de jeu fixe.</p>
+      <div class="sec-title" style="margin-top:22px"><h2>La saison</h2><span>Solde à chaque clôture</span></div>
+      <div class="curve" id="curve"></div>
+      <div class="sec-title" style="margin-top:22px"><h2>Ma caisse</h2></div>
+      <div class="cashbox">
+        <div class="cash-item"><p><b>Salaire de séance</b>500 W versés à chaque coup de sifflet final.</p></div>
+        <div class="cash-item"><p><b>Faillite</b>Sous 2 000 W, repars à 10 000 W. <span id="bkCount">0 faillite</span>.</p><button class="btn" id="btnBk" type="button">Repartir</button></div>
+        <div class="cash-item"><p><b>Parrainage</b>2 000 W pour toi et ton ami, 5 filleuls max. Code <span id="refCode">WB-····</span></p><button class="btn" id="btnRef" type="button">Copier</button></div>
+      </div>
+      <p class="fine">Cours tirés des vues réelles de Wikipédia en français (API Wikimedia Pageviews, <span id="dataSpan">du 7 juillet au 4 octobre 2026</span>, licence CC0). Les clôtures et les duels sont réels. Le mouvement minute par minute entre deux clôtures est simulé, les cotes aussi. Monnaie fictive, impossible à acheter.</p>
+    </div>
+  </main>
+
+  <aside class="slip-side" id="slipSide" aria-label="Coupon"></aside>
+</div>
+
+<div class="slipbar" id="slipbar" hidden><button type="button" id="slipOpen"><span class="n" id="slipN">1</span><span class="t">Coupon</span><span class="o" id="slipO">1,85</span></button></div>
+
+<nav class="tabbar" id="tabbar" aria-label="Sections"></nav>
+
+<div class="scrim" id="scrim" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Wiki-Bourse"></div></div>
+<div class="count" id="count" hidden><div id="countTxt">3</div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="data/pageviews.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

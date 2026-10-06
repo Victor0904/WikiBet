@@ -1,0 +1,176 @@
+[
+ {
+  "ticker": "MESSI",
+  "title": "Lionel_Messi",
+  "name": "Lionel Messi",
+  "category": "Sport"
+ },
+ {
+  "ticker": "MBAPE",
+  "title": "Kylian_Mbappé",
+  "name": "Kylian Mbappé",
+  "category": "Sport"
+ },
+ {
+  "ticker": "REMCO",
+  "title": "Remco_Evenepoel",
+  "name": "Remco Evenepoel",
+  "category": "Sport"
+ },
+ {
+  "ticker": "PSG",
+  "title": "Paris_Saint-Germain_Football_Club",
+  "name": "Paris Saint-Germain",
+  "category": "Sport"
+ },
+ {
+  "ticker": "DUPNT",
+  "title": "Antoine_Dupont",
+  "name": "Antoine Dupont",
+  "category": "Sport"
+ },
+ {
+  "ticker": "TANGY",
+  "title": "Jean-Philippe_Tanguy",
+  "name": "Jean-Philippe Tanguy",
+  "category": "Politique"
+ },
+ {
+  "ticker": "EPHIL",
+  "title": "Édouard_Philippe",
+  "name": "Édouard Philippe",
+  "category": "Politique"
+ },
+ {
+  "ticker": "GLUCK",
+  "title": "Raphaël_Glucksmann",
+  "name": "Raphaël Glucksmann",
+  "category": "Politique"
+ },
+ {
+  "ticker": "KNAFO",
+  "title": "Sarah_Knafo",
+  "name": "Sarah Knafo",
+  "category": "Politique"
+ },
+ {
+  "ticker": "MACRN",
+  "title": "Emmanuel_Macron",
+  "name": "Emmanuel Macron",
+  "category": "Politique"
+ },
+ {
+  "ticker": "BRDLA",
+  "title": "Jordan_Bardella",
+  "name": "Jordan Bardella",
+  "category": "Politique"
+ },
+ {
+  "ticker": "LINDN",
+  "title": "Vincent_Lindon",
+  "name": "Vincent Lindon",
+  "category": "Ciné & TV"
+ },
+ {
+  "ticker": "MRCTE",
+  "title": "Mercotte",
+  "name": "Mercotte",
+  "category": "Ciné & TV"
+ },
+ {
+  "ticker": "MBLNC",
+  "title": "Michel_Blanc",
+  "name": "Michel Blanc",
+  "category": "Ciné & TV"
+ },
+ {
+  "ticker": "FF10",
+  "title": "Fast_and_Furious_10",
+  "name": "Fast and Furious 10",
+  "category": "Ciné & TV"
+ },
+ {
+  "ticker": "KWAI",
+  "title": "Le_Pont_de_la_rivière_Kwaï_(film)",
+  "name": "Le Pont de la rivière Kwaï",
+  "category": "Ciné & TV"
+ },
+ {
+  "ticker": "MLJ",
+  "title": "Marie-Line_et_son_juge",
+  "name": "Marie-Line et son juge",
+  "category": "Ciné & TV"
+ },
+ {
+  "ticker": "LIZT",
+  "title": "Elizabeth_Taylor",
+  "name": "Elizabeth Taylor",
+  "category": "Ciné & TV"
+ },
+ {
+  "ticker": "LOUAN",
+  "title": "Louane",
+  "name": "Louane",
+  "category": "Musique"
+ },
+ {
+  "ticker": "GCM",
+  "title": "Grand_Corps_Malade",
+  "name": "Grand Corps Malade",
+  "category": "Musique"
+ },
+ {
+  "ticker": "SWIFT",
+  "title": "Taylor_Swift",
+  "name": "Taylor Swift",
+  "category": "Musique"
+ },
+ {
+  "ticker": "AYA",
+  "title": "Aya_Nakamura",
+  "name": "Aya Nakamura",
+  "category": "Musique"
+ },
+ {
+  "ticker": "NAPO",
+  "title": "Napoléon_Ier",
+  "name": "Napoléon Ier",
+  "category": "Histoire"
+ },
+ {
+  "ticker": "IA",
+  "title": "Intelligence_artificielle",
+  "name": "Intelligence artificielle",
+  "category": "Tech"
+ },
+ {
+  "ticker": "BTC",
+  "title": "Bitcoin",
+  "name": "Bitcoin",
+  "category": "Tech"
+ },
+ {
+  "ticker": "SQZ",
+  "title": "Squeezie",
+  "name": "Squeezie",
+  "category": "Tech"
+ },
+ {
+  "ticker": "CLIP",
+  "title": "Île_Clipperton",
+  "name": "Île Clipperton",
+  "category": "Insolite"
+ },
+ {
+  "ticker": "SPECU",
+  "title": "Spéculoos",
+  "name": "Spéculoos",
+  "category": "Insolite"
+ },
+ {
+  "ticker": "EIFEL",
+  "title": "Tour_Eiffel",
+  "name": "Tour Eiffel",
+  "category": "Insolite"
+ }
+]
