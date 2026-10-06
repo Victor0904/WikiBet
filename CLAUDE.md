@@ -46,6 +46,14 @@ Deux versions cohabitent :
 
 Noir bleuté `#08090D`, panneaux `#0F1117`/`#161922`, filets `#222634`. Gain `#1FCB8B`, perte `#F04B5C` (toujours doublés d'un signe ou d'une flèche ▲▼), action principale ambre `#F5B83D`. IBM Plex Sans (texte), Plex Sans Condensed (titres, noms), Plex Mono (chiffres). Mobile : positions en tête puis onglets Marché / Duels / Historique / Classement. À partir de 1024 px : positions en colonne gauche collante.
 
+**Navigation (refonte mobile d'octobre 2026, demandée par Victor) :**
+- Barre d'onglets flottante en bas, en « liquid glass » (verre flouté, `src/nav.jsx`, classe `.dock`) : Marché (Wikipédia | Duels), Live (Twitch | Steam), Positions (En cours | Historique, badge du nombre de paris ouverts), QG, Plus.
+- Le menu Plus (`src/pages.jsx`) regroupe Classement, Comment jouer, Mon compte (patrimoine, faillite) et Sources des données.
+- « Comment jouer » s'ouvre tout seul à la première visite (clé `wb-howto` dans le localStorage).
+- **Rien ne doit bouger sous le doigt.** L'ordre du marché est figé au coup d'envoi ou au changement de tri, avec un bouton « Retrier ». Celui du Live est figé par échéance. Seuls les prix se mettent à jour sur place.
+- Sur mobile, une bande compacte des paris en cours s'affiche en haut du Marché et du Live. Sur grand écran, la colonne des positions reste à gauche.
+- Montants avec espace insécable (`W()` dans `src/format.js`).
+
 Les graphiques suivent le skill dataviz : traits de 2 px, pointillé pour le cours d'entrée, zone verte du côté gagnant et rouge du côté perdant.
 
 ## Données

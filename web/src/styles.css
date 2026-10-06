@@ -243,8 +243,87 @@ button.brow:hover { background: var(--panel2) }
 @keyframes up { from { transform: translateY(24px); opacity: .5 } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }
 
+/* ===== Mobile d'abord : en-tête et séance compacts, barre d'onglets en verre ===== */
+.app { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) }
+.top { padding: 10px 16px 8px; margin: 0 -16px; background: rgba(8, 9, 13, .72); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border-bottom: 1px solid rgba(255, 255, 255, .05) }
+.top .cash { border: 1px solid var(--line); background: var(--panel2); color: var(--ink); font-size: 15px; padding: 6px 12px; border-radius: 99px }
+.session { margin: 10px 0 12px; padding: 8px 12px; gap: 2px 10px }
+.session .clock { font-size: 20px }
+.session .sub { font-size: 12px }
+
+/* Barre d'onglets flottante « liquid glass » */
+.dock { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); z-index: 45;
+  width: min(520px, calc(100% - 20px)); display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 6px; border-radius: 30px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .13), rgba(255, 255, 255, .03) 55%, rgba(255, 255, 255, .06)), rgba(18, 20, 28, .5);
+  -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, .14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 -1px 0 rgba(0, 0, 0, .3), 0 14px 40px -10px rgba(0, 0, 0, .75) }
+.dock button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 0 6px; border: 0; background: none; color: var(--muted); font-size: 11px; font-weight: 600; border-radius: 24px; transition: background .2s, color .2s }
+.dock button svg { width: 23px; height: 23px }
+.dock button[aria-current="page"] { color: var(--ink); background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .06)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2) }
+.dock button[aria-current="page"] svg { color: var(--accent) }
+.dot-badge { position: absolute; top: 3px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--down); color: #fff; font: 700 11px/18px var(--f-body); font-style: normal; box-shadow: 0 0 0 2px rgba(18, 20, 28, .9) }
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) { .dock, .top { background: rgba(14, 16, 22, .97) } }
+@media (prefers-reduced-transparency: reduce) { .dock, .top { background: rgba(14, 16, 22, .97); backdrop-filter: none; -webkit-backdrop-filter: none } }
+
+/* Contrôles segmentés en tête d'onglet, barre de tri */
+.top-seg { margin-bottom: 12px; padding: 4px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line) }
+.top-seg button { padding: 10px 6px; font-size: 14.5px; border-radius: 9px }
+.top-seg button[aria-pressed="true"] { background: var(--panel2); color: var(--ink); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06) }
+.sortbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px }
+.seg.mini { flex: 1; max-width: 360px }
+.seg.mini button { padding: 7px 6px; font-size: 12.5px }
+.btn.ghost { background: none; border-color: var(--line); color: var(--muted); padding: 7px 12px; font-size: 13px; white-space: nowrap }
+
+/* Bande de mes paris */
+.ticker { display: flex; gap: 8px; width: 100%; overflow-x: auto; scrollbar-width: none; margin-bottom: 12px; padding: 0; border: 0; background: none; text-align: left; color: inherit }
+.ticker::-webkit-scrollbar { display: none }
+.tick { flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 99px; background: var(--panel); border: 1px solid var(--line); font-size: 13px }
+.tick b { font-weight: 600; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+
+/* Paris en cours en liste, état vide */
+.pos-list.vertical { flex-direction: column; overflow: visible; margin: 0; padding: 0 }
+.pos-list.vertical .pos { flex-basis: auto }
+.empty-state { text-align: center; padding: 36px 16px; display: flex; flex-direction: column; gap: 8px; align-items: center }
+.empty-state b { font: 700 20px var(--f-cond) }
+.empty-state p { margin: 0; max-width: 34ch }
+.empty-acts { display: flex; gap: 8px; margin-top: 6px }
+
+/* Menu « Plus » et sous-pages */
+.menu { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; overflow: hidden }
+.menu-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 16px; background: var(--panel); border: 0; border-top: 1px solid var(--line); color: inherit; text-align: left; min-height: 60px }
+.menu-row:first-child { border-top: 0 }
+.menu-row:active { background: var(--panel2) }
+.menu-row span:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0 }
+.menu-row b { font-weight: 600; font-size: 15.5px }
+.menu-row small { color: var(--faint); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.chev { color: var(--faint); font-size: 26px; line-height: 1 }
+.subhead { display: flex; align-items: center; gap: 8px; margin: 0 0 12px }
+.subhead h2 { font-size: 22px }
+.back { border: 0; background: var(--panel); width: 38px; height: 38px; border-radius: 50%; font-size: 26px; line-height: 1; color: var(--ink); flex: none; padding-bottom: 3px }
+.howto-title { font-size: 26px; margin: 4px 0 12px }
+.steps { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 10px }
+.steps li { display: flex; gap: 12px; align-items: flex-start }
+.step-n { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 13px }
+.steps b { font: 700 17px var(--f-cond); display: block; margin-bottom: 3px }
+.steps p, .prose p { margin: 0; color: var(--muted); font-size: 14.5px; line-height: 1.5 }
+.prose { display: flex; flex-direction: column; gap: 12px }
+.prose b { color: var(--ink) }
+.account .panel { margin-bottom: 12px }
+.acc-name { margin: 0 0 6px; display: flex; flex-direction: column; gap: 2px }
+.acc-name b { font: 700 22px var(--f-cond) }
+
+/* Cibles tactiles plus généreuses sur mobile */
+.act .buy, .act .sell { width: 44px; height: 42px; font-size: 15px; border-radius: 10px }
+.qbtns button { min-height: 46px }
+.toast { bottom: calc(92px + env(safe-area-inset-bottom, 0px)) }
+.rail { display: none }
+
 @media (min-width: 1024px) {
   .layout { display: grid; grid-template-columns: 340px minmax(0, 1fr); align-items: start; gap: 20px }
+  .rail { display: flex }
+  .top { margin: 0; padding-inline: 0 }
+  .ticker { display: none }
   .rail { position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow: auto }
   .pos-list { flex-direction: column; overflow: visible; margin: 10px 0 0; padding: 0 }
   .pos { flex-basis: auto }

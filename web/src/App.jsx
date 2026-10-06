@@ -4,6 +4,8 @@ import { createEngine, tradeValue, liqPrice, LEVS, BK_LIMIT, CAP0, EPOCH, CYCLE_
 import { connect } from "./api.js";
 import { TradeChart, PositionChart, Spark } from "./charts.jsx";
 import { nf0, nf2, W, sW, clock, HOME_NAMES, THEMES, DEFAULT_ACCENT } from "./format.js";
+import { Dock, Segmented, SubHeader } from "./nav.jsx";
+import { MoreMenu, HowTo, Account, Legal } from "./pages.jsx";
 const QG = lazy(() => import("./QG.jsx")); // Three.js n'est chargé qu'à l'ouverture du QG
 
 /* ===== Formats ===== */
@@ -79,6 +81,9 @@ function Game({ api, engine }) {
 
   const [me, setMe] = useState(undefined), [bets, setBets] = useState([]), [board, setBoard] = useState([]);
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
+  const [marketView, setMarketView] = useState("wiki"), [liveSrc, setLiveSrc] = useState("twitch"), [posView, setPosView] = useState("open"), [more, setMore] = useState(null);
+  // « Comment jouer » s'ouvre tout seul à la première visite.
+  const [firstVisit, setFirstVisit] = useState(() => { try { return !localStorage.getItem("wb-howto") } catch { return false } });
   const [pref, setPref] = useState({ lev: 5, shorizon: "15", stake: 500 });
   const say = useCallback((text, tone) => { setToast({ text, tone, at: Date.now() }) }, []);
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 2600); return () => clearTimeout(id) }, [toast]);
@@ -133,47 +138,73 @@ function Game({ api, engine }) {
   if (me === undefined) return <div className="center"><p className="muted">Chargement…</p></div>;
   if (me === null) return <Onboarding api={api} onDone={refresh} />;
 
+  const go = t => { setTab(t); if (t !== "more") setMore(null); window.scrollTo({ top: 0 }) };
+  const closeTrade = b => run(() => api.closeTrade(b.id), r => `Clôturée : ${sW(r.payout - r.stake)}`);
+  const howtoDone = () => { try { localStorage.setItem("wb-howto", "1") } catch { } setFirstVisit(false); setMore(null); setTab("market") };
+  const patrimoine = me.cash + openStake + objectsValue;
+  const showHowto = firstVisit || (tab === "more" && more === "howto");
+
   return (
     <div className="app">
       <header className="top">
         <span className="logo">wiki<b>·</b>bourse</span>
-        {api.mode === "demo" && <span className="tag">démo locale</span>}
-        <span className="me">{me.pseudo}{myTitle && <small>{myTitle}</small>}</span>
-        <span className="cash mono">{W(me.cash)}</span>
+        {api.mode === "demo" && <span className="tag">démo</span>}
+        <button type="button" className="cash mono" onClick={() => { setTab("more"); setMore("account") }} aria-label="Mon compte">{W(me.cash)}</button>
       </header>
-
       <SessionBar s={s} now={now} engine={engine} />
       {kickoff && <div className="kickoff">Coup d'envoi · {sessName(s.k)}</div>}
 
       <div className="layout">
         <aside className="rail">
-          <Positions engine={engine} s={s} now={now} byLogin={byLogin} bets={open} onClose={b => run(() => api.closeTrade(b.id), r => `Clôturée : ${sW(r.payout - r.stake)}`)} />
+          <Positions engine={engine} s={s} now={now} byLogin={byLogin} bets={open} onClose={closeTrade} />
           {!s.playing && <SessionResults engine={engine} s={s} bets={bets} />}
         </aside>
 
         <main className="main">
-          <nav className="tabs" aria-label="Sections">
-            {[["market", "Marché"], ["streams", "Streamers"], ["steam", "Steam"], ["duels", "Duels"], ["qg", "QG"], ["history", "Historique"], ["board", "Classement"]].map(([k, l]) =>
-              <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}>{l}</button>)}
-          </nav>
-          {tab === "market" && <Market engine={engine} s={s} bets={open} onPick={(tk, dir) => setTicket({ kind: "trade", tk, dir })} />}
-          {(tab === "streams" || tab === "steam") && <Streams key={tab} src={tab === "steam" ? "steam" : "twitch"} streams={streams} markets={markets} mode={api.mode} bets={open} now={now} onPick={(market, side) => setTicket({ kind: "question", market, side })} />}
-          {tab === "duels" && <Duels engine={engine} s={s} onPick={(duel, side) => setTicket({ kind: "duel", duel, side })} />}
-          {tab === "history" && <History engine={engine} byLogin={byLogin} bets={bets.filter(b => b.status !== "open")} />}
-          {tab === "board" && <Board board={board} me={me} open={open} onVisit={visitQG} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} />}
+          {showHowto ? <HowTo first={firstVisit} onBack={firstVisit ? howtoDone : () => setMore(null)} /> : <>
+          {(tab === "market" || tab === "live") && <MiniTicker engine={engine} s={s} now={now} byLogin={byLogin} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
+
+          {tab === "market" && <>
+            <Segmented label="Marché" value={marketView} onChange={setMarketView} options={[["wiki", "Wikipédia"], ["duels", "Duels"]]} />
+            {marketView === "wiki"
+              ? <Market engine={engine} s={s} bets={open} onPick={(tk, dir) => setTicket({ kind: "trade", tk, dir })} />
+              : <Duels engine={engine} s={s} onPick={(duel, side) => setTicket({ kind: "duel", duel, side })} />}
+          </>}
+
+          {tab === "live" && <>
+            <Segmented label="Live" value={liveSrc} onChange={setLiveSrc} options={[["twitch", "Twitch"], ["steam", "Steam"]]} />
+            <Streams key={liveSrc} src={liveSrc} streams={streams} markets={markets} mode={api.mode} bets={open} now={now} onPick={(market, side) => setTicket({ kind: "question", market, side })} />
+          </>}
+
+          {tab === "positions" && <>
+            <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` · ${open.length}` : ""}`], ["history", "Historique"]]} />
+            {posView === "open" ? <>
+              {!s.playing && <SessionResults engine={engine} s={s} bets={bets} />}
+              {open.length ? <Positions vertical engine={engine} s={s} now={now} byLogin={byLogin} bets={open} onClose={closeTrade} />
+                : <div className="empty-state"><b>Aucun pari en cours</b><p className="muted">Prends position sur un article ou réponds à une question en direct.</p>
+                    <div className="empty-acts"><button type="button" className="btn primary" onClick={() => go("market")}>Marché</button><button type="button" className="btn" onClick={() => go("live")}>Live</button></div></div>}
+            </> : <History engine={engine} byLogin={byLogin} bets={bets.filter(b => b.status !== "open")} />}
+          </>}
+
           {tab === "qg" && <Suspense fallback={<p className="muted pad">Chargement du QG…</p>}>
             {visit
               ? <QG api={api} catalog={catalog} inv={visit.inv} owner={visit.row} self={false} patrimoine={visit.row.patrimoine} pnl={null}
                   accent={THEMES[catalog.find(i => i.category === "theme" && visit.inv[i.id]?.equipped)?.id] ?? DEFAULT_ACCENT} onBack={() => setVisit(null)} />
-              : <QG api={api} catalog={catalog} inv={inv} me={me} owner={{ pseudo: me.pseudo, title: myTitle }} self patrimoine={me.cash + openStake + objectsValue}
+              : <QG api={api} catalog={catalog} inv={inv} me={me} owner={{ pseudo: me.pseudo, title: myTitle }} self patrimoine={patrimoine}
                   openStake={openStake} pnl={pnl} accent={accent} act={run} />}
           </Suspense>}
-          <p className="fine">
-            Séances rejouées sur les vues réelles de Wikipédia en français (API Wikimedia, du {engine.dateOf(0).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" })} au {engine.dateOf(engine.END).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}, licence CC0).
-            Les clôtures et les duels sont réels. Le mouvement minute par minute entre deux clôtures est simulé, identique pour tous les joueurs. Monnaie fictive, impossible à acheter.
-          </p>
+
+          {tab === "more" && (
+            more === "board" ? <><SubHeader title="Classement" onBack={() => setMore(null)} /><Board board={board} me={me} onVisit={visitQG} /></>
+            : more === "account" ? <Account me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"}
+                canRestart={me.cash + openStake < BK_LIMIT} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} onBack={() => setMore(null)} />
+            : more === "legal" ? <Legal engine={engine} onBack={() => setMore(null)} />
+            : <MoreMenu go={setMore} me={me} title={myTitle} />)}
+          </>}
         </main>
       </div>
+
+      <Dock tab={showHowto && firstVisit ? null : tab} setTab={t => { if (firstVisit) howtoDone(); go(t) }} badge={open.length} />
 
       {ticket && <Ticket engine={engine} s={s} now={now} byLogin={byLogin} me={me} ticket={ticket} pref={pref} setPref={setPref} onClose={() => setTicket(null)}
         onSubmit={async args => {
@@ -188,6 +219,22 @@ function Game({ api, engine }) {
       {toast && <div className={"toast " + (toast.tone || "")} role="status">{toast.text}</div>}
       {effect && <Rain kind={effect} at={rain} />}
     </div>
+  );
+}
+
+// Bande compacte de mes paris en cours, en haut du Marché et du Live (sur mobile) : un appui ouvre l'onglet Positions.
+function MiniTicker({ engine, s, now, byLogin, bets, onOpen }) {
+  if (!bets.length) return null;
+  const chip = b => {
+    if (b.kind === "trade") { const net = liveTrade(engine, b, s).value - b.stake; return [engine.BY[b.tk].name, sW(net), cls(net)] }
+    if (b.kind === "stream") { const net = liveStream(b, byLogin[b.login], now).value - b.stake; return [byLogin[b.login]?.display_name ?? b.login, sW(net), cls(net)] }
+    if (b.kind === "question") { const st = byLogin[b.login], cur = st?.viewers ?? b.entry, win = (b.side === "yes") === (cur > b.threshold); return [st?.display_name ?? b.login, b.side === "yes" ? "Oui" : "Non", win ? "up" : "down"] }
+    return ["Duel", W(b.stake), "flat"];
+  };
+  return (
+    <button type="button" className="ticker" onClick={onOpen} aria-label="Voir mes paris en cours">
+      {bets.slice(0, 8).map(b => { const [n, v, c] = chip(b); return <span key={b.id} className="tick"><b>{n}</b><span className={"mono " + c}>{v}</span></span> })}
+    </button>
   );
 }
 
@@ -221,18 +268,18 @@ function SessionBar({ s, now, engine }) {
 }
 
 /* Mes positions en direct : toujours visibles, en tête sur mobile et dans la colonne de gauche sur grand écran. */
-function Positions({ engine, s, now, byLogin, bets, onClose }) {
-  if (!bets.length) return <div className="panel empty-pos"><h2>Mes positions</h2><p className="muted">Aucune position ouverte. Choisis un article et prends position à la hausse ou à la baisse.</p></div>;
+function Positions({ engine, s, now, byLogin, bets, onClose, vertical }) {
+  if (!bets.length && !vertical) return <div className="panel empty-pos"><h2>Mes positions</h2><p className="muted">Aucune position ouverte. Choisis un article et prends position à la hausse ou à la baisse.</p></div>;
   const list = [...bets].sort((a, b) => (b.kind !== "duel") - (a.kind !== "duel") || b.id - a.id);
+  const cards = list.map(b => b.kind === "trade" ? <TradeCard key={b.id} engine={engine} s={s} b={b} onClose={onClose} />
+    : b.kind === "stream" ? <StreamCard key={b.id} b={b} st={byLogin[b.login]} now={now} onClose={onClose} />
+    : b.kind === "question" ? <QuestionCard key={b.id} b={b} st={byLogin[b.login]} now={now} />
+    : <DuelCard key={b.id} engine={engine} b={b} />);
+  if (vertical) return <div className="pos-list vertical">{cards}</div>;
   return (
     <section className="panel">
       <h2>Mes positions <span className="muted">{bets.length} en cours</span></h2>
-      <div className="pos-list">
-        {list.map(b => b.kind === "trade" ? <TradeCard key={b.id} engine={engine} s={s} b={b} onClose={onClose} />
-          : b.kind === "stream" ? <StreamCard key={b.id} b={b} st={byLogin[b.login]} now={now} onClose={onClose} />
-          : b.kind === "question" ? <QuestionCard key={b.id} b={b} st={byLogin[b.login]} now={now} />
-          : <DuelCard key={b.id} engine={engine} b={b} />)}
-      </div>
+      <div className="pos-list">{cards}</div>
     </section>
   );
 }
@@ -304,14 +351,17 @@ function QuestionCard({ b, st, now }) {
 }
 
 function Streams({ src, streams: all, markets: allMarkets, mode, bets, now, onPick }) {
-  const [slot, setSlot] = useState(null), S = SRC[src], mineSrc = login => (srcOf(login) === S);
+  const [slot, setSlot] = useState(null), frozen = useRef({ key: null, logins: [] }), S = SRC[src], mineSrc = login => (srcOf(login) === S);
   const streams = all.filter(x => mineSrc(x.login)), markets = allMarkets.filter(m => mineSrc(m.login));
   if (!streams.length) return <p className="muted pad">{mode === "demo" ? S.demo : `Aucun relevé ${S.name} pour l'instant. La relève tourne chaque minute, reviens dans un instant.`}</p>;
   const slots = [...new Set(markets.map(m => m.closes_at))].sort(), cur = slots.includes(slot) ? slot : slots[0];
   const byL = Object.fromEntries(streams.map(x => [x.login, x])), lastTick = Math.max(...streams.map(x => Date.parse(x.at)));
   const mine = login => bets.some(b => (b.kind === "question" || b.kind === "stream") && b.login === login);
-  const list = markets.filter(m => m.closes_at === cur && byL[m.login]?.live).map(m => ({ m, x: byL[m.login] }))
-    .sort((a, b) => mine(b.x.login) - mine(a.x.login) || b.x.viewers - a.x.viewers);
+  const list = markets.filter(m => m.closes_at === cur && byL[m.login]?.live).map(m => ({ m, x: byL[m.login] }));
+  // Ordre figé tant qu'on reste sur la même échéance, pour ne pas faire bouger les cartes sous le doigt.
+  if (frozen.current.key !== src + cur || !frozen.current.logins.length) frozen.current = { key: src + cur, logins: [...list].sort((a, b) => b.x.viewers - a.x.viewers).map(r => r.x.login) };
+  const rank = l => { const i = frozen.current.logins.indexOf(l); return i < 0 ? 1e9 : i };
+  list.sort((a, b) => rank(a.x.login) - rank(b.x.login));
   return (
     <section>
       <div className="feed-info"><i className="pulse" aria-hidden="true" />{S.info} · dernier relevé {ago(now - lastTick)}</div>
@@ -371,16 +421,26 @@ function SessionResults({ engine, s, bets }) {
 }
 
 function Market({ engine, s, bets, onPick }) {
-  const [sector, setSector] = useState("Tout");
+  const [sector, setSector] = useState("Tout"), [sort, setSort] = useState("move"), [order, setOrder] = useState(null);
   const sectors = ["Tout", ...new Set(engine.STOCKS.map(x => x.sector))];
   const mine = tk => bets.find(b => b.kind === "trade" && b.tk === tk);
-  const rows = engine.STOCKS.filter(x => sector === "Tout" || x.sector === sector)
-    .map(x => { const p = engine.pathOf(x.tk, s.d); return { x, p, px: p[s.t], chg: p[s.t] / p[0] - 1 } })
-    .sort((a, b) => !!mine(b.x.tk) - !!mine(a.x.tk) || Math.abs(b.chg) - Math.abs(a.chg));
+  const all = engine.STOCKS.map(x => { const p = engine.pathOf(x.tk, s.d); return { x, p, px: p[s.t], chg: p[s.t] / p[0] - 1 } });
+  // L'ordre ne bouge pas tout seul : il est calculé au coup d'envoi, au changement de tri ou sur « Retrier ».
+  const resort = () => setOrder([...all].sort(sort === "az" ? (a, b) => a.x.name.localeCompare(b.x.name, "fr") : (a, b) => Math.abs(b.chg) - Math.abs(a.chg)).map(r => r.x.tk));
+  useEffect(resort, [sort, s.k]);
+  const byTk = Object.fromEntries(all.map(r => [r.x.tk, r]));
+  const rows = (order ?? all.map(r => r.x.tk)).map(tk => byTk[tk]).filter(r => sector === "Tout" || r.x.sector === sector);
   return (
     <section>
       <div className="chips" role="group" aria-label="Catégories">
         {sectors.map(x => <button key={x} type="button" aria-pressed={sector === x} onClick={() => setSector(x)}>{x}</button>)}
+      </div>
+      <div className="sortbar">
+        <div className="seg mini" role="group" aria-label="Tri">
+          <button type="button" aria-pressed={sort === "move"} onClick={() => setSort("move")}>Mouvements</button>
+          <button type="button" aria-pressed={sort === "az"} onClick={() => setSort("az")}>A → Z</button>
+        </div>
+        {sort === "move" && <button type="button" className="btn ghost" onClick={resort}>↻ Retrier</button>}
       </div>
       <div className="market">
         <div className="mrow head"><span>Article</span><span /><span className="r">Cours · séance</span><span /></div>
@@ -458,8 +518,7 @@ function History({ engine, byLogin, bets }) {
   );
 }
 
-function Board({ board, me, open, onRestart, onVisit }) {
-  const total = me.cash + open.reduce((a, b) => a + b.stake, 0);
+function Board({ board, me, onVisit }) {
   return (
     <section>
       <div className="board">
@@ -471,11 +530,7 @@ function Board({ board, me, open, onRestart, onVisit }) {
           </button>
         ))}
       </div>
-      <div className="panel bk">
-        <p><b>Faillite</b> Sous {W(BK_LIMIT)} (solde et mises en cours), tu peux repartir à {W(CAP0)}. Tes objets restent à toi. Le compteur s'affiche dans le classement.</p>
-        <button type="button" className="btn" disabled={total >= BK_LIMIT} onClick={onRestart}>Repartir</button>
-      </div>
-      <p className="fine">Classement au patrimoine : solde, mises en cours et 60 % du prix des objets du QG. Touche un joueur pour visiter son QG. Salaire de 500 W à la fin de chaque séance où tu as parié.</p>
+      <p className="fine">Classement au patrimoine : solde, mises en cours et 60 % du prix des objets du QG. Touche un joueur pour visiter son QG.</p>
     </section>
   );
 }
@@ -520,7 +575,7 @@ function Ticket({ engine, s, now, byLogin, me, ticket, pref, setPref, onClose, o
         <div className="row"><span>Cours actuel</span><b>{nf2.format(px)}</b></div>
         <div className="row"><span>1 % de variation</span><b>±{W(stake * pref.lev / 100)}</b></div>
         <div className="row"><span>Liquidation si le cours atteint</span><b>{nf2.format(liqPrice(b))}</b></div>
-        <div className="row"><span>Fermeture automatique</span><b>fin de séance, dans {mmss(s.endsAt - now)}</b></div>
+        <div className="row"><span>Fermeture</span><b>fin de séance · {mmss(s.endsAt - now)}</b></div>
       </div>
     </>;
   } else if (isQ) {
