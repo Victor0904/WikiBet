@@ -35,7 +35,27 @@ function liveStream(b, st, now) {
 // Instant du chiffre Twitch affiché : dernier relevé où le nombre a changé (Twitch le met à jour toutes les 1 à 3 min).
 function twitchAt(x) { let t = x.ts[0] ?? Date.parse(x.at); for (let i = 1; i < x.vs.length; i++) if (x.vs[i] !== x.vs[i - 1]) t = x.ts[i]; return t }
 const ago = ms => { const sec = Math.max(0, Math.round(ms / 1000)); return sec < 60 ? `il y a ${sec} s` : `il y a ${Math.floor(sec / 60)} min` };
-// Variation du nombre de spectateurs sur les 15 dernières minutes.
+// Sources des questions en direct : chaînes Twitch et jeux Steam (sujets 'steam:<appid>'), même mécanique.
+const SRC = {
+  twitch: {
+    unit: "spectateurs", name: "Twitch", what: "le live",
+    info: "Chiffres Twitch réels, que Twitch met à jour toutes les 1 à 3 min",
+    intro: "Le live dépassera-t-il le seuil à l'heure dite ? Réponds Oui ou Non : la cote est figée au moment du pari. Paris fermés 5 min avant l'échéance.",
+    demo: "Les streamers Twitch ne sont disponibles qu'en ligne : la démo locale n'a pas accès à Twitch.",
+    end: "si le live est terminé, c'est Non",
+    fine: "Spectateurs Twitch réels (API Twitch), relevés chaque minute. Une question se règle sur le dernier chiffre Twitch avant l'heure annoncée ; si le live est terminé, c'est Non.",
+  },
+  steam: {
+    unit: "joueurs", name: "Steam", what: "le jeu",
+    info: "Joueurs connectés réels sur Steam, relevés chaque minute",
+    intro: "Le jeu aura-t-il plus de joueurs connectés que le seuil à l'heure dite ? Réponds Oui ou Non : la cote est figée au moment du pari. Paris fermés 5 min avant l'échéance.",
+    demo: "Les jeux Steam ne sont disponibles qu'en ligne : la démo locale n'a pas accès à Steam.",
+    end: "s'il n'y a plus de relevé, c'est le dernier chiffre connu qui compte",
+    fine: "Joueurs connectés réels (API publique de Steam), relevés chaque minute. Une question se règle sur le dernier chiffre Steam avant l'heure annoncée.",
+  },
+};
+const srcOf = login => login?.startsWith("steam:") ? SRC.steam : SRC.twitch;
+// Variation du nombre de spectateurs (ou de joueurs) sur les 15 dernières minutes.
 function chg15(x) {
   if (!x.live || !x.vs.length) return 0;
   const lim = Date.parse(x.at) - 15 * 60000; let ref = x.vs[0];
@@ -133,11 +153,11 @@ function Game({ api, engine }) {
 
         <main className="main">
           <nav className="tabs" aria-label="Sections">
-            {[["market", "Marché"], ["streams", "Streamers"], ["duels", "Duels"], ["qg", "QG"], ["history", "Historique"], ["board", "Classement"]].map(([k, l]) =>
+            {[["market", "Marché"], ["streams", "Streamers"], ["steam", "Steam"], ["duels", "Duels"], ["qg", "QG"], ["history", "Historique"], ["board", "Classement"]].map(([k, l]) =>
               <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}>{l}</button>)}
           </nav>
           {tab === "market" && <Market engine={engine} s={s} bets={open} onPick={(tk, dir) => setTicket({ kind: "trade", tk, dir })} />}
-          {tab === "streams" && <Streams streams={streams} markets={markets} mode={api.mode} bets={open} now={now} onPick={(market, side) => setTicket({ kind: "question", market, side })} />}
+          {(tab === "streams" || tab === "steam") && <Streams key={tab} src={tab === "steam" ? "steam" : "twitch"} streams={streams} markets={markets} mode={api.mode} bets={open} now={now} onPick={(market, side) => setTicket({ kind: "question", market, side })} />}
           {tab === "duels" && <Duels engine={engine} s={s} onPick={(duel, side) => setTicket({ kind: "duel", duel, side })} />}
           {tab === "history" && <History engine={engine} byLogin={byLogin} bets={bets.filter(b => b.status !== "open")} />}
           {tab === "board" && <Board board={board} me={me} open={open} onVisit={visitQG} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} />}
@@ -274,20 +294,19 @@ function QuestionCard({ b, st, now }) {
         <b className="who">{st?.avatar && <img className="avatar sm" src={st.avatar} alt="" />}{st?.display_name ?? b.login}</b>
         <span className={"side " + (b.side === "yes" ? "up" : "down")}>{b.side === "yes" ? "Oui" : "Non"} · {nf2.format(b.odds)}</span>
       </div>
-      <p className="small">Plus de <b className="mono">{nf0.format(b.threshold)}</b> spectateurs à <b className="mono">{clock(end)}</b> ?</p>
+      <p className="small">Plus de <b className="mono">{nf0.format(b.threshold)}</b> {srcOf(b.login).unit} à <b className="mono">{clock(end)}</b> ?</p>
       <div className="pos-q mono"><span className={winning ? "up" : "down"}>{winning ? "gagnant" : "perdant"} pour l'instant</span><span>{nf0.format(cur)} / {nf0.format(b.threshold)}</span></div>
       <PositionChart id={b.id} entry={b.threshold} dir={b.side === "yes" ? "up" : "down"} pts={pts} x0={t0} x1={end} />
-      <div className="pos-x mono"><span>chiffre Twitch de {clock(at)}</span><span>mise {W(b.stake)}</span><span>gain {W(b.stake * b.odds)}</span></div>
-      {now >= end && <p className="muted small">Échéance passée, règlement au prochain chiffre Twitch…</p>}
+      <div className="pos-x mono"><span>chiffre {srcOf(b.login).name} de {clock(at)}</span><span>mise {W(b.stake)}</span><span>gain {W(b.stake * b.odds)}</span></div>
+      {now >= end && <p className="muted small">Échéance passée, règlement au prochain chiffre {srcOf(b.login).name}…</p>}
     </article>
   );
 }
 
-function Streams({ streams, markets, mode, bets, now, onPick }) {
-  const [slot, setSlot] = useState(null);
-  if (!streams.length) return <p className="muted pad">{mode === "demo"
-    ? "Les streamers Twitch ne sont disponibles qu'en ligne : la démo locale n'a pas accès à Twitch."
-    : "Aucun relevé Twitch pour l'instant. La relève tourne chaque minute, reviens dans un instant."}</p>;
+function Streams({ src, streams: all, markets: allMarkets, mode, bets, now, onPick }) {
+  const [slot, setSlot] = useState(null), S = SRC[src], mineSrc = login => (srcOf(login) === S);
+  const streams = all.filter(x => mineSrc(x.login)), markets = allMarkets.filter(m => mineSrc(m.login));
+  if (!streams.length) return <p className="muted pad">{mode === "demo" ? S.demo : `Aucun relevé ${S.name} pour l'instant. La relève tourne chaque minute, reviens dans un instant.`}</p>;
   const slots = [...new Set(markets.map(m => m.closes_at))].sort(), cur = slots.includes(slot) ? slot : slots[0];
   const byL = Object.fromEntries(streams.map(x => [x.login, x])), lastTick = Math.max(...streams.map(x => Date.parse(x.at)));
   const mine = login => bets.some(b => (b.kind === "question" || b.kind === "stream") && b.login === login);
@@ -295,24 +314,24 @@ function Streams({ streams, markets, mode, bets, now, onPick }) {
     .sort((a, b) => mine(b.x.login) - mine(a.x.login) || b.x.viewers - a.x.viewers);
   return (
     <section>
-      <div className="feed-info"><i className="pulse" aria-hidden="true" />Chiffres Twitch réels, que Twitch met à jour toutes les 1 à 3 min · dernier relevé {ago(now - lastTick)}</div>
-      <p className="muted small">Le live dépassera-t-il le seuil à l'heure dite ? Réponds Oui ou Non : la cote est figée au moment du pari. Paris fermés 5 min avant l'échéance.</p>
+      <div className="feed-info"><i className="pulse" aria-hidden="true" />{S.info} · dernier relevé {ago(now - lastTick)}</div>
+      <p className="muted small">{S.intro}</p>
       {slots.length > 0 && <div className="chips" role="group" aria-label="Échéance">
         {slots.map(t => <button key={t} type="button" aria-pressed={t === cur} onClick={() => setSlot(t)}>à {clock(Date.parse(t))}</button>)}
       </div>}
-      {!list.length && <p className="muted pad">Les questions arrivent avec le prochain relevé Twitch.</p>}
+      {!list.length && <p className="muted pad">Les questions arrivent avec le prochain relevé {S.name}.</p>}
       <div className="qlist">
         {list.map(({ m, x }) => (
           <article key={m.id} className={"qcard" + (mine(x.login) ? " mine" : "")}>
             <div className="qhead">
               <span className="who">
                 {x.avatar ? <img className="avatar" src={x.avatar} alt="" loading="lazy" /> : <span className="avatar" />}
-                <span><b>{x.display_name}</b><small title={x.title || ""}>{x.game || "en live"}</small></span>
+                <span><b>{x.display_name}</b><small title={x.title || ""}>{src === "steam" ? "joueurs connectés" : x.game || "en live"}</small></span>
               </span>
               <span className="r mono"><b>{nf0.format(x.viewers)}</b><small>chiffre de {clock(twitchAt(x))}</small></span>
             </div>
             {x.vs.length > 1 && <Spark path={x.vs} t={x.vs.length - 1} h={24} />}
-            <p className="qtext">Plus de <b className="mono">{nf0.format(m.threshold)}</b> spectateurs à <b className="mono">{clock(Date.parse(m.closes_at))}</b> ?</p>
+            <p className="qtext">Plus de <b className="mono">{nf0.format(m.threshold)}</b> {S.unit} à <b className="mono">{clock(Date.parse(m.closes_at))}</b> ?</p>
             <div className="qbtns">
               <button type="button" className="buy" onClick={() => onPick(m, "yes")}><span>Oui</span><b className="mono">{nf2.format(m.odds_yes)}</b></button>
               <button type="button" className="sell" onClick={() => onPick(m, "no")}><span>Non</span><b className="mono">{nf2.format(m.odds_no)}</b></button>
@@ -320,7 +339,7 @@ function Streams({ streams, markets, mode, bets, now, onPick }) {
           </article>
         ))}
       </div>
-      <p className="fine">Spectateurs Twitch réels (API Twitch), relevés chaque minute. Une question se règle sur le dernier chiffre Twitch avant l'heure annoncée ; si le live est terminé, c'est Non. Cote calculée sur l'écart au seuil, le temps restant et la volatilité du live sur la dernière heure, marge de 7 %.</p>
+      <p className="fine">{S.fine} Cote calculée sur l'écart au seuil, le temps restant et la volatilité du live sur la dernière heure, marge de 7 %.</p>
     </section>
   );
 }
@@ -506,7 +525,8 @@ function Ticket({ engine, s, now, byLogin, me, ticket, pref, setPref, onClose, o
     </>;
   } else if (isQ) {
     const m = ticket.market, x = byLogin[m.login], o = side === "yes" ? m.odds_yes : m.odds_no, end = Date.parse(m.closes_at);
-    title = `${x?.display_name ?? m.login} : plus de ${nf0.format(m.threshold)} spectateurs à ${clock(end)} ?`;
+    const S = srcOf(m.login);
+    title = `${x?.display_name ?? m.login} : plus de ${nf0.format(m.threshold)} ${S.unit} à ${clock(end)} ?`;
     cta = `${side === "yes" ? "Oui" : "Non"} à ${nf2.format(o)} · ${W(stake)}`;
     body = <>
       <div className="seg" role="group" aria-label="Réponse">
@@ -514,12 +534,12 @@ function Ticket({ engine, s, now, byLogin, me, ticket, pref, setPref, onClose, o
         <button type="button" aria-pressed={side === "no"} className="sell" onClick={() => setSide("no")}>Non · {nf2.format(m.odds_no)}</button>
       </div>
       <div className="rows mono">
-        <div className="row"><span>Spectateurs (chiffre de {x ? clock(twitchAt(x)) : "—"})</span><b>{x ? nf0.format(x.viewers) : "—"}</b></div>
+        <div className="row"><span>{S.unit[0].toUpperCase() + S.unit.slice(1)} (chiffre de {x ? clock(twitchAt(x)) : "—"})</span><b>{x ? nf0.format(x.viewers) : "—"}</b></div>
         <div className="row"><span>Seuil</span><b>{nf0.format(m.threshold)}</b></div>
         <div className="row"><span>Gain si {side === "yes" ? "Oui" : "Non"}</span><b>{W(stake * o)}</b></div>
         <div className="row"><span>Paris fermés à</span><b>{clock(end - 300000)}</b></div>
       </div>
-      <p className="muted small">Réglé sur le dernier chiffre Twitch avant {clock(end)} ; si le live est terminé, c'est Non. La cote bouge avec l'audience et le temps : celle retenue s'affiche après validation.</p>
+      <p className="muted small">Réglé sur le dernier chiffre {S.name} avant {clock(end)} ; {S.end}. La cote bouge avec l'audience et le temps : celle retenue s'affiche après validation.</p>
     </>;
   } else if (isStream) {
     const px = st?.viewers ?? 0, b = { entry: px, lev: pref.lev, dir, stake };

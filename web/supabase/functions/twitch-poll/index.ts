@@ -33,7 +33,7 @@ const q = (key: string, values: string[]) => values.map(v => `${key}=${encodeURI
 Deno.serve(async () => {
   try {
     // Garde-fou : une relève par minute au plus, même si quelqu'un appelle la fonction en boucle.
-    const { data: last } = await sb.from("stream_ticks").select("at").order("at", { ascending: false }).limit(1).maybeSingle();
+    const { data: last } = await sb.from("stream_ticks").select("at").not("login", "like", "steam:%").order("at", { ascending: false }).limit(1).maybeSingle();
     if (last && Date.now() - Date.parse(last.at) < 50_000) return Response.json({ skipped: true });
 
     const tok = await token();
