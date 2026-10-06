@@ -271,10 +271,10 @@ function SessionBar({ s, now, engine }) {
 function Positions({ engine, s, now, byLogin, bets, onClose, vertical }) {
   if (!bets.length && !vertical) return <div className="panel empty-pos"><h2>Mes positions</h2><p className="muted">Aucune position ouverte. Choisis un article et prends position à la hausse ou à la baisse.</p></div>;
   const list = [...bets].sort((a, b) => (b.kind !== "duel") - (a.kind !== "duel") || b.id - a.id);
-  const cards = list.map(b => b.kind === "trade" ? <TradeCard key={b.id} engine={engine} s={s} b={b} onClose={onClose} />
+  const cards = list.map(b => b.kind === "trade" ? <TradeCard key={b.id} engine={engine} s={s} now={now} b={b} onClose={onClose} />
     : b.kind === "stream" ? <StreamCard key={b.id} b={b} st={byLogin[b.login]} now={now} onClose={onClose} />
     : b.kind === "question" ? <QuestionCard key={b.id} b={b} st={byLogin[b.login]} now={now} />
-    : <DuelCard key={b.id} engine={engine} b={b} />);
+    : <DuelCard key={b.id} engine={engine} s={s} now={now} b={b} />);
   if (vertical) return <div className="pos-list vertical">{cards}</div>;
   return (
     <section className="panel">
@@ -284,9 +284,22 @@ function Positions({ engine, s, now, byLogin, bets, onClose, vertical }) {
   );
 }
 
-function TradeCard({ engine, s, b, onClose }) {
+// Informations détaillées d'un pari, en grille de deux colonnes.
+const Facts = ({ items }) => (
+  <dl className="facts">
+    {items.filter(Boolean).map(([k, v, c]) => <div key={k}><dt>{k}</dt><dd className={"mono " + (c || "")}>{v}</dd></div>)}
+  </dl>
+);
+// Temps restant lisible : « 4:12 » sous l'heure, « 1 h 05 » au-delà.
+const left = ms => ms <= 0 ? "maintenant" : ms < 3600e3 ? mmss(ms) : `${Math.floor(ms / 3600e3)} h ${String(Math.floor(ms / 60e3) % 60).padStart(2, "0")}`;
+// Barre de temps : part écoulée entre l'ouverture et la clôture prévue.
+const TimeBar = ({ from, to, now }) => <span className="timebar" aria-hidden="true"><i style={{ width: `${Math.max(0, Math.min(100, (now - from) / Math.max(1, to - from) * 100))}%` }} /></span>;
+// Distance au seuil de liquidation, en % du cours actuel ; alerte sous 3 %.
+const liqFact = (b, px, fmt) => { const lq = liqPrice(b), d = lq / px - 1; return ["Liquidation", `${fmt(lq)} (${pct(d)})`, Math.abs(d) < .03 ? "down warn" : ""] };
+
+function TradeCard({ engine, s, now, b, onClose }) {
   const st = liveTrade(engine, b, s), net = st.value - b.stake, name = engine.BY[b.tk].name;
-  const [busy, setBusy] = useState(false);
+  const live = b.session === s.k && s.playing, [busy, setBusy] = useState(false);
   return (
     <article className={"pos " + (net >= 0 ? "gain" : "loss")}>
       <div className="pos-h">
@@ -295,13 +308,17 @@ function TradeCard({ engine, s, b, onClose }) {
       </div>
       <div className="pos-pnl mono"><span className={cls(net)}>{sW(net)}</span><span className={cls(net)}>{pct(net / b.stake)}</span></div>
       <TradeChart b={b} path={engine.pathOf(b.tk, b.day)} upto={st.upto} />
-      <div className="pos-x mono">
-        <span>{hhmm(b.start_tick)} · entrée {nf2.format(b.entry)}</span>
-        <span>{st.liquidated ? "liquidée" : `${hhmm(st.upto)} · ${nf2.format(st.px)}`}</span>
-        <span>fin de séance</span>
-      </div>
+      <Facts items={[
+        ["Mise", `${W(b.stake)} · ×${b.lev}`],
+        ["Valeur", W(st.value), cls(net)],
+        ["Entrée", `${nf2.format(b.entry)} · ${clock(Date.parse(b.created_at))}`],
+        ["Cours", `${nf2.format(st.px)} (${pct(st.px / b.entry - 1)})`, cls((st.px / b.entry - 1) * (b.dir === "up" ? 1 : -1))],
+        !st.liquidated && liqFact(b, st.px, v => nf2.format(v)),
+        ["Clôture prévue", live ? `${clock(s.endsAt)} · dans ${left(s.endsAt - now)}` : "règlement en cours"],
+      ]} />
+      {live && <TimeBar from={Date.parse(b.created_at)} to={s.endsAt} now={now} />}
       {st.due
-        ? <p className="muted small">{st.liquidated ? "Liquidée, règlement en cours…" : "Échéance atteinte, règlement en cours…"}</p>
+        ? <p className="muted small">{st.liquidated ? "Liquidée, règlement en cours…" : "Fin de séance, règlement en cours…"}</p>
         : <button type="button" className="btn primary" disabled={busy} onClick={async () => { setBusy(true); await onClose(b); setBusy(false) }}>Clôturer · {W(st.value)}</button>}
     </article>
   );
@@ -319,11 +336,15 @@ function StreamCard({ b, st, now, onClose }) {
       </div>
       <div className="pos-pnl mono"><span className={cls(net)}>{sW(net)}</span><span className={cls(net)}>{pct(net / b.stake)}</span></div>
       <PositionChart id={b.id} entry={b.entry} dir={b.dir} pts={x.pts} x0={t0} x1={end} />
-      <div className="pos-x mono">
-        <span>{clock(t0)} · {nf0.format(b.entry)} spect.</span>
-        <span>{x.liquidated ? "liquidée" : `${clock(x.pts[x.pts.length - 1][0])} · ${nf0.format(x.px)}`}</span>
-        <span>{b.end_at ? `fin ${clock(end)}` : "fin du live"}</span>
-      </div>
+      <Facts items={[
+        ["Mise", `${W(b.stake)} · ×${b.lev}`],
+        ["Valeur", W(x.value), cls(net)],
+        ["Entrée", `${nf0.format(b.entry)} · ${clock(t0)}`],
+        ["Actuel", `${nf0.format(x.px)} (${pct(x.px / b.entry - 1)})`],
+        !x.liquidated && liqFact(b, x.px, v => nf0.format(Math.round(v))),
+        ["Clôture prévue", b.end_at ? `${clock(end)} · dans ${left(end - now)}` : "à la fin du live"],
+      ]} />
+      {b.end_at && <TimeBar from={t0} to={end} now={now} />}
       {x.due
         ? <p className="muted small">{x.liquidated ? "Liquidée, règlement en cours…" : st && !st.live ? "Live terminé, règlement en cours…" : "Échéance atteinte, règlement en cours…"}</p>
         : <button type="button" className="btn primary" disabled={busy} onClick={async () => { setBusy(true); await onClose(b); setBusy(false) }}>Clôturer · {W(x.value)}</button>}
@@ -334,18 +355,26 @@ function StreamCard({ b, st, now, onClose }) {
 function QuestionCard({ b, st, now }) {
   const t0 = Date.parse(b.created_at), end = Date.parse(b.end_at), upto = Math.min(now, end), pts = [[t0, b.entry]];
   if (st) st.ts.forEach((t, i) => { if (t > t0 && t <= upto) pts.push([t, st.vs[i]]) });
-  const [at, cur] = pts[pts.length - 1], winning = (b.side === "yes") === (cur > b.threshold);
+  const [at, cur] = pts[pts.length - 1], winning = (b.side === "yes") === (cur > b.threshold), S = srcOf(b.login);
   return (
     <article className={"pos " + (winning ? "gain" : "loss")}>
       <div className="pos-h">
         <b className="who">{st?.avatar && <img className="avatar sm" src={st.avatar} alt="" />}{st?.display_name ?? b.login}</b>
         <span className={"side " + (b.side === "yes" ? "up" : "down")}>{b.side === "yes" ? "Oui" : "Non"} · {nf2.format(b.odds)}</span>
       </div>
-      <p className="small">Plus de <b className="mono">{nf0.format(b.threshold)}</b> {srcOf(b.login).unit} à <b className="mono">{clock(end)}</b> ?</p>
+      <p className="small">Plus de <b className="mono">{nf0.format(b.threshold)}</b> {S.unit} à <b className="mono">{clock(end)}</b> ?</p>
       <div className="pos-q mono"><span className={winning ? "up" : "down"}>{winning ? "gagnant" : "perdant"} pour l'instant</span><span>{nf0.format(cur)} / {nf0.format(b.threshold)}</span></div>
       <PositionChart id={b.id} entry={b.threshold} dir={b.side === "yes" ? "up" : "down"} pts={pts} x0={t0} x1={end} />
-      <div className="pos-x mono"><span>chiffre {srcOf(b.login).name} de {clock(at)}</span><span>mise {W(b.stake)}</span><span>gain {W(b.stake * b.odds)}</span></div>
-      {now >= end && <p className="muted small">Échéance passée, règlement au prochain chiffre {srcOf(b.login).name}…</p>}
+      <Facts items={[
+        ["Mise", W(b.stake)],
+        ["Gain si gagné", W(b.stake * b.odds), "up"],
+        ["Au pari", `${nf0.format(b.entry)} · ${clock(t0)}`],
+        ["Écart au seuil", `${cur > b.threshold ? "+" : "−"}${nf0.format(Math.abs(cur - b.threshold))} (${pct(cur / b.threshold - 1)})`, winning ? "up" : "down"],
+        ["Échéance", now < end ? `${clock(end)} · dans ${left(end - now)}` : `${clock(end)} · passée`],
+        ["Chiffre affiché", `${S.name} de ${clock(at)}`],
+      ]} />
+      <TimeBar from={t0} to={end} now={now} />
+      {now >= end && <p className="muted small">Échéance passée, règlement au prochain chiffre {S.name}…</p>}
     </article>
   );
 }
@@ -394,14 +423,21 @@ function Streams({ src, streams: all, markets: allMarkets, mode, bets, now, onPi
   );
 }
 
-function DuelCard({ engine, b }) {
+function DuelCard({ engine, s, now, b }) {
   const du = engine.makeDuels(b.day).find(x => x.id === b.duel_id);
-  const [w, o] = b.side === "a" ? [du.a, du.b] : [du.b, du.a];
+  const [w, o] = b.side === "a" ? [du.a, du.b] : [du.b, du.a], W1 = engine.BY[w], W2 = engine.BY[o];
+  const live = b.session === s.k && s.playing;
   return (
     <article className="pos">
-      <div className="pos-h"><b>{engine.BY[w].name}</b><span className="side duel">duel</span></div>
-      <p className="muted small">bat {engine.BY[o].name} en vues · réglé à la fin de la séance</p>
-      <div className="pos-x mono"><span>mise {W(b.stake)} · cote {nf2.format(b.odds)}</span><span>gain {W(b.stake * b.odds)}</span></div>
+      <div className="pos-h"><b>{W1.name}</b><span className="side duel">duel · {nf2.format(b.odds)}</span></div>
+      <p className="muted small">bat {W2.name} en vues sur la journée</p>
+      <Facts items={[
+        ["Mise", W(b.stake)],
+        ["Gain si gagné", W(b.stake * b.odds), "up"],
+        ["Vues la veille", `${nf0.format(W1.views[b.day])} contre ${nf0.format(W2.views[b.day])}`],
+        ["Résultat", live ? `${clock(s.endsAt)} · dans ${left(s.endsAt - now)}` : "règlement en cours"],
+      ]} />
+      {live && <TimeBar from={s.startsAt} to={s.endsAt} now={now} />}
     </article>
   );
 }
