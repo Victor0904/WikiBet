@@ -123,6 +123,24 @@ h2 .muted { font: 400 12.5px var(--f-body) }
 .mrow.off { opacity: .55 }
 .clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 
+/* Questions sur les streamers */
+.feed-info { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; margin-bottom: 8px }
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--up); flex: none; animation: blink 2s infinite }
+@keyframes blink { 50% { opacity: .3 } }
+.qlist { display: grid; gap: 10px }
+.qcard { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0 }
+.qcard.mine { border-color: var(--accent) }
+.qhead { display: flex; justify-content: space-between; align-items: center; gap: 10px }
+.qhead .r b { font-size: 17px; font-weight: 600 }
+.qhead .r small { font-size: 11.5px; color: var(--faint) }
+.qcard .spark { height: 24px }
+.qtext { margin: 0; font-size: 15px }
+.qbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
+.qbtns button { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 8px; font-size: 14px }
+.qbtns button b { font-size: 17px }
+.pos-q { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 600 }
+@media (min-width: 1024px) { .qlist { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+
 /* Duels */
 .duels { display: flex; flex-direction: column; gap: 10px }
 .duel { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 8px }

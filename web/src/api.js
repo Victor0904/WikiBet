@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 
 // Les identifiants bigint et les cotes numeric arrivent parfois en texte : on normalise une fois ici.
 export const normBet = b => ({ ...b, id: Number(b.id), odds: b.odds == null ? null : Number(b.odds) });
+export const normMarket = m => ({ ...m, id: Number(m.id), closes_at: new Date(m.closes_at).toISOString(), p_yes: Number(m.p_yes), odds_yes: Number(m.odds_yes), odds_no: Number(m.odds_no) });
 export const normStream = s => ({ ...s, ts: (s.ts || []).map(Number), vs: (s.vs || []).map(Number) });
 
 export async function connect(engine) {
@@ -34,6 +35,8 @@ export async function connect(engine) {
     betDuel: ({ duel, side, stake }) => rpc("bet_duel", { p_duel: duel, p_side: side, p_stake: stake }),
     openStream: ({ login, dir, lev, stake, horizon }) => rpc("open_stream", { p_login: login, p_dir: dir, p_lev: lev, p_stake: stake, p_horizon: horizon }),
     streamBoard: async () => (await rpc("stream_board", { p_minutes: 120 })).map(normStream),
+    openMarkets: async () => (await rpc("open_markets")).map(normMarket),
+    betQuestion: ({ market, side, stake }) => rpc("bet_question", { p_market: market, p_side: side, p_stake: stake }),
     restart: () => rpc("restart"),
     settle: () => rpc("settle"),
     myBets: async minSession => (await rows(sb.from("bets").select("*").eq("user_id", uid).or(`status.eq.open,session.gte.${minSession}`).order("id", { ascending: false }))).map(normBet),

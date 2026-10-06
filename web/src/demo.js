@@ -5,12 +5,12 @@ import stub from "./demo-stub.sql?raw";
 // Toutes les migrations, dans l'ordre de leur nom (horodaté).
 const migrations = Object.entries(import.meta.glob("../supabase/migrations/*.sql", { query: "?raw", import: "default", eager: true })).sort(([a], [b]) => a.localeCompare(b)).map(([, sql]) => sql);
 import { seedRows } from "./seed.js";
-import { normBet, normStream } from "./api.js";
+import { normBet, normStream, normMarket } from "./api.js";
 
 const UID = "00000000-0000-4000-8000-000000000001";
 
 export async function demoApi(engine) {
-  const db = new PGlite("idb://wikibourse-demo-2"); // changer le numéro quand la migration change
+  const db = new PGlite("idb://wikibourse-demo-3"); // changer le numéro quand la migration change
   const ready = (await db.query("select to_regclass('public.bets') is not null as ok")).rows[0].ok;
   if (!ready) {
     await db.exec(stub);
@@ -36,6 +36,8 @@ export async function demoApi(engine) {
     betDuel: ({ duel, side, stake }) => act("select * from bet_duel($1, $2, $3)", [duel, side, stake]),
     openStream: ({ login, dir, lev, stake, horizon }) => act("select * from open_stream($1, $2, $3, $4, $5)", [login, dir, lev, stake, horizon]),
     streamBoard: async () => (await all("select * from stream_board(120)")).map(normStream),
+    openMarkets: async () => (await all("select * from open_markets()")).map(normMarket),
+    betQuestion: ({ market, side, stake }) => act("select * from bet_question($1, $2, $3)", [market, side, stake]),
     restart: () => act("select * from restart()"),
     settle: async () => (await all("select settle() as n"))[0].n,
     myBets: async min => (await all("select * from bets where user_id = $1 and (status = 'open' or session >= $2) order by id desc", [UID, min])).map(normBet),

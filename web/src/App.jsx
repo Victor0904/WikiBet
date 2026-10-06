@@ -35,6 +35,9 @@ function liveStream(b, st, now) {
   const px = pts[pts.length - 1][1];
   return { value: tradeValue(b, px), px, pts, liquidated: false, due: (end != null && now >= end) || (!!st && !st.live) };
 }
+// Instant du chiffre Twitch affiché : dernier relevé où le nombre a changé (Twitch le met à jour toutes les 1 à 3 min).
+function twitchAt(x) { let t = x.ts[0] ?? Date.parse(x.at); for (let i = 1; i < x.vs.length; i++) if (x.vs[i] !== x.vs[i - 1]) t = x.ts[i]; return t }
+const ago = ms => { const sec = Math.max(0, Math.round(ms / 1000)); return sec < 60 ? `il y a ${sec} s` : `il y a ${Math.floor(sec / 60)} min` };
 // Variation du nombre de spectateurs sur les 15 dernières minutes.
 function chg15(x) {
   if (!x.live || !x.vs.length) return 0;
@@ -72,13 +75,13 @@ function Game({ api, engine }) {
   useEffect(() => { refresh(); return api.onChange(refresh) }, [api, refresh]);
 
   // Lives Twitch : relevés côté serveur chaque minute, rechargés ici toutes les 20 s.
-  const [streams, setStreams] = useState([]);
-  const loadStreams = useCallback(() => api.streamBoard().then(setStreams).catch(() => {}), [api]);
+  const [streams, setStreams] = useState([]), [markets, setMarkets] = useState([]);
+  const loadStreams = useCallback(() => Promise.all([api.streamBoard(), api.openMarkets().catch(() => [])]).then(([b, m]) => { setStreams(b); setMarkets(m) }).catch(() => {}), [api]);
   useEffect(() => { loadStreams(); const id = setInterval(loadStreams, 20000); return () => clearInterval(id) }, [loadStreams]);
   const byLogin = useMemo(() => Object.fromEntries(streams.map(x => [x.login, x])), [streams]);
 
   // Règlement : au changement de phase, quand une position arrive à échéance ou se fait liquider, et toutes les 15 s.
-  const due = bets.filter(b => b.status === "open" && (b.kind === "trade" ? liveTrade(engine, b, s).due : b.kind === "stream" ? liveStream(b, byLogin[b.login], now).due : b.session < s.k || !s.playing)).length;
+  const due = bets.filter(b => b.status === "open" && (b.kind === "trade" ? liveTrade(engine, b, s).due : b.kind === "stream" ? liveStream(b, byLogin[b.login], now).due : b.kind === "question" ? now >= Date.parse(b.end_at) : b.session < s.k || !s.playing)).length;
   const settle = useCallback(() => api.settle().then(refresh).catch(() => {}), [api, refresh]);
   useEffect(() => { if (due) settle() }, [due, settle]);
   useEffect(() => { settle() }, [s.k, s.playing, settle]);
@@ -120,7 +123,7 @@ function Game({ api, engine }) {
               <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}>{l}</button>)}
           </nav>
           {tab === "market" && <Market engine={engine} s={s} bets={open} onPick={(tk, dir) => setTicket({ kind: "trade", tk, dir })} />}
-          {tab === "streams" && <Streams streams={streams} mode={api.mode} bets={open} onPick={(login, dir) => setTicket({ kind: "stream", login, dir })} />}
+          {tab === "streams" && <Streams streams={streams} markets={markets} mode={api.mode} bets={open} now={now} onPick={(market, side) => setTicket({ kind: "question", market, side })} />}
           {tab === "duels" && <Duels engine={engine} s={s} onPick={(duel, side) => setTicket({ kind: "duel", duel, side })} />}
           {tab === "history" && <History engine={engine} byLogin={byLogin} bets={bets.filter(b => b.status !== "open")} />}
           {tab === "board" && <Board board={board} me={me} open={open} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} />}
@@ -136,8 +139,9 @@ function Game({ api, engine }) {
           const opened = b => `Position ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} ouverte · ${W(b.stake)}`;
           const r = ticket.kind === "trade" ? await run(() => api.openTrade(args), opened)
             : ticket.kind === "stream" ? await run(() => api.openStream(args), opened)
+            : ticket.kind === "question" ? await run(() => api.betQuestion(args), b => `Pari validé : ${b.side === "yes" ? "Oui" : "Non"} à ${nf2.format(b.odds)} · ${W(b.stake)}`)
             : await run(() => api.betDuel(args), b => `Pari validé · ${W(b.stake)}`);
-          if (ticket.kind === "stream") loadStreams();
+          if (ticket.kind === "stream" || ticket.kind === "question") loadStreams();
           if (r) setTicket(null);
         }} />}
       {toast && <div className={"toast " + (toast.tone || "")} role="status">{toast.text}</div>}
@@ -184,6 +188,7 @@ function Positions({ engine, s, now, byLogin, bets, onClose }) {
       <div className="pos-list">
         {list.map(b => b.kind === "trade" ? <TradeCard key={b.id} engine={engine} s={s} b={b} onClose={onClose} />
           : b.kind === "stream" ? <StreamCard key={b.id} b={b} st={byLogin[b.login]} now={now} onClose={onClose} />
+          : b.kind === "question" ? <QuestionCard key={b.id} b={b} st={byLogin[b.login]} now={now} />
           : <DuelCard key={b.id} engine={engine} b={b} />)}
       </div>
     </section>
@@ -237,36 +242,63 @@ function StreamCard({ b, st, now, onClose }) {
   );
 }
 
-function Streams({ streams, mode, bets, onPick }) {
+function QuestionCard({ b, st, now }) {
+  const t0 = Date.parse(b.created_at), end = Date.parse(b.end_at), upto = Math.min(now, end), pts = [[t0, b.entry]];
+  if (st) st.ts.forEach((t, i) => { if (t > t0 && t <= upto) pts.push([t, st.vs[i]]) });
+  const [at, cur] = pts[pts.length - 1], winning = (b.side === "yes") === (cur > b.threshold);
+  return (
+    <article className={"pos " + (winning ? "gain" : "loss")}>
+      <div className="pos-h">
+        <b className="who">{st?.avatar && <img className="avatar sm" src={st.avatar} alt="" />}{st?.display_name ?? b.login}</b>
+        <span className={"side " + (b.side === "yes" ? "up" : "down")}>{b.side === "yes" ? "Oui" : "Non"} · {nf2.format(b.odds)}</span>
+      </div>
+      <p className="small">Plus de <b className="mono">{nf0.format(b.threshold)}</b> spectateurs à <b className="mono">{clock(end)}</b> ?</p>
+      <div className="pos-q mono"><span className={winning ? "up" : "down"}>{winning ? "gagnant" : "perdant"} pour l'instant</span><span>{nf0.format(cur)} / {nf0.format(b.threshold)}</span></div>
+      <PositionChart id={b.id} entry={b.threshold} dir={b.side === "yes" ? "up" : "down"} pts={pts} x0={t0} x1={end} />
+      <div className="pos-x mono"><span>chiffre Twitch de {clock(at)}</span><span>mise {W(b.stake)}</span><span>gain {W(b.stake * b.odds)}</span></div>
+      {now >= end && <p className="muted small">Échéance passée, règlement au prochain chiffre Twitch…</p>}
+    </article>
+  );
+}
+
+function Streams({ streams, markets, mode, bets, now, onPick }) {
+  const [slot, setSlot] = useState(null);
   if (!streams.length) return <p className="muted pad">{mode === "demo"
     ? "Les streamers Twitch ne sont disponibles qu'en ligne : la démo locale n'a pas accès à Twitch."
     : "Aucun relevé Twitch pour l'instant. La relève tourne chaque minute, reviens dans un instant."}</p>;
-  const mine = login => bets.some(b => b.kind === "stream" && b.login === login);
-  const list = [...streams].sort((a, b) => mine(b.login) - mine(a.login) || b.live - a.live || b.viewers - a.viewers);
+  const slots = [...new Set(markets.map(m => m.closes_at))].sort(), cur = slots.includes(slot) ? slot : slots[0];
+  const byL = Object.fromEntries(streams.map(x => [x.login, x])), lastTick = Math.max(...streams.map(x => Date.parse(x.at)));
+  const mine = login => bets.some(b => (b.kind === "question" || b.kind === "stream") && b.login === login);
+  const list = markets.filter(m => m.closes_at === cur && byL[m.login]?.live).map(m => ({ m, x: byL[m.login] }))
+    .sort((a, b) => mine(b.x.login) - mine(a.x.login) || b.x.viewers - a.x.viewers);
   return (
     <section>
-      <p className="muted small">Lives Twitch francophones les plus regardés, relevés chaque minute. Prends position sur la hausse ou la baisse du nombre de spectateurs : jusqu'à 15 min, 1 h ou la fin du live.</p>
-      <div className="market">
-        <div className="mrow head"><span>Streamer</span><span /><span className="r">Spectateurs · 15 min</span><span /></div>
-        {list.map(x => {
-          const c = chg15(x), fresh = Date.now() - Date.parse(x.at) < 180000, can = x.live && fresh;
-          return (
-            <div key={x.login} className={"mrow" + (mine(x.login) ? " mine" : "") + (x.live ? "" : " off")}>
-              <span className="name who">
+      <div className="feed-info"><i className="pulse" aria-hidden="true" />Chiffres Twitch réels, que Twitch met à jour toutes les 1 à 3 min · dernier relevé {ago(now - lastTick)}</div>
+      <p className="muted small">Le live dépassera-t-il le seuil à l'heure dite ? Réponds Oui ou Non : la cote est figée au moment du pari. Paris fermés 5 min avant l'échéance.</p>
+      {slots.length > 0 && <div className="chips" role="group" aria-label="Échéance">
+        {slots.map(t => <button key={t} type="button" aria-pressed={t === cur} onClick={() => setSlot(t)}>à {clock(Date.parse(t))}</button>)}
+      </div>}
+      {!list.length && <p className="muted pad">Les questions arrivent avec le prochain relevé Twitch.</p>}
+      <div className="qlist">
+        {list.map(({ m, x }) => (
+          <article key={m.id} className={"qcard" + (mine(x.login) ? " mine" : "")}>
+            <div className="qhead">
+              <span className="who">
                 {x.avatar ? <img className="avatar" src={x.avatar} alt="" loading="lazy" /> : <span className="avatar" />}
-                <span><b>{x.display_name}</b><small title={x.title || ""}>{x.live ? (x.game || "en live") : "hors ligne"}</small></span>
+                <span><b>{x.display_name}</b><small title={x.title || ""}>{x.game || "en live"}</small></span>
               </span>
-              {x.vs.length > 1 ? <Spark path={x.vs} t={x.vs.length - 1} /> : <span />}
-              <span className="r mono"><b>{x.live ? nf0.format(x.viewers) : "—"}</b><small className={cls(c)}>{x.live ? pct(c) : ""}</small></span>
-              <span className="act">
-                <button type="button" className="buy" disabled={!can} onClick={() => onPick(x.login, "up")} aria-label={`Hausse des spectateurs de ${x.display_name}`}>▲</button>
-                <button type="button" className="sell" disabled={!can} onClick={() => onPick(x.login, "down")} aria-label={`Baisse des spectateurs de ${x.display_name}`}>▼</button>
-              </span>
+              <span className="r mono"><b>{nf0.format(x.viewers)}</b><small>chiffre de {clock(twitchAt(x))}</small></span>
             </div>
-          );
-        })}
+            {x.vs.length > 1 && <Spark path={x.vs} t={x.vs.length - 1} h={24} />}
+            <p className="qtext">Plus de <b className="mono">{nf0.format(m.threshold)}</b> spectateurs à <b className="mono">{clock(Date.parse(m.closes_at))}</b> ?</p>
+            <div className="qbtns">
+              <button type="button" className="buy" onClick={() => onPick(m, "yes")}><span>Oui</span><b className="mono">{nf2.format(m.odds_yes)}</b></button>
+              <button type="button" className="sell" onClick={() => onPick(m, "no")}><span>Non</span><b className="mono">{nf2.format(m.odds_no)}</b></button>
+            </div>
+          </article>
+        ))}
       </div>
-      <p className="fine">Spectateurs Twitch réels (API Twitch). Un relevé par minute : une position se règle sur le dernier relevé avant l'échéance, ou avant la fin du live.</p>
+      <p className="fine">Spectateurs Twitch réels (API Twitch), relevés chaque minute. Une question se règle sur le dernier chiffre Twitch avant l'heure annoncée ; si le live est terminé, c'est Non. Cote calculée sur l'écart au seuil, le temps restant et la volatilité du live sur la dernière heure, marge de 7 %.</p>
     </section>
   );
 }
@@ -362,6 +394,12 @@ function History({ engine, byLogin, bets }) {
         const label = b.kind === "trade" ? `${engine.BY[b.tk].name} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev}`
           : b.kind === "stream" ? `${byLogin[b.login]?.display_name ?? b.login} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} · Twitch`
           : (() => { const d = engine.makeDuels(b.day).find(x => x.id === b.duel_id); return `${engine.BY[b.side === "a" ? d.a : d.b].name} (duel)` })();
+        if (b.kind === "question") return (
+          <div key={b.id} className="hrow">
+            <span><b>{byLogin[b.login]?.display_name ?? b.login} · plus de {nf0.format(b.threshold)} à {clock(Date.parse(b.end_at))} : {b.side === "yes" ? "Oui" : "Non"}</b><small>chiffre final {b.exit != null ? nf0.format(b.exit) : "—"} · cote {nf2.format(b.odds)}</small></span>
+            <span className="r mono"><b className={cls(net)}>{sW(net)}</b><small>mise {W(b.stake)}</small></span>
+          </div>
+        );
         if (b.kind === "stream") return (
           <div key={b.id} className="hrow">
             <span><b>{label}</b><small>{clock(Date.parse(b.created_at))} → {b.exit_at ? clock(Date.parse(b.exit_at)) : "—"} · {nf0.format(b.entry)} → {b.exit != null ? nf0.format(b.exit) : "—"} spectateurs{b.payout === 0 ? " · liquidée" : ""}</small></span>
@@ -402,12 +440,13 @@ function Board({ board, me, open, onRestart }) {
 }
 
 function Ticket({ engine, s, now, byLogin, me, ticket, pref, setPref, onClose, onSubmit }) {
-  const [stake, setStake] = useState(pref.stake), [busy, setBusy] = useState(false), [dir, setDir] = useState(ticket.dir);
+  const [stake, setStake] = useState(pref.stake), [busy, setBusy] = useState(false), [dir, setDir] = useState(ticket.dir), [side, setSide] = useState(ticket.side);
   const isTrade = ticket.kind === "trade", isStream = ticket.kind === "stream", isPos = isTrade || isStream;
   const st = isStream ? byLogin[ticket.login] : null;
   const set = p => setPref(x => ({ ...x, ...p }));
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
-  const open = isStream ? !!st?.live : s.playing;
+  const isQ = ticket.kind === "question";
+  const open = isQ ? Date.parse(ticket.market.closes_at) - 300000 > now : isStream ? !!st?.live : s.playing;
   const ok = stake > 0 && stake <= me.cash && open;
   let body, title, cta;
   if (isTrade) {
@@ -429,6 +468,23 @@ function Ticket({ engine, s, now, byLogin, me, ticket, pref, setPref, onClose, o
         <div className="row"><span>Liquidation si le cours atteint</span><b>{nf2.format(liqPrice(b))}</b></div>
         <div className="row"><span>Fermeture automatique</span><b>{hhmm(endTick(pref.horizon, s.t))}</b></div>
       </div>
+    </>;
+  } else if (isQ) {
+    const m = ticket.market, x = byLogin[m.login], o = side === "yes" ? m.odds_yes : m.odds_no, end = Date.parse(m.closes_at);
+    title = `${x?.display_name ?? m.login} : plus de ${nf0.format(m.threshold)} spectateurs à ${clock(end)} ?`;
+    cta = `${side === "yes" ? "Oui" : "Non"} à ${nf2.format(o)} · ${W(stake)}`;
+    body = <>
+      <div className="seg" role="group" aria-label="Réponse">
+        <button type="button" aria-pressed={side === "yes"} className="buy" onClick={() => setSide("yes")}>Oui · {nf2.format(m.odds_yes)}</button>
+        <button type="button" aria-pressed={side === "no"} className="sell" onClick={() => setSide("no")}>Non · {nf2.format(m.odds_no)}</button>
+      </div>
+      <div className="rows mono">
+        <div className="row"><span>Spectateurs (chiffre de {x ? clock(twitchAt(x)) : "—"})</span><b>{x ? nf0.format(x.viewers) : "—"}</b></div>
+        <div className="row"><span>Seuil</span><b>{nf0.format(m.threshold)}</b></div>
+        <div className="row"><span>Gain si {side === "yes" ? "Oui" : "Non"}</span><b>{W(stake * o)}</b></div>
+        <div className="row"><span>Paris fermés à</span><b>{clock(end - 300000)}</b></div>
+      </div>
+      <p className="muted small">Réglé sur le dernier chiffre Twitch avant {clock(end)} ; si le live est terminé, c'est Non. La cote bouge avec l'audience et le temps : celle retenue s'affiche après validation.</p>
     </>;
   } else if (isStream) {
     const px = st?.viewers ?? 0, b = { entry: px, lev: pref.lev, dir, stake };
@@ -463,6 +519,7 @@ function Ticket({ engine, s, now, byLogin, me, ticket, pref, setPref, onClose, o
         e.preventDefault(); if (!ok) return; setBusy(true); set({ stake });
         await onSubmit(isTrade ? { tk: ticket.tk, dir, lev: pref.lev, stake, horizon: pref.horizon }
           : isStream ? { login: ticket.login, dir, lev: pref.lev, stake, horizon: pref.shorizon }
+          : isQ ? { market: ticket.market.id, side, stake }
           : { duel: ticket.duel.id, side: ticket.side, stake });
         setBusy(false);
       }}>
@@ -471,9 +528,9 @@ function Ticket({ engine, s, now, byLogin, me, ticket, pref, setPref, onClose, o
         <label htmlFor="stake">Mise</label>
         <div className="stake"><input id="stake" className="mono" type="number" inputMode="numeric" min="1" step="1" value={stake} onChange={e => setStake(Math.max(0, Math.floor(+e.target.value || 0)))} /><span>W</span></div>
         <div className="chips">{[100, 500, 1000].map(v => <button key={v} type="button" onClick={() => setStake(v)}>{nf0.format(v)}</button>)}<button type="button" onClick={() => setStake(Math.floor(me.cash))}>Max</button></div>
-        {!open && <p className="error small">{isStream ? "Ce streamer n'est plus en live." : "Séance fermée, reprise dans quelques secondes."}</p>}
+        {!open && <p className="error small">{isQ ? "Les paris sur cette question sont fermés." : isStream ? "Ce streamer n'est plus en live." : "Séance fermée, reprise dans quelques secondes."}</p>}
         {stake > me.cash && <p className="error small">Solde insuffisant : il te manque {W(stake - me.cash)}.</p>}
-        <button type="submit" className={"btn big " + (isPos ? (dir === "up" ? "buy" : "sell") : "primary")} disabled={!ok || busy}>{cta}</button>
+        <button type="submit" className={"btn big " + (isPos ? (dir === "up" ? "buy" : "sell") : isQ ? (side === "yes" ? "buy" : "sell") : "primary")} disabled={!ok || busy}>{cta}</button>
       </form>
     </div>
   );
