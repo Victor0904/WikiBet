@@ -15,6 +15,9 @@ const gdur = ms => { const m = Math.max(0, Math.floor(ms / 1000 / SPM)), d = Mat
 // « aujourd'hui 14:45 », « demain 09:00 », « jour 14 · 16:00 » (jour et heure d'Aurelys).
 const gwhen = (atMs, nowMs) => { const a = gameClock(atMs / 1000), n = gameClock(nowMs / 1000), d = a.day - n.day;
   return `${d === 0 ? "aujourd'hui" : d === 1 ? "demain" : `jour ${a.day}`} ${a.hm}` };
+// Heure réelle, pour les articles et les levées de fonds : « 21:30 », « demain 01:30 », « ven. 9 oct. 14:00 ».
+const real = ms => { const d = new Date(ms), t = clock(ms), n = new Date(), days = Math.round((new Date(d).setHours(0, 0, 0, 0) - new Date(n).setHours(0, 0, 0, 0)) / 864e5);
+  return days === 0 ? t : days === 1 ? `demain ${t}` : days === -1 ? `hier ${t}` : `${d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })} ${t}` };
 const signed = v => `${v >= 0 ? "+" : "−"}${nf2.format(Math.abs(v)).replace(/,?0+$/, "")} %`;
 const agoTxt = ms => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `il y a ${s} s` : s < 3600 ? `il y a ${Math.floor(s / 60)} min` : `il y a ${Math.floor(s / 3600)} h` };
 // Derniers cours pour une mini-courbe : bougies d'une heure d'Aurelys, ou cours minute par minute tant qu'il y a peu de bougies.
@@ -65,7 +68,7 @@ export function AurelysMarket({ aur, now, bets, onPick, onDetail, onSubscribe })
       <div className="chips" role="group" aria-label="Vue">
         {VIEWS.map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}
       </div>
-      {view === "board" ? <Board aur={aur} now={now} onDetail={onDetail} onNews={() => setView("news")} onRead={setRead} />
+      {view === "board" ? <Board aur={aur} now={now} onDetail={onDetail} onNews={() => setView("news")} onRead={setRead} onList={() => setView("list")} />
         : view === "list" ? <List aur={aur} now={now} bets={bets} onPick={onPick} onDetail={onDetail} onSubscribe={onSubscribe} onRead={setRead} />
         : view === "news" ? <News aur={aur} now={now} onDetail={onDetail} onRead={setRead} />
         : <Heat aur={aur} now={now} onDetail={onDetail} />}
@@ -89,7 +92,7 @@ const CalRow = ({ e, aur, now }) => {
   return <div className="row"><span>{e.title}{c != null && <small className="cons"> · attendu {signed(c)}</small>}</span><b className="mono">{gwhen(e.at, now)}</b></div>;
 };
 
-function Board({ aur, now, onDetail, onNews, onRead }) {
+function Board({ aur, now, onDetail, onNews, onRead, onList }) {
   const x = aur.x, reg = REGIMES[x?.reg ?? "calme"], idx = closesOf(aur, INDEX, 36);
   // Palmarès figé une heure d'Aurelys (5 min réelles) pour ne pas bouger sous le doigt.
   const slot = Math.floor(now / 300000);
@@ -108,6 +111,14 @@ function Board({ aur, now, onDetail, onNews, onRead }) {
         <div className="tile"><small>Taux directeur</small><b className="mono">{x ? nf2.format(x.r) + " %" : "—"}</b></div>
         <div className="tile"><small>Croissance · inflation</small><b className="mono">{x ? `${nf2.format(x.g)} · ${nf2.format(x.pi)} %` : "—"}</b></div>
       </div>
+      {aur.rounds.map(d => (
+        <button key={d.tk} type="button" className="panel round-teaser" onClick={onList}>
+          <span className="paper-kicker">Introduction en bourse · levée de fonds</span>
+          <b>{d.name} · {d.what}</b>
+          <span className="muted small">Souscription à {px(d.roundPrice)} Ꜷ jusqu'à {real(d.roundEnds)} · dès {W(IPO.minWealth)} de patrimoine</span>
+          <span className="accent small">Voir la levée →</span>
+        </button>
+      ))}
       <div className="panel">
         <h2>Le jour d'Aurelys <span className="muted">depuis 00:00</span></h2>
         {[...movers.slice(0, 3), ...movers.slice(-3)].map(({ s }) => {
@@ -155,7 +166,8 @@ function List({ aur, now, bets, onPick, onDetail, onSubscribe, onRead }) {
         {aur.rounds.map(d => (
           <article key={d.tk} className="panel round">
             <div className="round-h"><TkIcon tk={d.tk} size={30} /><span><b>{d.name}</b><small className="muted">{d.what} · {SECTORS[d.sector]?.name}</small></span>
-              <span className="r mono"><b>{px(d.roundPrice)} Ꜷ</b><small>clôture {d.roundEnds ? gwhen(d.roundEnds, now) : "—"}</small></span></div>
+              <span className="r mono"><b>{px(d.roundPrice)} Ꜷ</b><small>clôture {d.roundEnds ? real(d.roundEnds) : "—"}</small></span></div>
+            <RoundClock d={d} now={now} stats={aur.roundStats?.[d.tk]} />
             <p className="small">{d.story}</p>
             <div className="empty-acts">
               <button type="button" className="btn primary" onClick={() => onSubscribe(d.tk)}>Souscrire</button>
@@ -179,6 +191,21 @@ function List({ aur, now, bets, onPick, onDetail, onSubscribe, onRead }) {
 const CAT = { resultats: "Résultats", essai: "Essai clinique", contrat: "Contrat", scandale: "Scandale", pdg: "Déclaration", analyste: "Analyste", rumeur: "Rumeur",
   produit: "Produit", meteo: "Météo", baleine: "Baleine", crise: "Crise", marche: "Marché", macro: "Macro", taux: "Banque Centrale", secteur: "Secteur", suspension: "Suspension", reel: "Chiffre réel",
   ipo: "Introduction en bourse", faillite: "Faillite" };
+// Levée de fonds : temps restant (heure réelle), part du temps écoulé, montant déjà souscrit.
+function RoundClock({ d, now, stats }) {
+  const start = d.roundEnds - 4 * 3600e3, left = Math.max(0, d.roundEnds - now), h = Math.floor(left / 3600e3), m = Math.floor(left / 60e3) % 60;
+  return (
+    <div className="round-clock">
+      <div className="round-stats mono">
+        <span><small>Clôture dans</small><b>{left ? `${h} h ${String(m).padStart(2, "0")}` : "clôturée"}</b></span>
+        <span><small>Déjà souscrit</small><b>{W(stats?.total ?? 0)}</b></span>
+        <span><small>Investisseurs</small><b>{nf0.format(stats?.investors ?? 0)}</b></span>
+      </div>
+      <span className="timebar" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.max(0, (now - start) / (d.roundEnds - start) * 100))}%` }} /></span>
+    </div>
+  );
+}
+
 // Un article du Courrier d'Aurelys, lu en entier.
 function Article({ n, now, onClose, onDetail }) {
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
@@ -188,7 +215,7 @@ function Article({ n, now, onClose, onDetail }) {
       <article className="sheet paper" role="dialog" aria-modal="true" aria-label={n.title}>
         <div className="sheet-h"><span className="paper-kicker">{CAT[n.cat] ?? n.cat}{n.fiab < .5 ? " · rumeur non confirmée" : ""}</span><button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button></div>
         <h2 className="paper-title">{n.title}</h2>
-        <p className="paper-meta mono">Le Courrier d'Aurelys · {gwhen(n.at, now)} · {agoTxt(now - n.at)}</p>
+        <p className="paper-meta mono">Le Courrier d'Aurelys · {real(n.at)} · {agoTxt(now - n.at)}</p>
         {paras(n.body).map((p, i) => <p key={i} className={i ? "paper-p" : "paper-lead"}>{p}</p>)}
         {s && BY[s.tk]?.status !== "round" && <button type="button" className="btn" onClick={() => onDetail(s.tk)}>Voir la fiche de {s.name}</button>}
       </article>
@@ -208,7 +235,7 @@ function NewsItem({ n, now, onDetail, onRead }) {
           {s ? <button type="button" className="as-link ntk" onClick={() => onDetail(s.tk)}>{s.tk}</button> : n.sector ? <span>{SECTORS[n.sector]?.name}</span> : null}
           <span className={isMajor(n) ? "major-tag" : ""}>{CAT[n.cat] ?? n.cat}</span>
           {n.fiab < .5 && <span className="warn-tag">Rumeur non confirmée</span>}
-          <span className="mono" title="Heure d'Aurelys, puis temps réel écoulé">{gameClock(n.at / 1000).hm} à Aurelys · {agoTxt(now - n.at)}</span>
+          <span className="mono">{real(n.at)} · {agoTxt(now - n.at)}</span>
         </p>
       </div>
     </article>
@@ -221,10 +248,10 @@ function News({ aur, now, onDetail, onRead }) {
   useEffect(() => { if (shown == null && top) setShown(top) }, [top, shown]);
   const fresh = aur.news.filter(n => n.id > lim).length;
   const list = aur.news.filter(n => n.id <= lim && (!major || isMajor(n)) && (f === "Tout" || n.sector === f || BY[n.tk]?.sector === f || (f === "Marché" && !n.tk && !n.sector)));
-  const une = list.find(isMajor) ?? list[0], c = gameClock(now / 1000);
+  const une = list.find(isMajor) ?? list[0];
   return (
     <div>
-      <div className="paper-mast"><b>Le Courrier d'Aurelys</b><span className="mono">Jour {c.day} · édition de {c.hm}</span></div>
+      <div className="paper-mast"><b>Le Courrier d'Aurelys</b><span className="mono">édition de {clock(now)}</span></div>
       {une && <button type="button" className="paper-une" onClick={() => onRead(une)}>
         <span className="paper-kicker">À la une · {CAT[une.cat] ?? une.cat}</span>
         <span className="paper-title">{une.title}</span>

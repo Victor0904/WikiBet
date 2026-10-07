@@ -9,6 +9,7 @@ import { BY as AUR, slipEstimate, FEE } from "../supabase/functions/_shared/aure
 import { Dock, Segmented, SubHeader } from "./nav.jsx";
 import { MoreMenu, HowTo, Account, Legal } from "./pages.jsx";
 import { Ranking, Friends, Guilds, LoginPanel } from "./social.jsx";
+import Portfolio from "./Portfolio.jsx";
 const QG = lazy(() => import("./QG.jsx")); // Three.js n'est chargé qu'à l'ouverture du QG
 
 /* ===== Formats ===== */
@@ -180,7 +181,7 @@ function Game({ api }) {
 
           {tab === "positions" && <>
             <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` · ${open.length}` : ""}`], ["folio", "Portefeuille"], ["history", "Historique"]]} />
-            {posView === "folio" ? <Portfolio holds={holds} px={holdPx} onSell={h => setInvest({ tk: h.tk, mode: "sell", qty: h.qty })} onBuy={tk => setInvest({ tk, mode: "buy" })} onMarket={() => go("market")} />
+            {posView === "folio" ? <Portfolio holds={holds} aur={aur} px={holdPx} onSell={h => setInvest({ tk: h.tk, mode: "sell", qty: h.qty })} onBuy={tk => setInvest({ tk, mode: "buy" })} onMarket={() => go("market")} />
             : posView === "open" ? <>
               {open.length ? <Positions vertical now={now} byLogin={byLogin} aur={aur} bets={open} onClose={closeTrade} />
                 : <div className="empty-state"><b>Aucun pari en cours</b><p className="muted">Prends position sur une action d'Aurelys ou réponds à une question en direct.</p>
@@ -442,35 +443,6 @@ function History({ byLogin, bets }) {
         );
       })}
     </div>
-  );
-}
-
-// Portefeuille : actions achetées sans levier (cote principale, jeunes pousses, levées en attente d'introduction).
-function Portfolio({ holds, px, onSell, onBuy, onMarket }) {
-  if (!holds.length) return <div className="empty-state"><b>Portefeuille vide</b><p className="muted">Ouvre la fiche d'une entreprise et choisis « Investir » : tu achètes des actions, sans levier, et tu les gardes aussi longtemps que tu veux. Certaines versent un dividende chaque jour d'Aurelys.</p>
-    <div className="empty-acts"><button type="button" className="btn primary" onClick={onMarket}>Marché</button></div></div>;
-  const tot = holds.reduce((a, h) => a + h.qty * px(h), 0), cost = holds.reduce((a, h) => a + h.cost, 0);
-  return (
-    <section>
-      <div className="panel folio-head"><span>Valeur du portefeuille</span><b className="mono">{W(tot)}</b><small className={"mono " + cls(tot - cost)}>{sW(tot - cost)} ({pct(tot / cost - 1)}) depuis l'achat</small></div>
-      <div className="history">
-        {holds.map(h => {
-          const p = px(h), val = h.qty * p, gain = val - h.cost, d = AUR[h.tk];
-          return (
-            <div key={h.tk} className="hrow folio-row">
-              <span><b>{d?.name ?? h.tk}{h.status === "round" ? " · levée en cours" : h.status === "listed" ? " · jeune pousse" : ""}</b>
-                <small>{nf2.format(h.qty)} actions · achat moyen {aurPx(h.cost / h.qty)} · cours {aurPx(p)}{d?.div ? ` · dividende ${nf2.format(d.div)} %/an` : ""}</small></span>
-              <span className="r mono"><b>{W(val)}</b><small className={cls(gain)}>{sW(gain)}</small></span>
-              {h.status !== "round" && <span className="folio-acts">
-                <button type="button" className="btn ghost" onClick={() => onBuy(h.tk)}>Acheter</button>
-                <button type="button" className="btn ghost" onClick={() => onSell(h)}>Vendre</button>
-              </span>}
-            </div>
-          );
-        })}
-      </div>
-      <p className="fine">Pas de levier, pas de liquidation : la valeur suit le cours. Les jeunes pousses peuvent faire faillite (sous 15 % de leur prix d'introduction), et leurs actions sont alors perdues. Frais de 0,1 % à l'achat et à la vente ; un gros ordre fait bouger le cours.</p>
-    </section>
   );
 }
 

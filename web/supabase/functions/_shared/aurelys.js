@@ -135,6 +135,8 @@ const FIRST = ["Léa", "Malo", "Inès", "Yanis", "Clara", "Noé", "Sarah", "Hugo
 const LAST = ["Arvel", "Brissac", "Corvin", "Deslandes", "Ferrand", "Gallois", "Haddad", "Lemaire", "Moreau", "Ostrowski", "Pradel", "Quintal", "Rocher", "Valence"];
 const CITIES = ["Port-Aurel", "Valmeyre", "Brennes", "Castellane", "Lisère", "Haut-Ombre", "Grise-Vallée", "Sel-Rouge"];
 const fmtPx = v => v.toFixed(2).replace(".", ",");
+// Heure réelle (Paris) dans les articles : « jeudi 8 octobre à 01:30 ».
+const realTxt = sec => new Date(sec * 1000).toLocaleString("fr-FR", { timeZone: "Europe/Paris", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 
 function spawn(S, R, out) {
   const sector = pick(R, Object.keys(IDEAS)), what = pick(R, IDEAS[sector]);
@@ -152,11 +154,11 @@ function spawn(S, R, out) {
     q: Math.max(-2, Math.min(2, gauss(R))), status: "round", roundPrice: price, roundEnd: S.t + IPO.roundDays * DAY, born: S.t,
   };
   S.extra[tk] = d; out.listing.push(pub(d));
-  const end = gameClock(realOf(d.roundEnd));
+  const end = realTxt(realOf(d.roundEnd));
   publish(S, out, { tk: null, sector, cat: "ipo", sent: .3, mag: 0, hl: 240,
     title: `${name} veut entrer en bourse : souscription ouverte à ${fmtPx(price)} Ꜷ l'action`,
     text: [`${d.story}`,
-      `La levée de fonds est ouverte jusqu'au jour ${end.day} à ${end.hm}. Chaque action est proposée à ${fmtPx(price)} Ꜷ ; ${(d.shares / 1e6).toFixed(0)} millions d'actions composeront le capital.`,
+      `La levée de fonds est ouverte jusqu'au ${end} (heure de Paris). Chaque action est proposée à ${fmtPx(price)} Ꜷ ; ${(d.shares / 1e6).toFixed(0)} millions d'actions composeront le capital.`,
       `Seuls les investisseurs déjà installés (au moins ${IPO.minWealth.toLocaleString("fr-FR")} W de patrimoine) peuvent souscrire, et pas plus de ${IPO.maxShare * 100} % de leur patrimoine.`,
       `« Ces jeunes sociétés peuvent multiplier leur valeur, ou disparaître en quelques semaines », prévient ${pick(R, ANALYSTS)}. Le premier cours sera fixé par le marché le jour de l'introduction.`].join("\n\n") });
 }

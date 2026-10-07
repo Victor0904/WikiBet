@@ -77,6 +77,7 @@ export async function connect() {
     aurStocks: () => rows(sb.from("aur_stocks").select("*").order("status").order("tk")),
     aurSubscribe: (tk, amount) => rpc("aur_subscribe", { p_tk: tk, p_amount: amount }),
     myHoldings: () => rpc("my_holdings"),
+    aurRounds: () => rpc("aur_round_stats"),
     aurNews: () => rows(sb.from("aur_news").select("*").order("id", { ascending: false }).limit(150)),
     aurOrder: body => invoke("aurelys", body),
     restart: () => rpc("restart"),

@@ -48,8 +48,9 @@ export function useAurelys(api, active) {
   // Jeunes pousses (créées par le moteur) : inscrites dans le registre BY pour que tout l'écran les connaisse.
   useEffect(() => {
     let alive = true;
-    const load = () => api.aurStocks().then(rows => {
+    const load = () => Promise.all([api.aurStocks(), api.aurRounds().catch(() => [])]).then(([rows, st]) => {
       if (!alive) return;
+      data.current.roundStats = Object.fromEntries(st.map(r => [r.tk, { investors: +r.investors, total: +r.total }]));
       for (const r of rows) if (r.meta && r.status !== "core") BY[r.tk] = { ...r.meta, status: r.status, roundEnds: r.round_ends && Date.parse(r.round_ends), ipoPrice: r.ipo_price };
       Object.assign(data.current, { young: rows.filter(r => r.status === "listed").map(r => BY[r.tk]), rounds: rows.filter(r => r.status === "round").map(r => BY[r.tk]) });
       render(k => k + 1);
