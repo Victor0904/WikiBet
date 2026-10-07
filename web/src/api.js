@@ -27,11 +27,17 @@ export async function connect() {
   const uid = session.user.id;
   const rpc = async (fn, args) => { const { data, error } = await sb.rpc(fn, args); if (error) throw new Error(error.message); return data };
   const rows = async q => { const { data, error } = await q; if (error) throw new Error(error.message); return data };
+  // Appel direct (sans functions.invoke) pour toujours montrer le message du serveur, jamais « non-2xx status code ».
   const invoke = async (fn, body) => {
-    const { data, error } = await sb.functions.invoke(fn, { body });
-    if (error) { let msg = error.message; try { msg = (await error.context.json()).error ?? msg } catch { } throw new Error(msg) }
-    if (data?.error) throw new Error(data.error);
-    return normBet(data);
+    const { data: { session: cur } } = await sb.auth.getSession();
+    let r;
+    try {
+      r = await fetch(`${url}/functions/v1/${fn}`, { method: "POST", body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${cur?.access_token ?? key}` } });
+    } catch { throw new Error("Pas de connexion au serveur du marché. Vérifie ta connexion et réessaie.") }
+    const text = await r.text(); let j = null; try { j = JSON.parse(text) } catch { }
+    if (!r.ok || j?.error) throw new Error(j?.error ?? (r.status >= 500 ? "Le serveur du marché est occupé, réessaie dans un instant." : `Ordre refusé par le serveur (code ${r.status}).`));
+    return normBet(j);
   };
 
   // Écart entre l'horloge du téléphone et celle du serveur, pour que tout le monde voie la même minute.
