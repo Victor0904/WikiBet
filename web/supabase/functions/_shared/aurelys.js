@@ -481,6 +481,14 @@ function runCrisis(S, out) {
   if (c.i >= steps.length) { S.crisis = null; S.crisisCd = S.t + 1440 * 20 }
 }
 
+// SPM cours de a vers b (le dernier vaut b) : marche aléatoire ramenée sur b (pont brownien), pas de σ par seconde.
+function bridge(R, a, b, sd) {
+  const w = [0]; for (let k = 1; k <= SPM; k++) w.push(w[k - 1] + gauss(R) * sd);
+  const la = Math.log(a), lb = Math.log(b), out = [];
+  for (let k = 1; k <= SPM; k++) out.push(k === SPM ? b : Math.exp(la + (lb - la) * k / SPM + w[k] - w[SPM] * k / SPM));
+  return out;
+}
+
 /* ===== Un tick ===== */
 function tick(S, R, out, pending) {
   const t = ++S.t, m = t, hour = hourOf(m), act = activity(hour), reg = REGIMES[S.reg];
@@ -519,6 +527,7 @@ function tick(S, R, out, pending) {
   const fear = 15 * Math.sqrt(S.vix / VIX_BASE), yr = 365 * DAY;
 
   let cap = 0, vol = 0, allHalt = S.haltAll > t;
+  const sub = []; // cours de chaque seconde de la minute, par action (voir plus bas)
   for (const s of STOCKS) {
     const x = S.st[s.tk], sec = SECTORS[s.sector];
     // Valeur fondamentale : croissance (modulée par la macro), incertitude, facteurs communs.
@@ -574,7 +583,11 @@ function tick(S, R, out, pending) {
       publish(S, out, { tk: s.tk, cat: "suspension", title: `Séance suspendue sur ${s.name} après un mouvement de ${pctTxt(p / x.h[x.h.length - 61] - 1).replace(/^(\d)/, "+$1")}`, sent: 0, mag: 0, hl: 30 });
     }
     cap += p * s.shares; vol += v;
-    out.ticks.push({ t: realOf(t), tk: s.tk, p: +p.toPrecision(7), v: Math.round(v), halt: halted || x.halt > t });
+    // Une minute d'Aurelys = SPM secondes : entre le cours précédent et le nouveau, un pont brownien donne un vrai cours
+    // à chaque seconde (même volatilité, cours atteignables par les ordres et la liquidation).
+    const ps = bridge(R, last, p, halted ? 0 : s.sig / Math.sqrt(DAY * SPM)), hl = halted || x.halt > t;
+    sub.push({ s, ps });
+    ps.forEach((q, k) => out.ticks.push({ t: realOf(t - 1) + k + 1, tk: s.tk, p: +q.toPrecision(7), v: Math.round(v / SPM), halt: hl }));
   }
   const idx = cap / DIV, ri = Math.log(idx / S.idx);
   S.vix += (ri * ri - S.vix) / 120; S.idx = idx; S.idxHi = Math.max(idx, S.idxHi * (1 - 1 / 2880));
@@ -583,7 +596,8 @@ function tick(S, R, out, pending) {
     S.haltAll = t + 15; S.cbAll = t;
     publish(S, out, { cat: "suspension", title: "AUR-12 : chute de plus de 7 %, toute la cote est suspendue 15 minutes", sent: -.3, mag: 0, hl: 60 });
   }
-  out.ticks.push({ t: realOf(t), tk: INDEX, p: +idx.toPrecision(7), v: Math.round(vol), halt: allHalt,
+  for (let k = 0; k < SPM - 1; k++) out.ticks.push({ t: realOf(t - 1) + k + 1, tk: INDEX, p: +(sub.reduce((a, { s, ps }) => a + ps[k] * s.shares, 0) / DIV).toPrecision(7), v: Math.round(vol / SPM), halt: allHalt });
+  out.ticks.push({ t: realOf(t), tk: INDEX, p: +idx.toPrecision(7), v: Math.round(vol / SPM), halt: allHalt,
     x: { reg: S.reg, regAge: S.regAge, vixa: Math.round(fear * 10) / 10, r: Math.round(S.r * 100) / 100, g: Math.round(S.g * 100) / 100, pi: Math.round(S.pi * 100) / 100,
       eps: Object.fromEntries(STOCKS.map(s => [s.tk, +S.st[s.tk].eps.toPrecision(4)])),
       cons: Object.fromEntries(STOCKS.map(s => [s.tk, S.st[s.tk].res?.cons ?? null])), // consensus des analystes (le vrai chiffre reste caché)

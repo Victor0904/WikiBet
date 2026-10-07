@@ -21,8 +21,10 @@ test("aurelys : moteur déterministe, même découpé en appels avec l'état rel
   const a = run(60), b = run(13);
   assert.deepEqual(a, b);
   assert.ok(a.every(k => Number.isFinite(k.p) && k.p > 0), "cours finis et positifs");
-  assert.equal(a.length, 600 * (STOCKS.length + 1), "une ligne par action et par minute de jeu, plus l'indice");
-  assert.equal(a[STOCKS.length + 1].t - a[0].t, SPM, "une minute de jeu = 5 s réelles");
+  assert.equal(a.length, 600 * SPM * (STOCKS.length + 1), "un cours par seconde réelle, par action et pour l'indice");
+  const slm = a.filter(k => k.tk === "SLM");
+  assert.ok(slm.every((k, i) => !i || k.t - slm[i - 1].t === 1), "un cours chaque seconde");
+  assert.ok(new Set(slm.slice(0, SPM).map(k => k.p)).size > 1, "les cours bougent à l'intérieur d'une minute d'Aurelys");
 });
 
 test("aurelys : un gros ordre pèse plus qu'un petit, et plus sur une petite valeur", () => {

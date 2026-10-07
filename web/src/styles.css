@@ -528,3 +528,6 @@ button:active:not(:disabled) { transform: scale(.96) }
 .troph b { font: 700 15px var(--f-cond) } .troph.got b { color: #e8c547 }
 .troph small { font-size: 12px; color: var(--muted) }
 .perks p { margin: 4px 0 0 }
+.city { display: flex; flex-direction: column; gap: 10px }
+.city p { margin: 0 }
+.city-scene { height: 380px; background: radial-gradient(ellipse at 50% 30%, #23304a 0%, var(--panel) 75%) }

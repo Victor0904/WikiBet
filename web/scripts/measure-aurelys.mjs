@@ -1,5 +1,5 @@
 // Mesure la volatilité réalisée et la corrélation des actions d'Aurelys sur N jours simulés. Usage : node scripts/measure-aurelys.mjs [jours] [graine]
-import { initState, advance, STOCKS, slip, DAY, SPM } from "../supabase/functions/_shared/aurelys.js";
+import { initState, advance, STOCKS, slip, DAY, SPM, EPOCH_S } from "../supabase/functions/_shared/aurelys.js";
 const days = +(process.argv[2] ?? 15), seed = +(process.argv[3] ?? 7);
 const t0 = 1_800_000_000, S = initState(t0, seed), P = Object.fromEntries(STOCKS.map(s => [s.tk, []]));
 let news = 0, regs = {};
@@ -8,7 +8,7 @@ for (let t = t0; t < t0 + days * DAY * SPM; t += 200) {
   if (process.env.NONEWS) for (const k in S.next) S.next[k] = 1e12;
   if (process.env.NOWHALE) for (const w of ["kraken", "orca", "lev"]) S.whales[w] = { ph: "idle", until: 1e12, pos: 0 };
   const out = advance(S, t + 200);
-  for (const k of out.ticks) if (P[k.tk]) P[k.tk].push(k.p);
+  for (const k of out.ticks) if (P[k.tk] && (k.t - EPOCH_S) % SPM === 0) P[k.tk].push(k.p); // cours de fin de minute
   news += out.news.length; regs[S.reg] = (regs[S.reg] ?? 0) + 1;
 }
 const sd = a => { const m = a.reduce((x, y) => x + y, 0) / a.length; return Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / (a.length - 1)) };

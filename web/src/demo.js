@@ -13,7 +13,7 @@ import { initState, advance, slip } from "../supabase/functions/_shared/aurelys.
 const UID = "00000000-0000-4000-8000-000000000001";
 
 export async function demoApi() {
-  const db = new PGlite("idb://wikibourse-demo-10"); // changer le numéro quand la migration change
+  const db = new PGlite("idb://wikibourse-demo-11"); // changer le numéro quand la migration change
   const ready = (await db.query("select to_regclass('public.bets') is not null as ok")).rows[0].ok;
   if (!ready) {
     await db.exec(stub);
@@ -82,6 +82,10 @@ export async function demoApi() {
     guildJoin: id => act("select guild_join($1)", [id]),
     guildLeave: () => act("select guild_leave()"),
     guildKick: id => act("select guild_kick($1)", [id]),
+    cityView: async id => (await all("select city_view($1) as v", [id]))[0].v,
+    cityCatalog: () => all("select * from city_catalog order by sort"),
+    cityGive: (amount, kind) => act("select * from city_give($1, $2)", [amount, kind]),
+    cityBuild: id => act("select * from city_build($1)", [id]),
     shopItems: () => all("select * from shop_items order by sort"),
     trophies: user => all("select * from trophies($1)", [user]),
     inventoryOf: user => all("select item_id, qty, equipped from inventory where user_id = $1 and qty > 0", [user]),

@@ -1,5 +1,6 @@
 // Comptes (e-mail, Apple), classement des gains, amis et guildes.
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+const City = lazy(() => import("./City.jsx")); // Three.js n'est chargé qu'à l'ouverture d'une ville
 import { W, sW, cls } from "./format.js";
 import { Segmented, SubHeader } from "./nav.jsx";
 
@@ -151,7 +152,7 @@ export function Friends({ api, say, onVisit, onBack }) {
 }
 
 // ===== Guildes =====
-export function Guilds({ api, me, say, onVisit, onBack }) {
+export function Guilds({ api, me, say, onVisit, onBack, accent }) {
   const [period, setPeriod] = useState("today"), [sel, setSel] = useState(null), [create, setCreate] = useState(false);
   const [list, reload] = useLoad(() => api.guildList(period), [api, period]);
   const mine = list?.find(g => g.mine);
@@ -160,7 +161,13 @@ export function Guilds({ api, me, say, onVisit, onBack }) {
   return (
     <section>
       <SubHeader title="Guildes" onBack={sel ? () => setSel(null) : onBack} />
-      {shown ? <GuildView api={api} me={me} g={shown} mine={shown.id === mine?.id} canJoin={!mine} run={run} onVisit={onVisit} />
+      {shown ? <>
+          <GuildView api={api} me={me} g={shown} mine={shown.id === mine?.id} canJoin={!mine} run={run} onVisit={onVisit} />
+          <h3 className="sec">La ville de {shown.name}</h3>
+          <Suspense fallback={<p className="muted small">Chargement de la ville…</p>}>
+            <City key={shown.id} api={api} guildId={shown.id} me={me} mine={shown.id === mine?.id} say={say} onVisit={onVisit} accent={accent} />
+          </Suspense>
+        </>
         : create ? <GuildForm onCreate={v => run(() => api.guildCreate(v), `Guilde ${v.name} fondée.`)} onCancel={() => setCreate(false)} />
         : <div className="panel guild-intro"><p className="muted">Une guilde réunit jusqu'à 30 traders. Ses gains sont la somme de ceux de ses membres.</p>
             <button type="button" className="btn primary" onClick={() => setCreate(true)}>Fonder une guilde</button></div>}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { STOCKS, INDEX, DAY, EPOCH_S, SPM } from "../supabase/functions/_shared/aurelys.js";
 
-const KEEP_S = 3600; // secondes réelles de cours gardées (720 minutes d'Aurelys), pour les graphiques fins et les positions récentes
+const KEEP_S = 1800; // secondes réelles de cours gardées (un cours par seconde), pour les graphiques fins et les positions récentes
 const HOUR_S = 60 * SPM; // une heure d'Aurelys en secondes réelles
 
 // Ajoute un cours à la bougie de son heure d'Aurelys (bougies [t, o, h, l, c, v], t en secondes réelles).
@@ -40,7 +40,7 @@ export function useAurelys(api, active) {
         d.live = f.rows.length > 0 || (d.since && f.now - d.since < 30);
         if (alive) render(n => n + 1);
       } catch { d.live = false }
-      if (alive) timer = setTimeout(poll, active ? 2500 : 15000); // un nouveau cours toutes les 5 s
+      if (alive) timer = setTimeout(poll, active ? 1000 : 15000); // un nouveau cours chaque seconde
     };
     poll();
     return () => { alive = false; clearTimeout(timer) };
