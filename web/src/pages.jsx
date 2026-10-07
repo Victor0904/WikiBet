@@ -39,7 +39,7 @@ const STEPS = [
 export function HowTo({ onBack, first }) {
   return (
     <section className="howto">
-      {first ? <h2 className="howto-title">Bienvenue sur wiki·bourse</h2> : <SubHeader title="Comment jouer" onBack={onBack} />}
+      {first ? <h2 className="howto-title">Bienvenue sur Aurelys</h2> : <SubHeader title="Comment jouer" onBack={onBack} />}
       <ol className="steps">
         {STEPS.map(([t, p], i) => <li key={t} className="panel"><span className="step-n mono">{i + 1}</span><div><b>{t}</b><p>{p}</p></div></li>)}
       </ol>

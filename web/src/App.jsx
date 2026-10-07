@@ -5,8 +5,8 @@ import { PositionChart, Spark } from "./charts.jsx";
 import { nf0, nf2, W, sW, clock, pct, cls, HOME_NAMES, THEMES, DEFAULT_ACCENT, PERKS } from "./format.js";
 import { useAurelys } from "./aurelys.js";
 import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
-import { BY as AUR, slipEstimate, FEE } from "../supabase/functions/_shared/aurelys.js";
-import { Dock, Segmented, SubHeader } from "./nav.jsx";
+import { BY as AUR, slipEstimate, FEE, gameClock } from "../supabase/functions/_shared/aurelys.js";
+import { Dock, Segmented, SubHeader, Logo } from "./nav.jsx";
 import { MoreMenu, HowTo, Account, Legal } from "./pages.jsx";
 import { Ranking, Friends, Guilds, LoginPanel } from "./social.jsx";
 import Portfolio from "./Portfolio.jsx";
@@ -52,6 +52,19 @@ const SRC = {
 };
 // Question « pic du jour » : échéance à 23:59:59 (les questions à l'heure tombent sur des quarts d'heure ronds).
 const isPeak = m => new Date(m.end_at ?? m.closes_at).getSeconds() === 59;
+const AUR_LEVS = [1, 5, 10, 15, 20, 25];
+// Montants cumulables : le premier appui remplace la mise affichée, les suivants s'ajoutent (10, 20, 30…).
+// 10 000 n'apparaît qu'au-delà de 10 000 W de solde.
+function StakeChips({ value, set, cash, max }) {
+  const fresh = useRef(true), add = v => { set(fresh.current ? v : value + v); fresh.current = false };
+  return (
+    <div className="chips stake-chips">
+      {[10, 100, 1000, ...(cash > 10000 ? [10000] : [])].map(v => <button key={v} type="button" onClick={() => add(v)}>+{nf0.format(v)}</button>)}
+      <button type="button" onClick={() => { set(0); fresh.current = false }}>0</button>
+      <button type="button" onClick={() => { set(max); fresh.current = false }}>Max</button>
+    </div>
+  );
+} // leviers d'Aurelys (×20 et ×25 se débloquent)
 const srcOf = login => login?.startsWith("steam:") ? SRC.steam : SRC.twitch;
 // Variation du nombre de spectateurs (ou de joueurs) sur les 15 dernières minutes.
 function chg15(x) {
@@ -101,6 +114,8 @@ function Game({ api }) {
     } catch (e) { say(e.message, "down") }
   }, [api, histFrom, say]);
   useEffect(() => { refresh(); return api.onChange(refresh) }, [api, refresh]);
+  // Présence : la ville de ta guilde allume tes fenêtres quand tu es connecté.
+  useEffect(() => { const ping = () => api.touch?.().catch(() => {}); ping(); const id = setInterval(ping, 60000); return () => clearInterval(id) }, [api]);
 
   // Lives Twitch : relevés côté serveur chaque minute, rechargés ici toutes les 20 s.
   const [streams, setStreams] = useState([]), [markets, setMarkets] = useState([]);
@@ -139,6 +154,15 @@ function Game({ api }) {
   const positions = open.filter(b => b.kind === "stream" || b.kind === "aurelys");
   const pnl = positions.length ? Math.round(positions.reduce((a, b) => a + (b.kind === "aurelys" ? aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).net
     : liveStream(b, byLogin[b.login], now).value - b.stake), 0)) : null;
+  // Le QG vit avec la partie : une position par écran, l'ambiance du jour, l'heure et l'humeur d'Aurelys, la une du Courrier.
+  const midnight = new Date().setHours(0, 0, 0, 0);
+  const dayNet = bets.filter(b => b.status !== "open" && Date.parse(b.closed_at) >= midnight).reduce((a, b) => a + b.payout - b.stake - (b.fee_open ?? 0), 0) + (pnl ?? 0);
+  const qgLive = {
+    positions: positions.map(b => b.kind === "aurelys" ? { label: AUR[b.aur]?.name ?? b.aur, pnl: aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).net }
+      : { label: byLogin[b.login]?.display_name ?? b.login, pnl: liveStream(b, byLogin[b.login], now).value - b.stake }),
+    mood: Math.abs(dayNet) < 1 ? 0 : Math.sign(dayNet), hour: gameClock(now / 1000).hour, reg: aur.x?.reg ?? "calme",
+    une: aur.news.find(n => n.cat !== "secteur" && Math.abs(n.sent) >= .3)?.title ?? aur.news[0]?.title ?? "",
+  };
   const visitQG = async row => {
     if (row.id === me.id) { setVisit(null); setTab("qg"); return }
     row = { ...row, patrimoine: row.patrimoine ?? board.find(b => b.id === row.id)?.patrimoine };
@@ -160,7 +184,7 @@ function Game({ api }) {
   return (
     <div className="app">
       <header className="top">
-        <span className="logo">wiki<b>·</b>bourse</span>
+        <Logo />
         {api.mode === "demo" && <span className="tag">démo</span>}
         <button type="button" className="cash mono" onClick={() => { setTab("more"); setMore("account") }} aria-label="Mon compte">{W(me.cash)}</button>
       </header>
@@ -197,7 +221,7 @@ function Game({ api }) {
               ? <QG api={api} catalog={catalog} inv={visit.inv} owner={visit.row} self={false} patrimoine={visit.row.patrimoine} pnl={null}
                   accent={THEMES[catalog.find(i => i.category === "theme" && visit.inv[i.id]?.equipped)?.id] ?? DEFAULT_ACCENT} onBack={() => setVisit(null)} />
               : <QG api={api} catalog={catalog} inv={inv} me={me} owner={{ pseudo: me.pseudo, title: myTitle }} self patrimoine={patrimoine}
-                  openStake={openStake} pnl={pnl} accent={accent} act={run} />}
+                  openStake={openStake} pnl={pnl} accent={accent} act={run} live={qgLive} />}
           </Suspense>}
 
           {tab === "more" && (
@@ -255,7 +279,7 @@ function Onboarding({ api, onDone }) {
   return (
     <div className="center">
       <form className="onboard" onSubmit={async e => { e.preventDefault(); try { await api.createProfile(pseudo); onDone() } catch (x) { setErr(x.message) } }}>
-        <span className="logo big">wiki<b>·</b>bourse</span>
+        <Logo big />
         <p className="muted">Une bourse inventée, Aurelys, dont les cours naissent des ordres des joueurs et des bots, et des questions en direct sur Twitch et Steam. Tu démarres avec {W(CAP0)}.</p>
         <label htmlFor="pseudo">Ton pseudo</label>
         <input id="pseudo" value={pseudo} onChange={e => setPseudo(e.target.value)} minLength={2} maxLength={20} required autoFocus />
@@ -484,8 +508,7 @@ function InvestSheet({ api, tk, mode, qty: q0, aur, me, hold, onClose, onDone })
         </> : <>
           <label htmlFor="inv-amount">Montant</label>
           <div className="stake"><input id="inv-amount" className="mono" type="number" inputMode="numeric" min="1" value={amount} onChange={e => setAmount(Math.max(0, Math.floor(+e.target.value || 0)))} /><span>W</span></div>
-          <div className="chips">{[500, 2000, 10000].map(v => <button key={v} type="button" onClick={() => setAmount(v)}>{nf0.format(v)}</button>)}
-            <button type="button" onClick={() => setAmount(round ? Math.min(maxRound, Math.floor(me.cash)) : Math.floor(me.cash / (1 + FEE)))}>Max</button></div>
+          <StakeChips value={amount} set={setAmount} cash={me.cash} max={round ? Math.min(maxRound, Math.floor(me.cash)) : Math.floor(me.cash / (1 + FEE))} />
         </>}
         <div className="rows mono">
           <div className="row"><span>{round ? "Prix de la levée" : "Cours actuel"}</span><b>{aurPx(p)}</b></div>
@@ -541,11 +564,10 @@ function Ticket({ api, aur, now, byLogin, me, ticket, pref, setPref, onClose, on
   const set = p => setPref(x => ({ ...x, ...p }));
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
   const isQ = ticket.kind === "question", isAur = ticket.kind === "aurelys";
-  // Aurelys : le levier ×10 se débloque après 30 positions clôturées (vérifié par le serveur).
-  const [xp, setXp] = useState(null);
-  useEffect(() => { if (ticket.kind === "aurelys") api.aurXp().then(setXp).catch(() => setXp(0)) }, [api, ticket.kind]);
-  const lev10 = !isAur || (xp ?? 0) >= 30;
-  useEffect(() => { if (!lev10 && pref.lev === 10) setPref(x => ({ ...x, lev: 5 })) }, [lev10, pref.lev, setPref]);
+  // Aurelys : ×20 avec un logement, ×25 dans une guilde qui a une salle des marchés (vérifié par le serveur).
+  const [maxLev, setMaxLev] = useState(15);
+  useEffect(() => { if (ticket.kind === "aurelys") api.aurMaxLev().then(n => setMaxLev(+n)).catch(() => {}) }, [api, ticket.kind]);
+  useEffect(() => { if (isAur && pref.lev > maxLev) setPref(x => ({ ...x, lev: maxLev })) }, [isAur, maxLev, pref.lev, setPref]);
   const fee = isAur ? stake * pref.lev * FEE : 0;
   const aq = isAur ? aur.quotes[ticket.tk] : null, overCap = isAur && stake * pref.lev > aurCap(ticket.tk);
   const open = isAur ? !!aq && !aq.halt && !overCap : isQ ? Date.parse(ticket.market.bet_until) > now : !!st?.live;
@@ -563,8 +585,8 @@ function Ticket({ api, aur, now, byLogin, me, ticket, pref, setPref, onClose, on
         <button type="button" aria-pressed={dir === "down"} className="sell" onClick={() => setDir("down")}>▼ Baisse</button>
       </div>
       <label>Levier</label>
-      <div className="seg" role="group" aria-label="Levier">{LEVS.map(v => <button key={v} type="button" aria-pressed={pref.lev === v} disabled={v === 10 && !lev10} onClick={() => set({ lev: v })}>×{v}{v === 10 && !lev10 ? " 🔒" : ""}</button>)}</div>
-      {!lev10 && xp != null && <p className="muted small">×10 se débloque après 30 positions clôturées sur Aurelys ({xp}/30).</p>}
+      <div className="seg" role="group" aria-label="Levier">{AUR_LEVS.map(v => <button key={v} type="button" aria-pressed={pref.lev === v} disabled={v > maxLev} onClick={() => set({ lev: v })}>×{v}{v > maxLev ? " 🔒" : ""}</button>)}</div>
+      {maxLev < 25 && <p className="muted small">{maxLev < 20 ? "×20 : achète un logement dans ton QG (studio ou plus). " : ""}×25 : rejoins une guilde qui a une salle des marchés.</p>}
       <div className="rows mono">
         <div className="row"><span>Cours actuel</span><b>{aurPx(p)}</b></div>
         <div className="row"><span>Impact de ton ordre (estimé)</span><b>{dir === "up" ? "+" : "−"}{nf2.format(sl * 100)} %</b></div>
@@ -629,7 +651,7 @@ function Ticket({ api, aur, now, byLogin, me, ticket, pref, setPref, onClose, on
         {body}
         <label htmlFor="stake">Mise</label>
         <div className="stake"><input id="stake" className="mono" type="number" inputMode="numeric" min="1" step="1" value={stake} onChange={e => setStake(Math.max(0, Math.floor(+e.target.value || 0)))} /><span>W</span></div>
-        <div className="chips">{[100, 500, 1000].map(v => <button key={v} type="button" onClick={() => setStake(v)}>{nf0.format(v)}</button>)}<button type="button" onClick={() => setStake(maxStake)}>Max</button></div>
+        <StakeChips value={stake} set={setStake} cash={me.cash} max={maxStake} />
         {overCap && <p className="error small">Au plus {W(aurCap(ticket.tk))} engagés (mise × levier) sur cette action.</p>}
         {isAur && aq?.halt && <p className="error small">Cotation suspendue, reprise dans quelques secondes.</p>}
         {!open && !isAur && <p className="error small">{isQ ? "Les paris sur cette question sont fermés." : "Ce streamer n'est plus en live."}</p>}

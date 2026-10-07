@@ -33,6 +33,16 @@ export function Segmented({ value, onChange, options, label }) {
   );
 }
 
+// Logo d'Aurelys : un A dont la barre est une courbe qui monte (même dessin que l'icône du site, public/favicon.svg).
+export const Logo = ({ big }) => (
+  <span className={"logo" + (big ? " big" : "")}>
+    <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0F1117" />
+      <path d="M14 50 32 13 50 50" fill="none" stroke="var(--accent)" strokeWidth="6.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M20 39 27 34 33 37 44 28" fill="none" stroke="var(--up)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+    Aurelys
+  </span>
+);
+
 export const SubHeader = ({ title, onBack }) => (
   <div className="subhead">
     <button type="button" className="back" onClick={onBack} aria-label="Retour">‹</button>

@@ -7,13 +7,13 @@ const SET_STREAM = ["ecran2", "ecran3", "micro", "camera", "chaise", "neon"];
 const TABS = [["decor", "Déco"], ["home", "Logement"], ["cosmetic", "Style"], ["bonus", "Bonus"]];
 const CATS = { theme: "Thème", title: "Titre", effect: "Effet de victoire" };
 
-function Scene({ level, items, accent, pnl, trophies }) {
+function Scene({ level, items, accent, pnl, trophies, souvenirs, live, onReady }) {
   const ref = useRef(null), sc = useRef(null), [err, setErr] = useState(null);
   useEffect(() => {
-    try { sc.current = createScene(ref.current) } catch (e) { setErr(e.message) }
+    try { sc.current = createScene(ref.current); onReady?.(sc.current) } catch (e) { setErr(e.message) }
     return () => sc.current?.dispose();
   }, []);
-  useEffect(() => { sc.current?.update({ level, items, accent, pnl, trophies }) }, [level, items, accent, pnl, trophies]);
+  useEffect(() => { sc.current?.update({ level, items, accent, pnl, trophies, souvenirs, ...live }) }, [level, items, accent, pnl, trophies, souvenirs, live]);
   return <div className="qg-scene" ref={ref}>{err && <p className="muted small pad">La 3D n'est pas disponible sur cet appareil.</p>}</div>;
 }
 
@@ -28,11 +28,22 @@ function Confirm({ label, confirm, onClick, disabled, className = "btn primary" 
 }
 
 
-export default function QG({ api, catalog, inv, me, owner, self, patrimoine, openStake, pnl, accent, act, onBack }) {
+// Mode photo : l'image du QG ou de la ville, à partager (ou à enregistrer si le partage n'est pas possible).
+export async function sharePhoto(url, name) {
+  try {
+    const file = new File([await (await fetch(url)).blob()], `${name}.png`, { type: "image/png" });
+    if (navigator.canShare?.({ files: [file] })) return await navigator.share({ files: [file], title: name });
+  } catch { /* partage annulé : on enregistre l'image */ }
+  const a = document.createElement("a"); a.href = url; a.download = `${name}.png`; a.click();
+}
+
+export default function QG({ api, catalog, inv, me, owner, self, patrimoine, openStake, pnl, accent, act, onBack, live }) {
   const [tab, setTab] = useState("decor"), [troph, setTroph] = useState([]);
   const uid = self ? me?.id : owner?.id;
   useEffect(() => { if (uid) api.trophies(uid).then(setTroph).catch(() => {}) }, [api, uid]);
   const wall = useMemo(() => troph.filter(t => t.got).map(t => ({ name: t.name, detail: t.detail })), [troph]);
+  const [souv, setSouv] = useState(null), scn = useRef(null);
+  useEffect(() => { if (uid) api.souvenirs(uid).then(setSouv).catch(() => {}) }, [api, uid]);
   const owned = id => (inv[id]?.qty ?? 0) > 0;
   const level = Math.max(0, ...catalog.filter(i => i.kind === "home" && owned(i.id)).map(i => i.level));
   const decor = catalog.filter(i => i.kind === "decor" && owned(i.id)).map(i => i.id);
@@ -54,7 +65,8 @@ export default function QG({ api, catalog, inv, me, owner, self, patrimoine, ope
       </div>
       {self && <p className="muted small">Solde {W(me.cash)} · en jeu {W(openStake)} · objets revendables {W(resale)} · logements {W(homes)} (ne se revendent pas, comptés à 60 % au classement)</p>}
 
-      <Scene level={level} items={decor} accent={accent} pnl={self ? pnl : null} trophies={wall} />
+      <Scene level={level} items={decor} accent={accent} pnl={self ? pnl : null} trophies={wall} souvenirs={souv} live={self ? live : null} onReady={s => { scn.current = s }} />
+      <button type="button" className="btn ghost photo-btn" onClick={() => scn.current && sharePhoto(scn.current.snapshot(`${self ? "Mon QG" : `Le QG de ${owner.pseudo}`} sur Aurelys`), "QG Aurelys")}>📷 Photo</button>
 
       <div className="qg-badges">
         <span className={"badge" + (setDone === SET_STREAM.length ? " done" : "")}>Setup streamer {setDone}/{SET_STREAM.length}</span>

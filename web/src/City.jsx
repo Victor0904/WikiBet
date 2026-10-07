@@ -1,21 +1,43 @@
 // Ville de guilde : la 3D (chargée à la demande), le Trésor, le fonds d'investissement et les bâtiments publics.
 import { useEffect, useRef, useState } from "react";
+import { sharePhoto } from "./QG.jsx";
 import { createCity } from "./qg/city.js";
 import { W, nf0 } from "./format.js";
 import { gameClock } from "../supabase/functions/_shared/aurelys.js";
 
 
-function Scene({ v, accent, now, onVisit }) {
+function Scene({ v, accent, now, onVisit, onReady, party }) {
   const ref = useRef(null), sc = useRef(null), [err, setErr] = useState(null), pick = useRef(onVisit);
   pick.current = onVisit;
-  useEffect(() => { try { sc.current = createCity(ref.current, m => pick.current(m)) } catch (e) { setErr(e.message) } return () => sc.current?.dispose() }, []);
+  useEffect(() => { try { sc.current = createCity(ref.current, m => pick.current(m)); onReady?.(sc.current) } catch (e) { setErr(e.message) } return () => sc.current?.dispose() }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const hour = gameClock(now / 1000).hour;
-  useEffect(() => { sc.current?.update({ members: v.members, buildings: v.buildings, accent, hour }) }, [v, accent, hour]);
+  useEffect(() => { sc.current?.update({ members: v.members, buildings: v.buildings, accent, hour, color: v.color, name: v.name, tag: v.tag, party }) }, [v, accent, hour, party]);
   return <div className="qg-scene city-scene" ref={ref}>{err && <p className="muted small pad">La 3D n'est pas disponible sur cet appareil.</p>}</div>;
 }
 
+// Blason de la guilde : un écu à sa couleur, avec son sigle.
+export const Blason = ({ color = "#F5B83D", tag = "", size = 44 }) => (
+  <svg className="blason" viewBox="0 0 40 46" width={size} height={size * 46 / 40} aria-hidden="true">
+    <path d="M3 3h34v18c0 11-8 18-17 22C11 39 3 32 3 21Z" fill={color} stroke="#08090d" strokeWidth="2" />
+    <path d="M3 15h34" stroke="#08090d" strokeOpacity=".25" strokeWidth="3" />
+    <text x="20" y="30" textAnchor="middle" fontFamily="IBM Plex Mono, monospace" fontWeight="700" fontSize={tag.length > 3 ? 9 : 11} fill="#08090d">{tag}</text>
+  </svg>
+);
+const COLORS = ["#F5B83D", "#1FCB8B", "#F04B5C", "#3987E5", "#A78BFA", "#F472B6", "#3CC8E6", "#E8E2D4"];
+function Identity({ v, api, run }) {
+  const [motto, setMotto] = useState(v.motto ?? "");
+  return (
+    <div className="panel identity">
+      <b>Identité de la guilde</b>
+      <div className="swatches">{COLORS.map(c => <button key={c} type="button" aria-label={`Couleur ${c}`} aria-pressed={v.color?.toUpperCase() === c} style={{ background: c }} onClick={() => run(() => api.guildUpdate(c, null), "Couleur de la guilde changée")} />)}</div>
+      <div className="add-row"><input value={motto} maxLength={80} placeholder="Devise" onChange={e => setMotto(e.target.value)} aria-label="Devise" />
+        <button type="button" className="btn" onClick={() => run(() => api.guildUpdate(null, motto), "Devise enregistrée")}>Enregistrer</button></div>
+    </div>
+  );
+}
+
 export default function City({ api, guildId, me, mine, say, onVisit, accent }) {
-  const [v, setV] = useState(null), [cat, setCat] = useState([]), [amt, setAmt] = useState(""), [now, setNow] = useState(Date.now());
+  const [v, setV] = useState(null), [cat, setCat] = useState([]), [amt, setAmt] = useState(""), [now, setNow] = useState(Date.now()), scn = useRef(null);
   const load = () => api.cityView(guildId).then(setV).catch(e => say(e.message, "down"));
   useEffect(() => { load(); api.cityCatalog().then(setCat).catch(() => {}) }, [guildId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(id) }, []);
@@ -23,9 +45,18 @@ export default function City({ api, guildId, me, mine, say, onVisit, accent }) {
   const boss = v.owner === me.id, lv = id => v.buildings.find(b => b.id === id), mairie = lv("mairie")?.level ?? 0;
   const run = async (fn, ok) => { try { await fn(); say(ok, "up"); setAmt(""); load() } catch (e) { say(e.message, "down") } };
   const amount = Math.floor(Number(amt)), above = Math.max(0, v.fund - v.hwm);
+  const GOALS = [["wins", "paris gagnants", 50], ["gifts", "W de dons", 20000]], party = GOALS.every(([k, , n]) => v.goals?.[k] >= n);
   return (
     <div className="city">
-      <Scene v={v} accent={accent} now={now} onVisit={onVisit} />
+      <div className="city-head"><Blason color={v.color} tag={v.tag} /><span><b>{v.name}</b>{v.motto && <small className="muted">« {v.motto} »</small>}</span>
+        <button type="button" className="btn ghost" onClick={() => scn.current && sharePhoto(scn.current.snapshot(`La ville de ${v.name} sur Aurelys`), "Ville Aurelys")}>📷 Photo</button></div>
+      <Scene v={v} accent={accent} now={now} onVisit={onVisit} party={party} onReady={s => { scn.current = s }} />
+      <div className="panel goals">
+        <b>Objectifs de la semaine {party && <span className="up">· atteints, feu d'artifice sur la ville !</span>}</b>
+        {GOALS.map(([k, l, n]) => <div key={k} className="goal"><span className="small">{nf0.format(Math.min(v.goals?.[k] ?? 0, n))} / {nf0.format(n)} {l}</span><span className="timebar"><i style={{ width: `${Math.min(100, (v.goals?.[k] ?? 0) / n * 100)}%` }} /></span></div>)}
+        <p className="muted small">Ensemble, avant lundi. Fenêtres allumées : membres connectés. Fanal vert : membre en gain aujourd'hui.</p>
+      </div>
+      {boss && <Identity v={v} api={api} run={run} />}
       <p className="muted small">Un immeuble par membre : son allure suit son logement. Touche-le pour visiter son QG. La nuit d'Aurelys, les fenêtres s'allument.</p>
       <div className="tiles">
         <div className="tile"><small>Trésor</small><b className="mono">{W(v.treasury)}</b><small>entretien {W(v.upkeep)} / jour ({v.active} membre{v.active > 1 ? "s" : ""} actif{v.active > 1 ? "s" : ""})</small></div>

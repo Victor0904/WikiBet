@@ -127,12 +127,19 @@ test("aurelys : une entreprise branchée sur un chiffre réel suit son écart à
   assert.ok(hot.n.some(n => n.cat === "reel" && n.tk === "PXF"), "le changement est annoncé dans les actualités");
 });
 
-test("aurelys : ×10 réservé aux joueurs qui ont clôturé 30 positions", async () => {
+test("aurelys : ×15 pour tous, ×20 avec un logement, ×25 dans une guilde qui a une salle des marchés", async () => {
   const db = await freshDb(); await login(db, A, "alice");
   await tick(db, 2, 10);
-  await assert.rejects(open(db, "up", 10, 100), /30 positions/);
-  await veteran(db);
-  assert.equal((await open(db, "up", 10, 100)).lev, 10);
+  assert.equal((await open(db, "up", 15, 100)).lev, 15);
+  await assert.rejects(open(db, "up", 20, 100), /logement/);
+  await db.query("update profiles set cash = 1e6 where id = $1", [A]); await db.query("select buy_item('studio')");
+  assert.equal((await open(db, "up", 20, 100)).lev, 20);
+  await assert.rejects(open(db, "up", 25, 100), /salle des marchés/);
+  const { rows: [g] } = await db.query("select * from guild_create('Les Taureaux', 'TOR')");
+  await db.query("update guilds set treasury = 1e6 where id = $1", [g.id]);
+  await db.query("select city_build('mairie')"); await db.query("select city_build('salle')");
+  assert.equal((await open(db, "up", 25, 100)).lev, 25);
+  await assert.rejects(open(db, "up", 30, 100), /invalide/);
 });
 
 test("aurelys : bougies d'une heure d'Aurelys (2 min 30 réelles)", async () => {

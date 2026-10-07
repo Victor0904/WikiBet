@@ -504,7 +504,7 @@ export function AurelysCard({ b, aur, now, onClose, Facts }) {
         ["Liquidation", `${px(x.lq)} (${pct(d)})`, Math.abs(d) < .03 ? "down warn" : ""],
         ["Frais", `${W(b.fees)} payés + ${W(x.closeFee)}`],
         ["Ouverte depuis", `${gdur(now - t0)} d'Aurelys`],
-        ["Clôture", x.halt ? "à la reprise de la cotation" : "quand tu veux"],
+        x.halt && ["Clôture", "à la reprise de la cotation"],
       ]} />
       {x.hit
         ? <p className="muted small">Seuil de liquidation touché, règlement en cours…</p>

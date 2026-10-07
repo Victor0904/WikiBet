@@ -44,3 +44,17 @@ test("moteur : des jeunes pousses sont annoncées, introduites en bourse, et rad
   assert.ok(Object.values(S.extra).filter(d => d.status === "listed").length <= IPO.maxYoung);
   for (const d of by("delisted")) assert.ok(d.lastPrice < d.ipoPrice * IPO.delist, "radiée sous 15 % du prix d'introduction");
 });
+
+test("souvenirs : certificat d'actionnaire fondateur numéroté, meilleur trade avec son graphique et la une du jour", async () => {
+  const db = await freshDb(); await login(db, A, "alice");
+  await db.query("update profiles set cash = 100000 where id = $1", [A]);
+  await db.query("select aur_listing($1)", [JSON.stringify([{ tk: "NEO", name: "Néogen", sector: "sante", L: 3000, status: "round", roundPrice: 10, roundEnd: Date.now() / 1000 + 3600 }])]);
+  await db.query("select aur_subscribe('NEO', 1000)"); await db.query("select aur_subscribe('NEO', 1000)");
+  await db.query("insert into aur_candles (tk, t, o, h, l, c, v) select 'NXR', now() - make_interval(mins => g), 1, 1, 1, 100 + g, 1 from generate_series(1, 5) g");
+  await db.query("insert into aur_news (id, t, cat, title) values (1, now() - interval '30 seconds', 'resultats', 'Nexora pulvérise les attentes')");
+  await db.query("insert into bets (user_id, session, day, kind, stake, aur, dir, lev, entry, exit, status, payout, created_at, closed_at, exit_at) values ($1, 0, 0, 'aurelys', 100, 'NXR', 'up', 5, 101, 104, 'won', 300, now() - interval '4 minutes', now(), now())", [A]);
+  const { rows: [{ s }] } = await db.query("select souvenirs($1) as s", [A]);
+  assert.deepEqual(s.founders.map(f => [f.tk, f.n]), [["NEO", 1]], "un seul certificat, n° 1");
+  assert.equal(s.best.tk, "NXR"); assert.ok(s.best.series.length >= 4, "le vrai graphique du trade");
+  assert.equal(s.best.une, "Nexora pulvérise les attentes");
+});

@@ -13,7 +13,7 @@ import { initState, advance, slip } from "../supabase/functions/_shared/aurelys.
 const UID = "00000000-0000-4000-8000-000000000001";
 
 export async function demoApi() {
-  const db = new PGlite("idb://wikibourse-demo-12"); // changer le numéro quand la migration change
+  const db = new PGlite("idb://wikibourse-demo-13"); // changer le numéro quand la migration change
   const ready = (await db.query("select to_regclass('public.bets') is not null as ok")).rows[0].ok;
   if (!ready) {
     await db.exec(stub);
@@ -62,12 +62,15 @@ export async function demoApi() {
     aurFeed: async since => (await all("select aur_feed($1) as f", [since ? new Date(since * 1000).toISOString() : null]))[0].f,
     aurHistory: async (tk, minutes) => (await all("select aur_history($1, $2) as h", [tk, minutes]))[0].h,
     aurTicks: async (tk, minutes) => (await all("select aur_ticks_of($1, $2) as k", [tk, minutes]))[0].k,
-    aurXp: async () => (await all("select my_aur_xp() as n"))[0].n,
+    aurMaxLev: async () => (await all("select my_max_lev() as n"))[0].n,
     aurStocks: () => all("select * from aur_stocks order by status, tk"),
     aurSubscribe: (tk, amount) => act("select * from aur_subscribe($1, $2)", [tk, amount]),
     myHoldings: () => all("select * from my_holdings()"),
     aurRounds: () => all("select * from aur_round_stats()"),
     myWealth: async () => (await all("select my_wealth() as w"))[0].w,
+    touch: () => all("select touch()"),
+    souvenirs: async user => (await all("select souvenirs($1) as s", [user]))[0].s,
+    guildUpdate: (color, motto) => act("select * from guild_update($1, $2)", [color, motto]),
     myCity: async () => (await all("select my_city() as c"))[0].c,
     aurNews: () => all("select * from aur_news where t <= now() order by id desc limit 150"),
     aurOrder: async body => {

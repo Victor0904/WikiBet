@@ -113,7 +113,7 @@ Deno.serve(async req => {
 
     if (body.action === "open") {
       const lev = Number(body.lev), stake = Number(body.stake);
-      if (!(BY[body.tk] || row.state.extra?.[body.tk]) || !["up", "down"].includes(body.dir) || ![1, 5, 10].includes(lev) || !(stake > 0)) return json({ error: "Ordre invalide." }, 400);
+      if (!(BY[body.tk] || row.state.extra?.[body.tk]) || !["up", "down"].includes(body.dir) || ![1, 5, 10, 15, 20, 25].includes(lev) || !(stake > 0)) return json({ error: "Ordre invalide." }, 400);
       const { data, error } = await admin.rpc("aur_open", { p_user: user.id, p_tk: body.tk, p_dir: body.dir, p_lev: lev, p_stake: stake, p_slip: slip(row.state, body.tk, stake * lev) });
       return error ? json({ error: error.message }, 400) : json(data);
     }
