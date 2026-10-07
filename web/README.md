@@ -50,6 +50,14 @@ npx supabase db push
 - `src/api.js` : appels Supabase et temps réel (classement et paris). `src/demo.js` : la même interface avec PGlite.
 - `src/App.jsx`, `src/charts.jsx`, `src/styles.css` : l'interface.
 
+## Comptes (Apple et e-mail)
+
+On joue d'abord sans compte (connexion anonyme). Dans Mon compte, le joueur lie sa partie à Apple ou à un e-mail. Réglages à faire une fois dans Supabase (Authentication) :
+
+1. **URL Configuration** : Site URL = l'adresse Vercel du jeu, et la même adresse dans Redirect URLs (plus `http://localhost:5173` pour le développement).
+2. **Sign In / Providers → Apple** : il faut un compte Apple Developer. Créer un Services ID (Sign in with Apple, domaine du site, retour `https://<projet>.supabase.co/auth/v1/callback`) et une clé ; coller le Services ID et le secret dans Supabase.
+3. **Sign In / Providers → Allow manual linking** : nécessaire pour lier Apple à une partie anonyme.
+
 ## Tests
 
 ```bash

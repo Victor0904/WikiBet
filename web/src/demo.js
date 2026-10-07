@@ -5,13 +5,13 @@ import stub from "./demo-stub.sql?raw";
 // Toutes les migrations, dans l'ordre de leur nom (horodaté).
 const migrations = Object.entries(import.meta.glob("../supabase/migrations/*.sql", { query: "?raw", import: "default", eager: true })).sort(([a], [b]) => a.localeCompare(b)).map(([, sql]) => sql);
 import { seedRows } from "./seed.js";
-import { normBet, normStream, normMarket, normBoard } from "./api.js";
+import { normBet, normStream, normMarket, normBoard, normGuild } from "./api.js";
 import { initState, advance, slip } from "../supabase/functions/_shared/aurelys.js";
 
 const UID = "00000000-0000-4000-8000-000000000001";
 
 export async function demoApi(engine) {
-  const db = new PGlite("idb://wikibourse-demo-7"); // changer le numéro quand la migration change
+  const db = new PGlite("idb://wikibourse-demo-8"); // changer le numéro quand la migration change
   const ready = (await db.query("select to_regclass('public.bets') is not null as ok")).rows[0].ok;
   if (!ready) {
     await db.exec(stub);
@@ -77,6 +77,16 @@ export async function demoApi(engine) {
     settle: async () => (await all("select settle() as n"))[0].n,
     myBets: async min => (await all("select * from bets where user_id = $1 and (status = 'open' or session >= $2) order by id desc", [UID, min])).map(normBet),
     leaderboard: async () => (await all("select * from leaderboard()")).map(normBoard),
+    gainsBoard: (period, scope) => all("select * from gains_board($1, $2)", [period, scope]),
+    myFriends: () => all("select * from my_friends()"),
+    friendAdd: async pseudo => (await act("select friend_add($1) as s", [pseudo])).s,
+    friendRemove: id => act("select friend_remove($1)", [id]),
+    guildList: async period => (await all("select * from guild_list($1)", [period])).map(normGuild),
+    guildMembers: id => all("select * from guild_members_of($1)", [id]),
+    guildCreate: ({ name, tag, motto }) => act("select * from guild_create($1, $2, $3)", [name, tag, motto]),
+    guildJoin: id => act("select guild_join($1)", [id]),
+    guildLeave: () => act("select guild_leave()"),
+    guildKick: id => act("select guild_kick($1)", [id]),
     shopItems: () => all("select * from shop_items order by sort"),
     inventoryOf: user => all("select item_id, qty, equipped from inventory where user_id = $1 and qty > 0", [user]),
     profileOf: async user => (await all("select id, pseudo, cash, bankruptcies from profiles where id = $1", [user]))[0] ?? null,

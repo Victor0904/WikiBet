@@ -11,6 +11,7 @@ import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx
 import { BY as AUR, slipEstimate } from "../supabase/functions/_shared/aurelys.js";
 import { Dock, Segmented, SubHeader } from "./nav.jsx";
 import { MoreMenu, HowTo, Account, Legal } from "./pages.jsx";
+import { Ranking, Friends, Guilds, LoginPanel } from "./social.jsx";
 const QG = lazy(() => import("./QG.jsx")); // Three.js n'est chargé qu'à l'ouverture du QG
 
 /* ===== Formats ===== */
@@ -86,6 +87,7 @@ function Game({ api, engine }) {
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
   const crypto = useCrypto(), [detail, setDetail] = useState(null);
   const [marketView, setMarketView] = useState("crypto"), [aurDetail, setAurDetail] = useState(null), [liveSrc, setLiveSrc] = useState("twitch"), [posView, setPosView] = useState("open"), [more, setMore] = useState(null);
+  useEffect(() => { if (api.account?.landed) { setTab("more"); setMore("account") } }, [api]); // retour d'un lien e-mail ou d'Apple
   // « Comment jouer » s'ouvre tout seul à la première visite.
   const [firstVisit, setFirstVisit] = useState(() => { try { return !localStorage.getItem("wb-howto") } catch { return false } });
   const [pref, setPref] = useState({ lev: 5, shorizon: "15", stake: 500 });
@@ -140,6 +142,7 @@ function Game({ api, engine }) {
     : (b.kind === "trade" ? liveTrade(engine, b, s) : liveStream(b, byLogin[b.login], now)).value - b.stake), 0)) : null;
   const visitQG = async row => {
     if (row.id === me.id) { setVisit(null); setTab("qg"); return }
+    row = { ...row, patrimoine: row.patrimoine ?? board.find(b => b.id === row.id)?.patrimoine };
     try { const rows = await api.inventoryOf(row.id); setVisit({ row, inv: Object.fromEntries(rows.map(r => [r.item_id, r])) }); setTab("qg") } catch (e) { say(e.message, "down") }
   };
 
@@ -209,8 +212,10 @@ function Game({ api, engine }) {
           </Suspense>}
 
           {tab === "more" && (
-            more === "board" ? <><SubHeader title="Classement" onBack={() => setMore(null)} /><Board board={board} me={me} onVisit={visitQG} /></>
-            : more === "account" ? <Account me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"}
+            more === "board" ? <><SubHeader title="Classement" onBack={() => setMore(null)} /><Ranking api={api} me={me} onVisit={visitQG} wealth={<Board board={board} me={me} onVisit={visitQG} />} /></>
+            : more === "friends" ? <Friends api={api} say={say} onVisit={visitQG} onBack={() => setMore(null)} />
+            : more === "guilds" ? <Guilds api={api} me={me} say={say} onVisit={visitQG} onBack={() => setMore(null)} />
+            : more === "account" ? <Account account={api.account} me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"}
                 canRestart={me.cash + openStake < BK_LIMIT} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} onBack={() => setMore(null)} />
             : more === "legal" ? <Legal engine={engine} onBack={() => setMore(null)} />
             : <MoreMenu go={setMore} me={me} title={myTitle} />)}
@@ -260,7 +265,7 @@ function MiniTicker({ engine, s, now, byLogin, crypto, aur, bets, onOpen }) {
 }
 
 function Onboarding({ api, onDone }) {
-  const [pseudo, setPseudo] = useState(""), [err, setErr] = useState(null);
+  const [pseudo, setPseudo] = useState(""), [err, setErr] = useState(null), [login, setLogin] = useState(!!api.account?.error);
   return (
     <div className="center">
       <form className="onboard" onSubmit={async e => { e.preventDefault(); try { await api.createProfile(pseudo); onDone() } catch (x) { setErr(x.message) } }}>
@@ -271,6 +276,10 @@ function Onboarding({ api, onDone }) {
         {err && <p className="error">{err}</p>}
         <button className="btn primary" type="submit">Entrer sur le marché</button>
       </form>
+      {api.account && <div className="onboard">
+        {api.account.error && <p className="error">{api.account.error}</p>}
+        {login ? <LoginPanel account={api.account} /> : <button type="button" className="link" onClick={() => setLogin(true)}>Déjà un compte ? Se connecter</button>}
+      </div>}
     </div>
   );
 }

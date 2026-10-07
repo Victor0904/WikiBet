@@ -45,7 +45,7 @@ export default function QG({ api, catalog, inv, me, owner, self, patrimoine, ope
           <h2>{self ? "Mon QG" : `QG de ${owner.pseudo}`} <span className="muted">{HOME_NAMES[level]}</span></h2>
           {owner.title && <p className="title-tag">{owner.title}</p>}
         </div>
-        <div className="r mono"><b className="big-num">{W(patrimoine)}</b><small>patrimoine</small></div>
+        {patrimoine != null && <div className="r mono"><b className="big-num">{W(patrimoine)}</b><small>patrimoine</small></div>}
       </div>
       {self && <p className="muted small">Solde {W(me.cash)} · en jeu {W(openStake)} · objets {W(objects)} (valeur de revente, 60 %)</p>}
 

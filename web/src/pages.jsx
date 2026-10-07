@@ -1,10 +1,13 @@
 // Pages du menu « Plus » : menu, Comment jouer, Mon compte, Sources des données.
 import { W, CAP0_TXT } from "./format.js";
 import { SubHeader } from "./nav.jsx";
+import { AccountLink } from "./social.jsx";
 
 export function MoreMenu({ go, me, title }) {
   const rows = [
-    ["board", "Classement", "Les meilleurs patrimoines, et les QG à visiter"],
+    ["board", "Classement", "Meilleurs gains du jour, de tous les temps, patrimoine"],
+    ["friends", "Amis", "Ajoute tes amis et compare vos gains"],
+    ["guilds", "Guildes", "Rejoins une équipe de traders"],
     ["howto", "Comment jouer", "Les règles en deux minutes"],
     ["account", "Mon compte", `${me.pseudo}${title ? ` · ${title}` : ""}`],
     ["legal", "Sources des données", "Ce qui est réel, ce qui est simulé"],
@@ -29,6 +32,7 @@ const STEPS = [
   ["Les duels", "Deux articles d'audience proche : lequel fera le plus de vues ? Tu paries à cote fixe, réglé à la fin de la séance sur les vraies vues du jour."],
   ["Le Live : Twitch et Steam", "Des questions Oui / Non sur de vrais chiffres : « Ce streamer aura-t-il plus de 50 000 spectateurs à 21:30 ? », « Ce jeu dépassera-t-il 700 000 joueurs à 22:00 ? ». La cote est figée quand tu paries, et les paris ferment 5 min avant l'échéance. Twitch ne met ses chiffres à jour que toutes les 1 à 3 min."],
   ["Ton QG", "Dépense tes gains : logements, déco en 3D, thèmes, titres et bonus. Le classement compte ton patrimoine (solde, mises en cours et 60 % de la valeur de tes objets) : acheter ne fait pas perdre de places, et tes objets survivent à une faillite."],
+  ["Classements, amis et guildes", "Trois classements : les gains du jour (remis à zéro à minuit), les gains de tous les temps et le patrimoine. Ajoute tes amis par leur pseudo, ou rejoins une guilde de 30 traders au plus. Lie ta partie à Apple ou à un e-mail dans Mon compte pour la garder."],
   ["Salaire et faillite", "+500 W à la fin de chaque séance où tu as parié. Sous 2 000 W, tu peux repartir à " + CAP0_TXT + " depuis Mon compte. Le compteur de faillites est visible de tous."],
 ];
 
@@ -44,7 +48,7 @@ export function HowTo({ onBack, first }) {
   );
 }
 
-export function Account({ me, title, patrimoine, openStake, objects, canRestart, onRestart, demo, onBack }) {
+export function Account({ account, me, title, patrimoine, openStake, objects, canRestart, onRestart, demo, onBack }) {
   return (
     <section className="account">
       <SubHeader title="Mon compte" onBack={onBack} />
@@ -58,11 +62,12 @@ export function Account({ me, title, patrimoine, openStake, objects, canRestart,
           <div className="row"><span>Faillites</span><b>{me.bankruptcies}</b></div>
         </div>
       </div>
+      {account && <AccountLink account={account} />}
       <div className="panel bk">
         <p><b>Faillite</b>Sous 2 000 W (solde et mises en cours), tu peux repartir à {CAP0_TXT}. Tes paris en cours sont perdus, tes objets restent à toi, et le compteur de faillites augmente.</p>
         <button type="button" className="btn" disabled={!canRestart} onClick={onRestart}>Repartir</button>
       </div>
-      {demo && <p className="fine">Mode démo locale : ta partie est enregistrée dans ce navigateur uniquement.</p>}
+      {demo && <p className="fine">Mode démo locale : ta partie est enregistrée dans ce navigateur uniquement, sans compte.</p>}
     </section>
   );
 }

@@ -6,12 +6,17 @@ import { createClient } from "@supabase/supabase-js";
 export const normBet = b => ({ ...b, id: Number(b.id), odds: b.odds == null ? null : Number(b.odds) });
 export const normMarket = m => ({ ...m, id: Number(m.id), closes_at: new Date(m.closes_at).toISOString(), p_yes: Number(m.p_yes), odds_yes: Number(m.odds_yes), odds_no: Number(m.odds_no) });
 export const normBoard = r => ({ ...r, cash: Number(r.cash), patrimoine: Number(r.patrimoine) });
+export const normGuild = g => ({ ...g, id: Number(g.id) });
 export const normStream = s => ({ ...s, ts: (s.ts || []).map(Number), vs: (s.vs || []).map(Number) });
 
 export async function connect(engine) {
   const url = import.meta.env.VITE_SUPABASE_URL, key = import.meta.env.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) return (await import("./demo.js")).demoApi(engine);
 
+  // Retour d'un lien e-mail ou d'Apple : lien de nouveau mot de passe, ou erreur à afficher. Lu avant que Supabase ne nettoie l'adresse.
+  const back = new URLSearchParams(location.hash.slice(1) + "&" + location.search.slice(1));
+  const recovery = back.get("type") === "recovery", authError = back.get("error_description");
+  if (authError) history.replaceState(null, "", location.pathname);
   const sb = createClient(url, key);
   let { data: { session } } = await sb.auth.getSession();
   if (!session) {
@@ -32,8 +37,24 @@ export async function connect(engine) {
   // Écart entre l'horloge du téléphone et celle du serveur, pour que tout le monde voie la même minute.
   const t0 = Date.now(), st = await rpc("server_time"), offset = Date.parse(st) - (t0 + Date.now()) / 2;
 
+  // Comptes : la partie anonyme devient un vrai compte en liant un e-mail ou Apple (même identifiant, rien n'est perdu).
+  const home = location.origin + location.pathname;
+  const auth = async (p, reload) => { const { data, error } = await p; if (error) throw new Error(authMsg(error)); if (reload) location.replace(home); return data };
+
   return {
     mode: "supabase", uid,
+    account: {
+      recovery, error: authError && authMsg({ message: authError }),
+      landed: !!(back.get("type") || authError), // retour d'un lien : on ouvre Mon compte
+      user: async () => (await sb.auth.getUser()).data.user,
+      appleSignIn: () => auth(sb.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: home } })),
+      appleLink: () => auth(sb.auth.linkIdentity({ provider: "apple", options: { redirectTo: home } })),
+      emailLink: email => auth(sb.auth.updateUser({ email }, { emailRedirectTo: home })),
+      setPassword: password => auth(sb.auth.updateUser({ password, data: { pw: true } }), true),
+      emailSignIn: (email, password) => auth(sb.auth.signInWithPassword({ email, password }), true),
+      resetPassword: email => auth(sb.auth.resetPasswordForEmail(email, { redirectTo: home })),
+      signOut: () => auth(sb.auth.signOut(), true),
+    },
     now: () => Date.now() + offset,
     me: async () => (await rows(sb.from("profiles").select("*").eq("id", uid).maybeSingle())) ?? null,
     createProfile: pseudo => rpc("create_profile", { p_pseudo: pseudo }),
@@ -55,6 +76,16 @@ export async function connect(engine) {
     settle: () => rpc("settle"),
     myBets: async minSession => (await rows(sb.from("bets").select("*").eq("user_id", uid).or(`status.eq.open,session.gte.${minSession}`).order("id", { ascending: false }))).map(normBet),
     leaderboard: async () => (await rpc("leaderboard")).map(normBoard),
+    gainsBoard: (period, scope) => rpc("gains_board", { p_period: period, p_scope: scope }),
+    myFriends: () => rpc("my_friends"),
+    friendAdd: pseudo => rpc("friend_add", { p_pseudo: pseudo }),
+    friendRemove: id => rpc("friend_remove", { p_user: id }),
+    guildList: async period => (await rpc("guild_list", { p_period: period })).map(normGuild),
+    guildMembers: id => rpc("guild_members_of", { p_id: id }),
+    guildCreate: ({ name, tag, motto }) => rpc("guild_create", { p_name: name, p_tag: tag, p_motto: motto }),
+    guildJoin: id => rpc("guild_join", { p_id: id }),
+    guildLeave: () => rpc("guild_leave"),
+    guildKick: id => rpc("guild_kick", { p_user: id }),
     shopItems: () => rows(sb.from("shop_items").select("*").order("sort")),
     inventoryOf: user => rows(sb.from("inventory").select("item_id,qty,equipped").eq("user_id", user).gt("qty", 0)),
     profileOf: async user => (await rows(sb.from("profiles").select("id,pseudo,cash,bankruptcies").eq("id", user).maybeSingle())) ?? null,
@@ -72,4 +103,19 @@ export async function connect(engine) {
       return () => sb.removeChannel(ch);
     },
   };
+}
+
+// Messages d'erreur de Supabase Auth, en français.
+function authMsg(e) {
+  const m = `${e.code ?? ""} ${e.message ?? ""}`;
+  return /invalid_credentials|Invalid login/i.test(m) ? "E-mail ou mot de passe incorrect."
+    : /provider is not enabled|Unsupported provider/i.test(m) ? "La connexion Apple n'est pas encore activée sur le serveur."
+    : /manual_linking|Manual linking/i.test(m) ? "La liaison de compte n'est pas activée sur le serveur."
+    : /identity_already_exists|already linked/i.test(m) ? "Ce compte Apple est déjà lié à une autre partie : utilise « Se connecter »."
+    : /email_exists|already been registered|already registered/i.test(m) ? "Cet e-mail a déjà un compte : connecte-toi."
+    : /weak_password|at least 6/i.test(m) ? "Mot de passe trop court : 8 caractères au moins."
+    : /email_not_confirmed|not confirmed/i.test(m) ? "Confirme d'abord ton e-mail avec le lien reçu."
+    : /rate_limit|security purposes|rate limit/i.test(m) ? "Trop de demandes : réessaie dans une minute."
+    : /email_address_invalid|invalid format|Unable to validate email/i.test(m) ? "Adresse e-mail invalide."
+    : e.message;
 }

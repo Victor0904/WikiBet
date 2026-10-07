@@ -28,9 +28,14 @@ Deux versions cohabitent :
   - `session(now)` : séance k, jour de données `START + k mod 30`, minute de jeu `floor(off × T / PLAY_MS)`. Même calcul que `game_now()` en SQL : ne modifier l'un qu'avec l'autre.
   - Duels : paires d'audience proche (ratio < 3), probabilité selon `vues^0.85`, cote = 0,93 / p (min 1,08), premier duel boosté ×1,4 sur l'outsider, réglés sur `vues[d+1]`.
 - `supabase/migrations/20261006000000_init.sql` : **la base fait foi.** Les cours sont stockés par `npm run seed` (tableau de 511 points par article et par jour, calculés par le moteur). Les joueurs n'écrivent rien directement (RLS). Tout passe par des fonctions `security definer` : `open_trade`, `close_trade`, `bet_duel`, `restart`, `create_profile`, `settle`. `settle()` tourne chaque minute (pg_cron) et à la demande des clients. Chaque règlement verrouille la ligne, donc pas de double paiement.
-- `src/api.js` : Supabase (connexion anonyme + pseudo, temps réel sur `profiles` et sur mes `bets`, décalage d'horloge corrigé avec `server_time()`). `src/demo.js` : même interface sur PGlite.
+- `src/api.js` : Supabase (connexion anonyme + pseudo, comptes Apple / e-mail, temps réel sur `profiles` et sur mes `bets`, décalage d'horloge corrigé avec `server_time()`). `src/demo.js` : même interface sur PGlite.
 - `tests/` : `npm test` lance la vraie migration dans PGlite (horloge, cours, liquidation, règlement, RLS, pause).
 - Pas de bots : le classement réunit les vrais joueurs.
+- **Comptes, classement des gains, amis, guildes** (migration `20261010000000_social.sql`, front `src/social.jsx`) :
+  - On joue d'abord en anonyme. Dans Mon compte, la partie devient un vrai compte en liant Apple (`linkIdentity`) ou un e-mail (`updateUser`, lien de confirmation, puis mot de passe ; `user_metadata.pw` dit qu'il est choisi). Même identifiant : rien n'est perdu. Connexion : Apple ou e-mail et mot de passe, puis rechargement de la page. Se connecter depuis une partie anonyme la remplace.
+  - À régler dans Supabase : fournisseur Apple (Services ID, clé de l'Apple Developer), « Allow manual linking », Site URL et Redirect URLs du site Vercel. La confirmation d'e-mail est active.
+  - Gain d'un pari = paiement − mise − frais d'ouverture (`bet_gain`). Classements : du jour (depuis minuit, heure de Paris), total, patrimoine ; pour tous, mes amis ou ma guilde (`gains_board`).
+  - Amis par pseudo : demande, puis acceptation (`friend_add` des deux côtés). Guildes ouvertes : 30 membres, une à la fois, sigle de 2 à 4 caractères, le fondateur peut exclure, le plus ancien membre lui succède. Classement des guildes = somme des gains de leurs membres actuels.
 - **Marché Crypto, le marché principal** (choisi par Victor : « le plus vrai et réel ») : migration `20261008000000_crypto.sql`, fonction `supabase/functions/crypto`, front `src/crypto.js` et `src/CryptoUI.jsx`.
   - Prix réels de Coinbase, **paires en dollars** (migration `20261008120000_crypto_usd.sql`). Mesuré : en euros, la plupart des cryptos restaient figées (0 à 3 échanges en 30 s) ; en dollars, Bitcoin bouge environ 3 fois par seconde. 14 actifs : BTC, ETH, SOL, XRP, DOGE, ADA, AVAX, LINK, LTC, BCH, SUI, UNI, XLM, TIA. DOT, SHIB et ATOM sont désactivés (`crypto_assets.active`), mais gardés pour l'historique. Avant d'ajouter une crypto, mesurer son activité sur le flux Coinbase en dollars.
   - **Le prix d'un ordre vient du serveur**, jamais du joueur. La fonction `crypto` (actions `open` et `close`, avec le jeton du joueur) lit le ticker Coinbase, puis appelle `crypto_open` / `crypto_close`, que seule la clé serveur peut exécuter.
@@ -86,7 +91,7 @@ Attention au biais actuel : une partie des articles a été choisie dans le top 
 
 1. Coter tout Wikipédia : une tâche planifiée récupère chaque matin le top 1 000 des articles du jour (`/metrics/pageviews/top/...`) et recalcule les cours, au lieu de rejouer 30 jours en boucle.
 2. Données plus fines : vues horaires (dumps.wikimedia.org/other/pageviews) pour un intraday réel ; EventStreams (`https://stream.wikimedia.org/v2/stream/recentchange`) comme signal d'agitation.
-3. Comptes durables (lier la connexion anonyme à un e-mail), parrainage, ligues privées pour streamers.
+3. Parrainage, ligues privées pour streamers.
 4. Frais d'ouverture sur les positions : sans eux, la maison n'a aucun avantage.
 5. Partage du résultat en image.
 

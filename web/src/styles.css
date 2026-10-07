@@ -475,3 +475,31 @@ button:active:not(:disabled) { transform: scale(.96) }
 .session { grid-template-columns: auto minmax(0, 1fr); margin: 0 0 12px }
 .session .count { justify-self: end; font-size: 14px; color: var(--ink) }
 .session .sub { grid-column: 1 / -1; grid-row: auto; font-size: 12.5px }
+.story { display: flex; flex-direction: column; gap: 6px; background: var(--bg); border-radius: 8px; padding: 10px 12px }
+.story p { margin: 0; line-height: 1.45 }
+
+/* ===== Comptes, amis et guildes ===== */
+.center { align-content: center; gap: 18px }
+.auth { display: flex; flex-direction: column; gap: 8px }
+.auth p { margin: 0 }
+.auth input, .add-row input { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; font-size: 16px; color: var(--ink); min-width: 0 }
+.auth-panel { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px }
+.auth-panel > p { margin: 0; font-size: 14px }
+.btn.apple { display: flex; align-items: center; justify-content: center; gap: 8px; background: #fff; color: #000; border-color: #fff; padding: 11px 14px; font-size: 15px }
+.btn.apple svg { width: 18px; height: 18px; margin-top: -2px }
+.or { text-align: center; color: var(--faint); font-size: 12px }
+.link { background: none; border: 0; color: var(--accent); font-size: 14px; padding: 6px 0; text-align: center }
+.link:disabled { color: var(--faint) }
+.small { font-size: 13px }
+.gtag { font: 600 10.5px var(--f-mono); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; margin-left: 6px; vertical-align: 2px }
+.sec { font: 700 15px var(--f-cond); color: var(--muted); margin: 18px 0 8px }
+.add-row { display: flex; gap: 8px; margin-bottom: 4px }
+.add-row input { flex: 1 }
+.frow { grid-template-columns: minmax(0, 1fr) auto }
+.fname { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; background: none; border: 0; padding: 0; color: inherit; text-align: left; font: inherit }
+.facts { display: flex; gap: 6px }
+.guild, .guild-intro { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px }
+.guild p, .guild-intro p { margin: 0 }
+.guild-h b { font: 700 22px var(--f-cond) }
+.board .me small { text-align: left; color: var(--faint) }
+.board .fname b small.accent { display: inline; color: var(--accent); font-size: 12px }
