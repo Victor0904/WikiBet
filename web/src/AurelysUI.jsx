@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { STOCKS, BY, SECTORS, REGIMES, CHARACTERS, INDEX, FEE, CAP_MULT, gameClock, calendar, sma, bollinger, rsi } from "../supabase/functions/_shared/aurelys.js";
 import { dayOpen } from "./aurelys.js";
+import { STORIES } from "./aurelys-stories.js";
 import { W, sW, nf0, nf2, pct, cls, clock } from "./format.js";
 import { tradeValue, liqPrice } from "./engine.js";
 import { Spark, PositionChart } from "./charts.jsx";
@@ -98,7 +99,7 @@ function List({ aur, now, bets, onPick, onDetail }) {
         return (
           <div key={s.tk} className={"mrow" + (mine(s.tk) ? " mine" : "")}>
             <button type="button" className="name who as-link" onClick={() => onDetail(s.tk)} aria-label={`Fiche de ${s.name}`}>
-              <TkIcon tk={s.tk} /><span><b>{s.name}</b><small>{q?.halt ? "cotation suspendue" : SECTORS[s.sector].name}</small></span>
+              <TkIcon tk={s.tk} /><span><b>{s.name}</b><small>{q?.halt ? "cotation suspendue" : STORIES[s.tk].what}</small></span>
             </button>
             {v.length > 1 ? <Spark path={v} t={v.length - 1} /> : <span />}
             <span className="r mono"><b>{px(q?.p)}</b><small className={cls(c)}>{q ? pct(c) : ""}</small></span>
@@ -273,7 +274,11 @@ export function AurelysDetail({ tk, aur, api, now, onPick, onClose }) {
           <button type="button" className="buy" disabled={!q || q.halt} onClick={() => onPick(tk, "up")}><span>▲ Hausse</span></button>
           <button type="button" className="sell" disabled={!q || q.halt} onClick={() => onPick(tk, "down")}><span>▼ Baisse</span></button>
         </div>
-        <p className="small">{s.desc}</p>
+        <div className="story">
+          <p className="small"><b>{STORIES[tk].what}</b> · fondée en {STORIES[tk].since}</p>
+          <p className="small">{STORIES[tk].story}</p>
+          <p className="small muted">{s.desc}</p>
+        </div>
         <div className="rows mono">
           <div className="row"><span>Capitalisation</span><b>{q ? `${nf0.format(q.p * s.shares / 1e6)} M` : "—"}</b></div>
           <div className="row"><span>PER</span><b>{q && eps ? nf2.format(q.p / eps) : "—"}</b></div>
