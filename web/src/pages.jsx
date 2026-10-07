@@ -24,16 +24,15 @@ export function MoreMenu({ go, me, title }) {
 }
 
 const STEPS = [
-  ["Le principe", "Tu trades avec des W, une monnaie fictive, sur des chiffres réels (le prix des cryptos, les vues de Wikipédia, les spectateurs Twitch, les joueurs Steam) et sur une bourse inventée, Aurelys. Tu commences avec " + CAP0_TXT + "."],
-  ["La crypto, le marché principal", "Bitcoin, Ethereum, Solana… au vrai prix de Coinbase, en dollars et en direct, 24 h/24. Prends position à la hausse ou à la baisse avec un levier. Le prix retenu est celui du serveur au moment de l'ordre. Des frais de 0,1 % du montant engagé sont prélevés à l'ouverture et à la clôture. La position reste ouverte jusqu'à ce que tu la clôtures, ou jusqu'à la liquidation."],
-  ["La Bourse d'Aurelys", "Un pays fictif, 12 entreprises inventées, une bourse ouverte 24 h/24. Rien n'est dessiné à l'avance : les prix naissent des ordres de bots aux caractères différents, de baleines et des joueurs. Lis les actualités (résultats, essais cliniques, rumeurs, Banque Centrale) pour deviner où va le cours. Ton propre ordre fait bouger le prix : plus il est gros, plus tu paies cher. Une seconde réelle vaut une minute d'Aurelys."],
-  ["Les séances du Marché", "Le Marché Wikipédia vit par séances : 10 minutes de jeu, 1 minute de pause, en continu. Tout le monde voit les mêmes cours au même moment. L'horloge « marché » (9:00 → 17:30) est un décor : une séance rejoue une vraie journée de vues en 10 minutes."],
-  ["Prendre position", "▲ si tu penses que le cours va monter, ▼ s'il va baisser. Ton gain suit la variation, multipliée par le levier : à ×5, +2 % de cours font +10 % sur ta mise. Clôture quand tu veux, sinon la position se ferme au coup de sifflet final. Si elle perd toute sa mise, elle est liquidée."],
-  ["Les duels", "Deux articles d'audience proche : lequel fera le plus de vues ? Tu paries à cote fixe, réglé à la fin de la séance sur les vraies vues du jour."],
-  ["Le Live : Twitch et Steam", "Des questions Oui / Non sur de vrais chiffres : « Ce streamer aura-t-il plus de 50 000 spectateurs à 21:30 ? », « Ce jeu dépassera-t-il 700 000 joueurs à 22:00 ? ». La cote est figée quand tu paries, et les paris ferment 5 min avant l'échéance. Twitch ne met ses chiffres à jour que toutes les 1 à 3 min."],
-  ["Ton QG", "Dépense tes gains : logements, déco en 3D, thèmes, titres et bonus. Le classement compte ton patrimoine (solde, mises en cours et 60 % de la valeur de tes objets) : acheter ne fait pas perdre de places, et tes objets survivent à une faillite."],
+  ["Le principe", "Tu trades avec des W, une monnaie fictive, sur une bourse inventée, Aurelys, et tu réponds à des questions sur de vrais chiffres en direct (Twitch et Steam). Tu commences avec " + CAP0_TXT + ". Ici, c'est le talent qui paie : lire les nouvelles, connaître les jeux et les streamers, anticiper."],
+  ["La Bourse d'Aurelys", "Un pays fictif, 13 entreprises inventées, une bourse ouverte 24 h/24. Un jour d'Aurelys dure 2 h réelles : tu as le temps de lire et de réfléchir. Les prix naissent des ordres de bots aux caractères différents, de baleines et des joueurs. Ton propre ordre fait bouger le prix : plus il est gros, et plus l'action est petite, plus tu paies cher."],
+  ["Résultats et consensus", "Avant chaque publication de résultats, les analystes annoncent ce qu'ils attendent. Le cours réagit à la surprise, pas au chiffre : +12 % quand on attendait +8 %, ça monte ; +12 % quand on attendait +15 %, ça baisse. Les indices sortent avant : commandes, rumeurs, révisions des analystes."],
+  ["Des entreprises branchées sur le réel", "Pixelfold suit les joueurs connectés sur Steam, Ondéo les spectateurs de Twitch, Granterre la pluie et la chaleur en Beauce, Helvane la consommation électrique française, Lumirue les jours fériés et la météo du week-end. Ces chiffres sont réels et à venir : celui qui voit venir une grosse sortie de jeu ou une canicule a un temps d'avance."],
+  ["Prendre position", "▲ si tu penses que le cours va monter, ▼ s'il va baisser. Ton gain suit la variation, multipliée par le levier : à ×5, +2 % de cours font +10 % sur ta mise. Le ×10 se débloque après 30 positions clôturées. Frais de 0,1 % du montant engagé à l'ouverture et à la clôture. Si la position perd toute sa mise, elle est liquidée."],
+  ["Le Live : Twitch et Steam", "Des questions Oui / Non sur de vrais chiffres : « Ce streamer aura-t-il plus de 50 000 spectateurs à 21:30 ? », « Le pic de joueurs de ce jeu aujourd'hui battra-t-il celui d'hier ? ». Le seuil est placé près de la prévision : à toi de savoir mieux qu'elle (horaires, sorties, soldes, week-ends). La cote est figée quand tu paries."],
+  ["Ton QG", "Dépense tes gains : logements, déco en 3D, thèmes, titres et bonus. Un plus grand logement donne aussi un historique plus long et plus d'alertes de prix. Tes trophées s'affichent au mur. Le classement compte ton patrimoine (solde, mises en cours et 60 % de la valeur de tes objets)."],
   ["Classements, amis et guildes", "Trois classements : les gains du jour (remis à zéro à minuit), les gains de tous les temps et le patrimoine. Ajoute tes amis par leur pseudo, ou rejoins une guilde de 30 traders au plus. Lie ta partie à Apple ou à un e-mail dans Mon compte pour la garder."],
-  ["Salaire et faillite", "+500 W à la fin de chaque séance où tu as parié. Sous 2 000 W, tu peux repartir à " + CAP0_TXT + " depuis Mon compte. Le compteur de faillites est visible de tous."],
+  ["Salaire et faillite", "+500 W toutes les 11 minutes où tu as parié. Sous 2 000 W (solde, mises et valeur de revente de tes objets), tu peux repartir à " + CAP0_TXT + " depuis Mon compte. Le compteur de faillites est visible de tous."],
 ];
 
 export function HowTo({ onBack, first }) {
@@ -64,7 +63,7 @@ export function Account({ account, me, title, patrimoine, openStake, objects, ca
       </div>
       {account && <AccountLink account={account} />}
       <div className="panel bk">
-        <p><b>Faillite</b>Sous 2 000 W (solde et mises en cours), tu peux repartir à {CAP0_TXT}. Tes paris en cours sont perdus, tes objets restent à toi, et le compteur de faillites augmente.</p>
+        <p><b>Faillite</b>Sous 2 000 W (solde, mises en cours et valeur de revente de tes objets et bonus), tu peux repartir à {CAP0_TXT}. Tes paris en cours sont perdus, tes objets restent à toi, et le compteur de faillites augmente.</p>
         <button type="button" className="btn" disabled={!canRestart} onClick={onRestart}>Repartir</button>
       </div>
       {demo && <p className="fine">Mode démo locale : ta partie est enregistrée dans ce navigateur uniquement, sans compte.</p>}
@@ -72,15 +71,13 @@ export function Account({ account, me, title, patrimoine, openStake, objects, ca
   );
 }
 
-export function Legal({ engine, onBack }) {
-  const d = (i, y) => engine.dateOf(i).toLocaleDateString("fr-FR", { day: "numeric", month: "long", ...(y ? { year: "numeric" } : {}), timeZone: "UTC" });
+export function Legal({ onBack }) {
   return (
     <section className="legal">
       <SubHeader title="Sources des données" onBack={onBack} />
       <div className="panel prose">
-        <p><b>Crypto.</b> Prix réels de Coinbase, en dollars, en direct. Le prix d'un ordre est relevé par le serveur au moment où il le reçoit ; la liquidation est vérifiée chaque minute sur les vrais plus hauts et plus bas.</p>
-        <p><b>Bourse d'Aurelys.</b> Entièrement fictive : pays, entreprises, personnages, cours et actualités sont simulés par le serveur, identiques pour tous les joueurs. Toute ressemblance avec une société réelle serait fortuite.</p>
-        <p><b>Marché Wikipédia.</b> Vues quotidiennes réelles de Wikipédia en français (API Wikimedia Pageviews, du {d(0)} au {d(engine.END, true)}, licence CC0). Les clôtures et les duels sont réels. Le mouvement minute par minute entre deux clôtures est simulé, identique pour tous les joueurs.</p>
+        <p><b>Bourse d'Aurelys.</b> Fictive : pays, entreprises, personnages, cours et actualités sont simulés par le serveur, identiques pour tous les joueurs. Toute ressemblance avec une société réelle serait fortuite.</p>
+        <p><b>Chiffres réels utilisés par Aurelys.</b> Joueurs Steam et spectateurs Twitch (relevés du jeu), météo en Beauce et à Paris (Open-Meteo), consommation électrique française (RTE éCO2mix, open data), jours fériés (calendrier.api.gouv.fr). Relevés au plus tous les quarts d'heure ; ils influencent la valeur de 5 entreprises fictives.</p>
         <p><b>Twitch.</b> Spectateurs réels des lives francophones (API Twitch), relevés chaque minute. Twitch met ses chiffres à jour toutes les 1 à 3 minutes.</p>
         <p><b>Steam.</b> Joueurs connectés réels (API publique de Steam), relevés chaque minute.</p>
         <p><b>Monnaie.</b> Les W sont fictifs : ils ne s'achètent pas et ne se revendent pas. Tout se gagne en jouant.</p>

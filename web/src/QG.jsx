@@ -1,19 +1,19 @@
 // Onglet QG : la pièce en 3D et la boutique. Chargé à la demande (Three.js ne pèse que sur cet onglet).
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createScene } from "./qg/scene.js";
-import { W, nf0, clock, HOME_NAMES } from "./format.js";
+import { W, nf0, clock, HOME_NAMES, PERKS } from "./format.js";
 
 const SET_STREAM = ["ecran2", "ecran3", "micro", "camera", "chaise", "neon"];
 const TABS = [["decor", "Déco"], ["home", "Logement"], ["cosmetic", "Style"], ["bonus", "Bonus"]];
 const CATS = { theme: "Thème", title: "Titre", effect: "Effet de victoire" };
 
-function Scene({ level, items, accent, pnl }) {
+function Scene({ level, items, accent, pnl, trophies }) {
   const ref = useRef(null), sc = useRef(null), [err, setErr] = useState(null);
   useEffect(() => {
     try { sc.current = createScene(ref.current) } catch (e) { setErr(e.message) }
     return () => sc.current?.dispose();
   }, []);
-  useEffect(() => { sc.current?.update({ level, items, accent, pnl }) }, [level, items, accent, pnl]);
+  useEffect(() => { sc.current?.update({ level, items, accent, pnl, trophies }) }, [level, items, accent, pnl, trophies]);
   return <div className="qg-scene" ref={ref}>{err && <p className="muted small pad">La 3D n'est pas disponible sur cet appareil.</p>}</div>;
 }
 
@@ -27,8 +27,12 @@ function Confirm({ label, confirm, onClick, disabled, className = "btn primary" 
   }}>{armed ? confirm : label}</button>;
 }
 
+
 export default function QG({ api, catalog, inv, me, owner, self, patrimoine, openStake, pnl, accent, act, onBack }) {
-  const [tab, setTab] = useState("decor");
+  const [tab, setTab] = useState("decor"), [troph, setTroph] = useState([]);
+  const uid = self ? me?.id : owner?.id;
+  useEffect(() => { if (uid) api.trophies(uid).then(setTroph).catch(() => {}) }, [api, uid]);
+  const wall = useMemo(() => troph.filter(t => t.got).map(t => ({ name: t.name, detail: t.detail })), [troph]);
   const owned = id => (inv[id]?.qty ?? 0) > 0;
   const level = Math.max(0, ...catalog.filter(i => i.kind === "home" && owned(i.id)).map(i => i.level));
   const decor = catalog.filter(i => i.kind === "decor" && owned(i.id)).map(i => i.id);
@@ -49,13 +53,25 @@ export default function QG({ api, catalog, inv, me, owner, self, patrimoine, ope
       </div>
       {self && <p className="muted small">Solde {W(me.cash)} · en jeu {W(openStake)} · objets {W(objects)} (valeur de revente, 60 %)</p>}
 
-      <Scene level={level} items={decor} accent={accent} pnl={self ? pnl : null} />
+      <Scene level={level} items={decor} accent={accent} pnl={self ? pnl : null} trophies={wall} />
 
       <div className="qg-badges">
         <span className={"badge" + (setDone === SET_STREAM.length ? " done" : "")}>Setup streamer {setDone}/{SET_STREAM.length}</span>
         <span className="badge">{decor.length} objet{decor.length > 1 ? "s" : ""} de déco</span>
         {boost && <span className="badge done">Salaire doublé jusqu'à {clock(boost)}</span>}
       </div>
+
+      {troph.length > 0 && <div className="panel trophies">
+        <h2>Trophées <span className="muted">{troph.filter(t => t.got).length}/{troph.length}</span></h2>
+        <div className="troph-grid">
+          {troph.map(t => <div key={t.id} className={"troph" + (t.got ? " got" : "")} title={t.how}><b>{t.got ? "★" : "☆"} {t.name}</b><small>{t.got ? t.detail ?? t.how : t.how}</small></div>)}
+        </div>
+      </div>}
+
+      {self && <div className="panel perks">
+        <b>Avantages de ton logement</b>
+        <p className="muted small">Historique de tes paris sur {PERKS[level].hist} jour{PERKS[level].hist > 1 ? "s" : ""} · {PERKS[level].alerts} alerte{PERKS[level].alerts > 1 ? "s" : ""} de prix sur Aurelys.{next ? ` Avec le ${next.name.toLowerCase()} : ${PERKS[level + 1].hist} jours et ${PERKS[level + 1].alerts} alertes.` : ""}</p>
+      </div>}
 
       {self && next && (
         <div className="panel next-home">

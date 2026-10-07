@@ -4,12 +4,13 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 // Par logement : taille de la pièce, sol, murs, largeur de la fenêtre (part du mur du fond).
+// Petites pièces au départ (moins de vide), murs plus chauds : on doit avoir envie d'y être.
 const HOMES = [
-  { size: 6, floor: 0x6b4f3a, wall: 0x343a52, win: 0.32 },   // chambre
-  { size: 7, floor: 0x8a6a4b, wall: 0x2c3247, win: 0.38 },   // studio
-  { size: 8.5, floor: 0x585d68, wall: 0x22283a, win: 0.6 },  // open space
-  { size: 10, floor: 0x4a3528, wall: 0x7a3b2e, win: 0.5 },   // loft (briques)
-  { size: 12, floor: 0xd4d0c8, wall: 0x141824, win: 0.9 },   // penthouse
+  { size: 4.8, floor: 0x7a5a40, wall: 0x4a4258, win: 0.4 },  // chambre
+  { size: 6.6, floor: 0x8a6a4b, wall: 0x3f3a52, win: 0.42 }, // studio
+  { size: 8, floor: 0x6e6258, wall: 0x2f3346, win: 0.6 },    // open space
+  { size: 9.5, floor: 0x4a3528, wall: 0x7a3b2e, win: 0.5 },  // loft (briques)
+  { size: 11.5, floor: 0xd4d0c8, wall: 0x1c2030, win: 0.9 }, // penthouse
 ];
 const H = 3.2; // hauteur des murs
 
@@ -57,6 +58,15 @@ function pnlTex() {
     g.font = "600 22px 'IBM Plex Mono', monospace"; g.fillText(up ? "▲ en gain" : "▼ en perte", 14, 136);
   });
 }
+// Affiche « Bourse d'Aurelys » : le décor par défaut du mur de gauche.
+function posterTex() {
+  return canvasTex(192, 256, g => {
+    const bg = g.createLinearGradient(0, 0, 0, 256); bg.addColorStop(0, "#3b2a5a"); bg.addColorStop(1, "#d86b3c"); g.fillStyle = bg; g.fillRect(0, 0, 192, 256);
+    g.fillStyle = "rgba(255,240,220,.9)"; g.beginPath(); g.arc(96, 150, 46, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#1a1424"; for (let x = 0; x < 192; x += 22) g.fillRect(x, 170 - (x * 7) % 60, 18, 90);
+    g.fillStyle = "#fff4e6"; g.font = "700 22px 'IBM Plex Sans Condensed', sans-serif"; g.textAlign = "center"; g.fillText("BOURSE", 96, 40); g.fillText("D'AURELYS", 96, 64);
+  });
+}
 function chartTex(seed) {
   return canvasTex(128, 80, (g, w, h) => {
     g.fillStyle = "#07090f"; g.fillRect(0, 0, w, h);
@@ -78,6 +88,13 @@ function buildItems(ids, S, accent, screens) {
   const c = -S / 2, A = new THREE.Color(accent), out = [];
   const wood = mat(0x7a5537), dark = mat(0x1a1d26), metal = mat(0x9aa3b5, { metalness: .6, roughness: .3 });
   const deskX = c + 2.3, deskZ = c + .9, top = .78;
+  // Mobilier de base, offert : un lit (chambre et studio) et une affiche, pour que la pièce ne paraisse pas vide.
+  if (S < 7) {
+    const sheet = mat(0xe9e2d4), wood2 = mat(0x5a3d28);
+    out.push(at(group(box(1.25, .35, 2.1, wood2), box(1.15, .18, 2, sheet, 0, .35), box(1.15, .12, .45, mat(accent), 0, .53, -.7), box(1.25, .8, .1, wood2, 0, 0, -1.05)), c + S - .75, c + S - 1.25));
+  }
+  const poster = new THREE.Mesh(new THREE.PlaneGeometry(.9, 1.2), new THREE.MeshBasicMaterial({ map: screens.poster }));
+  poster.position.set(c + .03, 1.75, c + S * .62); poster.rotation.y = Math.PI / 2; out.push(poster);
   // Bureau et écran principal : toujours là.
   out.push(at(group(box(2.1, .06, .8, wood, 0, top - .06), ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([i, j]) => box(.06, top - .06, .06, dark, i * .98, 0, j * .35))), deskX, deskZ));
   const main = monitor(screens.pnl); main.position.set(deskX, top, deskZ - .15); out.push(main);
@@ -124,6 +141,7 @@ function buildItems(ids, S, accent, screens) {
       const sc = new THREE.Mesh(new THREE.PlaneGeometry(.78, .48), new THREE.MeshBasicMaterial({ map: screens.wall[(i * 3 + j) % screens.wall.length] }));
       sc.position.set(c + .04, 1 + i * .55, c + S - 2.9 + j * .85); sc.rotation.y = Math.PI / 2; g.add(sc);
     }
+    g.userData.flat = true; // écrans placés en coordonnées absolues : pas d'agrandissement
     out.push(g);
   }
   if (has("lingots")) {
@@ -132,6 +150,25 @@ function buildItems(ids, S, accent, screens) {
     for (let k = 0; k < 6; k++) g.add(box(.28, .1, .14, gold, -.3 + (k % 3) * .3, .92 + Math.floor(k / 3) * .11, (k % 2) * .16 - .08));
     out.push(at(g, c + S - .9, c + 6.4, Math.PI / 2));
   }
+  // Les objets sont agrandis d'un cran : à l'échelle de la pièce, ils se voient.
+  out.forEach(o => { if (!o.isLight && !o.userData.flat) o.scale.multiplyScalar(o.scale.x === 1 ? 1.15 : 1) });
+  return out;
+}
+
+// Cadres des trophées sur le mur de gauche : nom et détail (le meilleur trade affiche son gain).
+function trophyFrames(list, S) {
+  const c = -S / 2, out = [], gold = mat(0xe8c547, { metalness: .8, roughness: .3 });
+  list.slice(0, Math.floor((S - 1.2) / .75)).forEach((t, i) => {
+    const tex = canvasTex(256, 192, g => {
+      g.fillStyle = "#14161f"; g.fillRect(0, 0, 256, 192); g.fillStyle = "#e8c547"; g.font = "700 64px serif"; g.fillText("★", 96, 76);
+      g.font = "600 22px 'IBM Plex Sans Condensed', sans-serif"; g.fillStyle = "#f2efe6"; g.textAlign = "center"; g.fillText(t.name, 128, 124);
+      if (t.detail) { g.font = "600 18px 'IBM Plex Mono', monospace"; g.fillStyle = "#1fcb8b"; g.fillText(t.detail.slice(0, 22), 128, 156) }
+    });
+    const f = group(box(.66, .5, .04, gold), new THREE.Mesh(new THREE.PlaneGeometry(.58, .43), new THREE.MeshBasicMaterial({ map: tex })));
+    f.children[1].position.set(0, .25, .025);
+    f.position.set(c + .05, 2.25 - (i % 2) * .62, c + .9 + Math.floor(i / 2) * .75); f.rotation.y = Math.PI / 2; f.userData.flat = true;
+    out.push(f);
+  });
   return out;
 }
 
@@ -141,11 +178,11 @@ export function createScene(parent, { interactive = true } = {}) {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   parent.appendChild(renderer.domElement);
   const scene = new THREE.Scene(), camera = new THREE.OrthographicCamera(-1, 1, 1, -1, .1, 100);
-  scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x2a1e14, 1.1));
-  const sun = new THREE.DirectionalLight(0xfff1dc, 1.6); sun.position.set(6, 10, 8); sun.castShadow = true;
+  scene.add(new THREE.HemisphereLight(0xffe4c4, 0x3a2614, 1.05)); // lumière chaude
+  const sun = new THREE.DirectionalLight(0xffe0b8, 1.5); sun.position.set(6, 10, 8); sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9 }); scene.add(sun);
 
-  const screens = { pnl: pnlTex(), c1: chartTex(11), c2: chartTex(24), wall: [3, 8, 13, 21, 34, 55].map(chartTex) };
+  const screens = { pnl: pnlTex(), c1: chartTex(11), c2: chartTex(24), wall: [3, 8, 13, 21, 34, 55].map(chartTex), poster: posterTex() };
   Object.values(screens).flat().forEach(t => { t.userData.keep = true }); // réutilisées d'un logement à l'autre
   let room = null, state = {}, S = 6;
   const fine = matchMedia("(pointer: fine)").matches;
@@ -156,7 +193,7 @@ export function createScene(parent, { interactive = true } = {}) {
     renderer.setSize(w, h, false);
     Object.assign(camera, { left: -view * asp / 2, right: view * asp / 2, top: view / 2, bottom: -view / 2 }); camera.updateProjectionMatrix();
   }
-  function build({ level, items, accent }) {
+  function build({ level, items, accent, trophies = [] }) {
     if (room) { scene.remove(room); dispose(room) }
     const home = HOMES[level] ?? HOMES[0]; S = home.size;
     const c = -S / 2; room = new THREE.Group();
@@ -166,13 +203,15 @@ export function createScene(parent, { interactive = true } = {}) {
     const ww = S * home.win, win = new THREE.Mesh(new THREE.PlaneGeometry(ww, level >= 4 ? H - .4 : 1.6), new THREE.MeshBasicMaterial({ map: skyline(level) }));
     win.position.set(level >= 4 ? 0 : c + S - ww / 2 - .5, level >= 4 ? H / 2 : 1.75, c + .02); room.add(win);
     buildItems(new Set(items), S, accent, screens).forEach(o => room.add(o));
+    trophyFrames(trophies, S).forEach(o => room.add(o));
+    const lamp = new THREE.PointLight(0xffc98a, 1.4, S * 1.6); lamp.position.set(0, H - .3, 0); room.add(lamp); // plafonnier chaud
     scene.add(room);
     camera.position.set(S * 1.1, S * 1.05, S * 1.1); camera.lookAt(0, 1.2, 0);
     if (controls) { controls.target.set(0, 1.2, 0); controls.update() }
     frame();
   }
   function update(next) {
-    const key = JSON.stringify([next.level, [...next.items].sort(), next.accent]);
+    const key = JSON.stringify([next.level, [...next.items].sort(), next.accent, next.trophies ?? []]);
     if (key !== state.key) build(next);
     if (next.pnl !== state.pnl || next.accent !== state.accent) screens.pnl.redraw(next.pnl, next.accent);
     state = { ...next, key };

@@ -10,9 +10,9 @@ test("Steam : un jeu reçoit des questions comme un streamer, mais n'est jamais 
   await db.query("select settle()");
   const { rows } = await db.query("select login, threshold from stream_markets where login = 'steam:730'");
   assert.equal(rows.length, 3);
-  assert.ok(rows.every(r => r.threshold > 1300000 && r.threshold < 1300000 * 1.05 && r.threshold % 1000 === 0), `seuil à moins de 5 % au-dessus, arrondi : ${rows.map(r => r.threshold)}`);
+  assert.ok(rows.every(r => Math.abs(r.threshold / 1300000 - 1) < .05 && r.threshold % 10000 === 0), `seuil près de la prévision, arrondi : ${rows.map(r => r.threshold)}`);
   const { rows: odds } = await db.query("select p_yes from open_markets() where login = 'steam:730'");
-  assert.ok(odds.every(o => o.p_yes > .15 && o.p_yes < .5), `question ouverte : ${odds.map(o => o.p_yes.toFixed(2))}`);
+  assert.ok(odds.every(o => o.p_yes > .3 && o.p_yes < .7), `question équilibrée : ${odds.map(o => o.p_yes.toFixed(2))}`);
   const watch = (await db.query("select login from streamers_to_watch()")).rows.map(r => r.login);
   assert.deepEqual(watch, ["zerator"]);
 });

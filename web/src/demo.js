@@ -5,18 +5,20 @@ import stub from "./demo-stub.sql?raw";
 // Toutes les migrations, dans l'ordre de leur nom (horodaté).
 const migrations = Object.entries(import.meta.glob("../supabase/migrations/*.sql", { query: "?raw", import: "default", eager: true })).sort(([a], [b]) => a.localeCompare(b)).map(([, sql]) => sql);
 import { seedRows } from "./seed.js";
+import { createEngine } from "./engine.js";
+import data from "./pageviews.json"; // la démo remplit sa base locale (les tables du replay Wiki restent nécessaires à l'horloge des séances)
 import { normBet, normStream, normMarket, normBoard, normGuild } from "./api.js";
 import { initState, advance, slip } from "../supabase/functions/_shared/aurelys.js";
 
 const UID = "00000000-0000-4000-8000-000000000001";
 
-export async function demoApi(engine) {
-  const db = new PGlite("idb://wikibourse-demo-8"); // changer le numéro quand la migration change
+export async function demoApi() {
+  const db = new PGlite("idb://wikibourse-demo-10"); // changer le numéro quand la migration change
   const ready = (await db.query("select to_regclass('public.bets') is not null as ok")).rows[0].ok;
   if (!ready) {
     await db.exec(stub);
     for (const sql of migrations) await db.exec(sql);
-    const rows = seedRows(engine);
+    const rows = seedRows(createEngine(data));
     for (const t of ["game_config", "articles", "views", "prices", "duels"])
       await db.query(`insert into ${t} select * from json_populate_recordset(null::${t}, $1::json)`, [JSON.stringify(rows[t])]);
     await db.query("insert into auth.users values ($1)", [UID]);
@@ -56,17 +58,10 @@ export async function demoApi(engine) {
     streamBoard: async () => (await all("select * from stream_board(120)")).map(normStream),
     openMarkets: async () => (await all("select * from open_markets()")).map(normMarket),
     betQuestion: ({ market, side, stake }) => act("select * from bet_question($1, $2, $3)", [market, side, stake]),
-    // Démo : pas de serveur, le prix est relevé chez Coinbase par le navigateur.
-    cryptoOrder: async body => {
-      const [{ pair }] = body.action === "open" ? await all("select pair from crypto_assets where sym = $1", [body.sym])
-        : await all("select a.pair from bets b join crypto_assets a on a.sym = b.sym where b.id = $1", [body.id]);
-      const px = +(await (await fetch(`https://api.exchange.coinbase.com/products/${pair}/ticker`)).json()).price;
-      return normBet(body.action === "open"
-        ? await act("select * from crypto_open($1, $2, $3, $4, $5, $6)", [UID, body.sym, body.dir, body.lev, body.stake, px])
-        : await act("select * from crypto_close($1, $2, $3)", [UID, body.id, px]));
-    },
     aurFeed: async since => (await all("select aur_feed($1) as f", [since ? new Date(since * 1000).toISOString() : null]))[0].f,
     aurHistory: async (tk, minutes) => (await all("select aur_history($1, $2) as h", [tk, minutes]))[0].h,
+    aurTicks: async (tk, minutes) => (await all("select aur_ticks_of($1, $2) as k", [tk, minutes]))[0].k,
+    aurXp: async () => (await all("select my_aur_xp() as n"))[0].n,
     aurNews: () => all("select * from aur_news where t <= now() order by id desc limit 150"),
     aurOrder: async body => {
       if (body.action === "open") return normBet(await act("select * from aur_open($1, $2, $3, $4, $5, $6)", [UID, body.tk, body.dir, body.lev, body.stake, slip(S, body.tk, body.stake * body.lev)]));
@@ -88,6 +83,7 @@ export async function demoApi(engine) {
     guildLeave: () => act("select guild_leave()"),
     guildKick: id => act("select guild_kick($1)", [id]),
     shopItems: () => all("select * from shop_items order by sort"),
+    trophies: user => all("select * from trophies($1)", [user]),
     inventoryOf: user => all("select item_id, qty, equipped from inventory where user_id = $1 and qty > 0", [user]),
     profileOf: async user => (await all("select id, pseudo, cash, bankruptcies from profiles where id = $1", [user]))[0] ?? null,
     buyItem: id => act("select * from buy_item($1)", [id]),

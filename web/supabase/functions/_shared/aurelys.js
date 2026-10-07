@@ -2,19 +2,23 @@
 // Les prix ne sont pas dessinés : ils naissent des ordres des bots, des baleines et des joueurs (loi de la racine carrée),
 // et ces ordres réagissent aux actualités, aux régimes de marché et à la valeur fondamentale cachée.
 // Partagé par la fonction serveur « aurelys » (Deno), le mode démo (navigateur) et l'écran. Aucune dépendance.
-// 1 tick = 1 seconde réelle = 1 minute de jeu. Tout l'aléatoire passe par un générateur dont la graine est dans l'état :
-// le même état rejoue exactement la même suite.
+// 1 tick = 1 minute de jeu = SPM secondes réelles (une journée d'Aurelys dure 2 h). S.t compte les minutes de jeu depuis EPOCH_S.
+// Tout l'aléatoire passe par un générateur dont la graine est dans l'état : le même état rejoue exactement la même suite.
 
-export const DAY = 1440;                          // minutes de jeu par jour d'Aurelys (= 24 min réelles)
+export const DAY = 1440;                          // minutes de jeu par jour d'Aurelys
+export const SPM = 5;                             // secondes réelles par minute de jeu : un jour d'Aurelys = 2 h réelles
 export const EPOCH_S = Date.UTC(2026, 9, 1) / 1000; // jour 1, 00:00 d'Aurelys
 export const INDEX = "AUR12";
 export const FEE = 0.001;                         // 0,1 % du montant engagé, à l'ouverture et à la clôture
 export const CAP_MULT = 20;                       // exposition max d'un joueur par action = 20 × liquidité par minute
-const Y = 0.43, PERM = 0.3, TAU = 5;              // impact : constante, part permanente, décroissance du temporaire (ticks)
+const Y = 0.34, PERM = 0.3, TAU = 5;              // impact : constante, part permanente, décroissance du temporaire (ticks)
 const FLOW = 0.55, GAP = 0.5;                                      // taille des ordres des bots, en part de la liquidité
 const VIX_BASE = 1.7e-7;                          // variance par tick de l'indice en marché calme (calibrée)
 
 const LIQ = { haute: 60000, moyenne: 20000, faible: 6000 }; // Ꜷ échangés par minute de jeu, en journée
+// Profondeur du carnet face à l'ordre d'un joueur (Ꜷ) : un ordre de cette taille fait bouger le cours d'environ 0,43 σ jour.
+// Volontairement faible, pour que « plus on achète, plus ça monte » se voie : 25 000 W sur Solarmine ≈ 1 % de hausse.
+const DEPTH = { haute: 600000, moyenne: 200000, faible: 60000 };
 
 export const SECTORS = {
   tech: { name: "Tech", rate: -0.08, cyc: 0.5, infl: 0 },
@@ -41,12 +45,22 @@ export const STOCKS = [
   ["LMR", "Lumirue Distribution", "conso", 16.9, 250, .012, .8, "haute", .03, 18, 3.5, "#F5B83D", "Supermarchés, très défensive."],
   ["SLM", "Solarmine Lithium", "matieres", 12.4, 70, .038, 1.3, "faible", .07, 21, 0, "#1FCB8B", "Petite minière, cible favorite des baleines."],
   ["KST", "Kestrel Aéro", "industrie", 88.7, 45, .018, .9, "moyenne", .05, 22, 1.6, "#C2A633", "Aéronautique et contrats d'État."],
+  ["OND", "Ondéo Live", "loisirs", 24.5, 50, .03, 1.2, "moyenne", .08, 35, 0, "#7C5CFF", "Plateforme de streaming : vit de l'audience des lives."],
 ].map(([tk, name, sector, p0, shares, sig, beta, liq, mu, per, div, color, desc], i) => {
-  const sm = 0.01 * beta, ss = 0.008; // part du marché et du secteur dans la volatilité
-  return { i, tk, name, sector, p0, shares: shares * 1e6, sig, beta, liq, L: LIQ[liq], mu, per, div, color, desc,
+  const sm = 0.006 * beta, ss = 0.005; // part du marché et du secteur dans la volatilité
+  return { i, tk, name, sector, p0, shares: shares * 1e6, sig, beta, liq, L: LIQ[liq], depth: DEPTH[liq], mu, per, div, color, desc,
     si: Math.sqrt(Math.max((0.3 * sig) ** 2, sig * sig - sm * sm - ss * ss)) };
 });
 export const BY = Object.fromEntries(STOCKS.map(s => [s.tk, s]));
+// Entreprises branchées sur des chiffres réels, relevés par le serveur (fonction aurelys) : un écart à la normale fait
+// bouger leur valeur fondamentale et leurs prochains résultats. Ce sont des données futures : on ne peut pas les connaître d'avance.
+export const LINKS = {
+  PXF: { src: "Joueurs connectés sur Steam (29 jeux suivis), comparés à la veille à la même heure", beta: .5 },
+  OND: { src: "Spectateurs des grands lives Twitch francophones, comparés à la veille à la même heure", beta: .5 },
+  GTR: { src: "Pluie des 14 derniers jours et chaleur prévue en Beauce (Open-Meteo)", beta: .4 },
+  HLV: { src: "Consommation électrique française (RTE éCO2mix), comparée à la veille", beta: .4 },
+  LMR: { src: "Jours fériés à venir et météo du week-end à Paris (Open-Meteo)", beta: .3 },
+};
 const DIV = STOCKS.reduce((a, s) => a + s.p0 * s.shares, 0) / 1000; // AUR-12 vaut 1 000 au départ
 
 export const CHARACTERS = [
@@ -58,11 +72,11 @@ export const CHARACTERS = [
 ];
 
 export const REGIMES = {
-  calme: { name: "Calme", icon: "☀", drift: .0002, vol: 1, news: 1, fam: { fund: 1.3, mom: .8, contra: 1, chart: 1, noise: 1 }, mm: 1, panic: 0 },
-  euphorie: { name: "Euphorie", icon: "🚀", drift: .0008, vol: 1.3, news: 1.5, fam: { fund: .6, mom: 1.6, contra: .8, chart: 1, noise: 1.2 }, mm: 1, panic: .25 },
-  nervosite: { name: "Nervosité", icon: "⛅", drift: 0, vol: 1.8, news: 2, fam: { fund: .9, mom: 1, contra: 1.4, chart: 1.4, noise: 1.1 }, mm: .8, panic: -.1 },
-  krach: { name: "Krach", icon: "⛈", drift: -.004, vol: 3.5, news: 3, fam: { fund: .5, mom: 1.3, contra: .7, chart: 1, noise: 1.8 }, mm: .5, panic: -.6 },
-  reprise: { name: "Reprise", icon: "🌤", drift: .0005, vol: 1.5, news: 1.5, fam: { fund: 1.3, mom: 1, contra: 1.3, chart: 1, noise: 1 }, mm: .9, panic: .1 },
+  calme: { name: "Calme", icon: "☀", drift: .00005, vol: 1, news: 1, fam: { fund: 1.3, mom: .8, contra: 1, chart: 1, noise: 1 }, mm: 1, panic: 0 },
+  euphorie: { name: "Euphorie", icon: "🚀", drift: .0003, vol: 1.2, news: 1.5, fam: { fund: .6, mom: 1.6, contra: .8, chart: 1, noise: 1.2 }, mm: 1, panic: .25 },
+  nervosite: { name: "Nervosité", icon: "⛅", drift: 0, vol: 1.4, news: 2, fam: { fund: .9, mom: 1, contra: 1.4, chart: 1.4, noise: 1.1 }, mm: .8, panic: -.1 },
+  krach: { name: "Krach", icon: "⛈", drift: -.0015, vol: 2.2, news: 3, fam: { fund: .5, mom: 1.3, contra: .7, chart: 1, noise: 1.8 }, mm: .5, panic: -.6 },
+  reprise: { name: "Reprise", icon: "🌤", drift: .0002, vol: 1.2, news: 1.5, fam: { fund: 1.3, mom: 1, contra: 1.3, chart: 1, noise: 1 }, mm: .9, panic: .1 },
 };
 const RK = Object.keys(REGIMES);
 // Probabilités de passage par heure de jeu (lignes : depuis ; colonnes : calme, euphorie, nervosité, krach, reprise).
@@ -95,7 +109,9 @@ const BOTS = STOCKS.map(s => {
 });
 
 /* ===== Horloge d'Aurelys ===== */
-export const gameMin = sec => Math.floor(sec - EPOCH_S);
+export const gameMin = sec => Math.floor((sec - EPOCH_S) / SPM);
+export const realOf = m => EPOCH_S + m * SPM; // seconde réelle où commence la minute de jeu m
+const hourOf = m => (m % DAY) / 60;
 export const gameClock = sec => {
   const m = gameMin(sec), d = Math.floor(m / DAY) + 1, h = Math.floor((m % DAY) / 60), mn = m % 60;
   return { day: d, hm: `${String(h).padStart(2, "0")}:${String(mn).padStart(2, "0")}`, hour: (m % DAY) / 60 };
@@ -112,7 +128,7 @@ export function calendar(sec, n = 8) {
     const ev = [];
     STOCKS.forEach(s => { const t = resultsAt(s.i, d); if (t != null) ev.push({ m: t, tk: s.tk, kind: "resultats", title: `Résultats de ${s.name}` }) });
     const b = bcaAt(d); if (b != null) ev.push({ m: b, tk: null, kind: "taux", title: "Décision de taux de la Banque Centrale" });
-    ev.sort((a, b) => a.m - b.m).forEach(e => { if (e.m > m && out.length < n) out.push({ ...e, at: (EPOCH_S + e.m) * 1000 }) });
+    ev.sort((a, b) => a.m - b.m).forEach(e => { if (e.m > m && out.length < n) out.push({ ...e, at: realOf(e.m) * 1000 }) });
   }
   return out;
 }
@@ -121,15 +137,15 @@ const soonEvent = (s, m) => { const d = Math.floor(m / DAY); for (const dd of [d
 /* ===== Actualités : gabarits ===== */
 const pctTxt = x => `${Math.round(x * 100)} %`;
 const CATS = {
-  resultats: { mag: [.03, .12], hl: 360, label: "Résultats" },
-  essai: { mag: [.15, .45], hl: 720, big: true, label: "Essai clinique" },
-  contrat: { mag: [.02, .08], hl: 240, sign: 1, label: "Contrat" },
-  scandale: { mag: [.05, .25], hl: 480, big: true, sign: -1, label: "Scandale" },
-  pdg: { mag: [.02, .10], hl: 120, label: "Déclaration" },
-  analyste: { mag: [.01, .04], hl: 240, label: "Analyste" },
-  rumeur: { mag: [.02, .15], hl: 180, fiab: .3, label: "Rumeur" },
-  produit: { mag: [.05, .30], hl: 480, big: true, label: "Produit" },
-  meteo: { mag: [.02, .08], hl: 360, label: "Météo" },
+  resultats: { mag: [.02, .08], hl: 360, label: "Résultats" },
+  essai: { mag: [.06, .18], hl: 720, big: true, label: "Essai clinique" },
+  contrat: { mag: [.01, .05], hl: 240, sign: 1, label: "Contrat" },
+  scandale: { mag: [.04, .15], hl: 480, big: true, sign: -1, label: "Scandale" },
+  pdg: { mag: [.02, .08], hl: 120, label: "Déclaration" },
+  analyste: { mag: [.005, .02], hl: 240, label: "Analyste" },
+  rumeur: { mag: [.01, .08], hl: 180, fiab: .3, label: "Rumeur" },
+  produit: { mag: [.04, .15], hl: 480, big: true, label: "Produit" },
+  meteo: { mag: [.01, .05], hl: 360, label: "Météo" },
 };
 const T = {
   resultats: {
@@ -186,17 +202,20 @@ const SECTOR_NEWS = {
 const fill = (s, v) => s.replace(/\{(\w)\}/g, (_, k) => v[k] ?? "");
 
 /* ===== État initial ===== */
-export function initState(nowSec, seed = 20261001) {
+// `last` : derniers cours connus { tk: prix } pour repartir sans trou quand l'état change de format.
+export function initState(nowSec, seed = 20261001, last = {}) {
+  const t = gameMin(nowSec), p0 = s => last[s.tk] ?? s.p0;
+  const I = STOCKS.reduce((a, s) => a + p0(s) * s.shares, 0) / DIV;
   return {
-    t: Math.floor(nowSec), rs: seed | 0, nid: 1,
+    t, rs: seed | 0, nid: 1, sig: {},
     reg: "calme", regAge: 0, crisisCd: 0,
-    r: 3.0, g: 1.5, pi: 2.4, vix: VIX_BASE, idx: 1000, idxHi: 1000, idxH: [],
+    r: 3.0, g: 1.5, pi: 2.4, vix: VIX_BASE, idx: I, idxHi: I, idxH: [],
     sent: {}, follow: [], crisis: null, flash: 0, haltAll: 0,
     next: Object.fromEntries([...STOCKS.map(s => s.tk), ...Object.keys(SECTORS).map(k => "sec:" + k), "mkt"].map(k => [k, 0])),
-    whales: { kraken: { ph: "idle", until: nowSec + 1440, pos: 0 }, orca: { ph: "idle", until: nowSec + 2880, pos: 0 }, lev: { ph: "idle", until: nowSec + 2160, pos: 0 }, sov: { ph: "idle", until: 0 } },
+    whales: { kraken: { ph: "idle", until: t + 1440, pos: 0 }, orca: { ph: "idle", until: t + 2880, pos: 0 }, lev: { ph: "idle", until: t + 2160, pos: 0 }, sov: { ph: "idle", until: 0 } },
     st: Object.fromEntries(STOCKS.map(s => [s.tk, {
-      v: Math.log(s.p0), lp: Math.log(s.p0), tmp: 0, e: EMA_H.map(() => s.p0), rg: 0, rl: 0, h: [s.p0], gh: 1, h0: s.p0,
-      halt: 0, pat: null, ve: s.L, eps: s.p0 / s.per,
+      v: Math.log(p0(s)), lp: Math.log(p0(s)), tmp: 0, e: EMA_H.map(() => p0(s)), rg: 0, rl: 0, h: [p0(s)], gh: 1, h0: p0(s),
+      halt: 0, pat: null, ve: s.L, eps: s.p0 / s.per, z: 0, res: null,
     }])),
   };
 }
@@ -209,32 +228,38 @@ const addSent = (S, key, s, t, hl) => (S.sent[key] ??= []).push([s, t, hl]);
 // Impact relatif d'un ordre de `q` Ꜷ (loi de la racine carrée) : volatilité du moment (GARCH, régime, événement proche)
 // et liquidité de l'heure.
 const impactOf = (s, q, act, gh, reg, pre) => Math.sign(q) * Y * (s.si / Math.sqrt(DAY)) * gh * REGIMES[reg].vol ** .7 * pre * Math.sqrt(Math.abs(q) / (s.L * act));
-const impact = (S, s, q, act) => impactOf(s, q, act, S.st[s.tk].gh, S.reg, soonEvent(s, gameMin(S.t)) ? 1.5 : 1);
+const impact = (S, s, q, act) => impactOf(s, q, act, S.st[s.tk].gh, S.reg, soonEvent(s, S.t) ? 1.5 : 1);
+// Ordres des joueurs : même loi, mais face à la profondeur du carnet (DEPTH) et à la volatilité journalière.
+const playerImpactOf = (s, q, gh, reg) => Math.sign(q) * Y * s.sig * gh * REGIMES[reg].vol ** .7 * Math.sqrt(Math.abs(q) / s.depth);
+const playerImpact = (S, s, q) => playerImpactOf(s, q, S.st[s.tk].gh, S.reg);
 // Écart de prix subi par un joueur pour un ordre de `notional` Ꜷ : ce qu'il paie en plus à l'achat, en moins à la vente.
 // Prix moyen d'exécution : la moitié du mouvement qu'il provoque.
-export const slip = (S, tk, notional) => impact(S, BY[tk], notional, activity(gameClock(S.t).hour)) * 0.5;
+export const slip = (S, tk, notional) => playerImpact(S, BY[tk], notional) * 0.5;
 // Estimation pour l'écran, qui ne connaît pas la volatilité du moment (gardée par le serveur).
-export const slipEstimate = (tk, notional, sec, reg = "calme") => impactOf(BY[tk], notional, activity(gameClock(sec).hour), 1, reg, 1) * 0.5;
+export const slipEstimate = (tk, notional, sec, reg = "calme") => playerImpactOf(BY[tk], notional, 1, reg) * 0.5;
 
-// Avance la simulation jusqu'à `untilSec` (tick par tick). `orders` : ordres des joueurs [{ tk, q }] (q en Ꜷ, + achat), joués au premier tick.
-// Renvoie les cours de chaque seconde et les actualités publiées.
-export function advance(S, untilSec, orders = []) {
+// Avance la simulation jusqu'à `untilSec` (seconde réelle). `orders` : ordres des joueurs [{ tk, q }] (q en Ꜷ, + achat), joués au premier tick.
+// `signals` : chiffres réels du moment { tk: { z, txt } } (z = écart à la normale, +0,1 = 10 % au-dessus), voir LINKS.
+// Renvoie les cours de chaque minute de jeu (t en secondes réelles) et les actualités publiées.
+export function advance(S, untilSec, orders = [], signals = null) {
   const R = () => { const [s, v] = mulberry(S.rs); S.rs = s; return v };
-  const out = { ticks: [], news: [] };
-  if (untilSec - S.t > 300) S.t = Math.floor(untilSec) - 1; // longue coupure : le marché reprend là où il s'était arrêté
+  const out = { ticks: [], news: [] }, target = gameMin(untilSec);
+  if (signals) S.sig = signals;
+  if (target - S.t > 300) S.t = target - 1; // longue coupure : le marché reprend là où il s'était arrêté
   const pending = {};
   for (const o of orders) pending[o.tk] = (pending[o.tk] ?? 0) + Number(o.q);
-  while (S.t < untilSec) { tick(S, R, out, pending); for (const k in pending) delete pending[k] }
+  while (S.t < target) { tick(S, R, out, pending); for (const k in pending) delete pending[k] }
   return out;
 }
 
 function publish(S, out, n) {
-  const item = { id: S.nid++, t: S.t, tk: n.tk ?? null, sector: n.sector ?? null, cat: n.cat, title: n.title, text: n.text ?? "",
+  const item = { id: S.nid++, t: realOf(S.t), tk: n.tk ?? null, sector: n.sector ?? null, cat: n.cat, title: n.title, text: n.text ?? "",
     sent: Math.round(n.sent * 100) / 100, fiab: n.fiab ?? 1 };
   out.news.push(item);
   const hl = n.hl ?? 240, keys = n.tk ? [n.tk] : n.sector ? STOCKS.filter(s => s.sector === n.sector).map(s => s.tk) : STOCKS.map(s => s.tk);
   for (const tk of keys) {
-    const m = typeof n.mag === "object" ? n.mag[tk] ?? n.mag._ ?? 0 : n.mag ?? 0;
+    // Nouvelles de secteur ou de marché : elles pèsent selon le tempérament de chaque action (une valeur refuge bouge moins).
+    const m = (typeof n.mag === "object" ? n.mag[tk] ?? n.mag._ ?? 0 : n.mag ?? 0) * (n.tk ? 1 : Math.min(1.5, BY[tk].sig / .02));
     const dv = Math.log(Math.max(.05, 1 + m * (n.fiab ?? 1)));
     S.st[tk].v += dv;
     // Les teneurs de marché décalent leurs prix dès l'annonce : une partie du choc passe d'un coup (gap), le reste par les ordres.
@@ -245,9 +270,11 @@ function publish(S, out, n) {
 }
 
 function companyNews(S, R, out, s, cat, signed) {
-  const c = CATS[cat], sign = signed ?? c.sign ?? (R() < .5 ? -1 : 1);
+  const x = S.st[s.tk], hint = x.res && Math.abs(x.res.act - x.res.cons) > 1.5 && R() < .6 ? Math.sign(x.res.act - x.res.cons) : 0;
+  if (cat === "analyste" && R() < .5 && revision(S, R, out, s)) return;
+  const c = CATS[cat], sign = signed ?? c.sign ?? (hint || (R() < .5 ? -1 : 1));
   // Les petites nouvelles pèsent selon le tempérament de l'action ; les gros événements gardent leur ampleur.
-  const mag = sign * between(R, c.mag) * (c.big ? 1 : .5 * s.sig / .02);
+  const mag = sign * between(R, c.mag) * (c.big ? .8 : .4 * s.sig / .02);
   const pool = T[cat][sign > 0 ? "up" : "down"] ?? T[cat].up;
   let title = fill(pick(R, pool), { N: s.name, X: pctTxt(Math.abs(mag) * (1 + R())), K: 50 + Math.floor(R() * 50), M: (1 + R() * 3).toFixed(1).replace(".", ",") });
   if (cat === "pdg" && s.tk !== "VLS" && /Varesko/.test(title)) title = fill(pick(R, T.pdg[sign > 0 ? "up" : "down"].slice(2)), { N: s.name });
@@ -260,7 +287,45 @@ function companyNews(S, R, out, s, cat, signed) {
   if (cat === "rumeur") S.follow.push({ t: S.t + 60 + Math.floor(R() * 300), tk: s.tk, mag, ok: R() < .5 });
 }
 
+// Résultats trimestriels : croissance du chiffre d'affaires sur un an, en points de %. Le consensus des analystes est public ;
+// le vrai chiffre est tiré à l'avance et reste caché. Le cours réagit à la surprise (vrai − attendu), pas au chiffre.
+// Des indices sortent entre-temps (commandes, déclarations, révisions d'analystes) ; les chiffres réels (LINKS) pèsent aussi.
+function drawResult(R, s) {
+  const cons = Math.round((s.mu * 100 + gauss(R) * 3) * 2) / 2;
+  return { cons, act: cons + gauss(R) * (2 + 100 * s.sig) };
+}
+function results(S, R, out, s) {
+  const x = S.st[s.tk], r = x.res ?? drawResult(R, s);
+  const act = Math.round((r.act + (LINKS[s.tk] ? 30 * LINKS[s.tk].beta * (x.z ?? 0) : 0)) * 10) / 10, surprise = act - r.cons;
+  const mag = surprise / 100 * .8, up = surprise >= 0, f = v => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1).replace(".", ",")} %`;
+  const title = Math.abs(surprise) < .5 ? `${s.name} : chiffre d'affaires ${f(act)}, conforme aux attentes`
+    : `${s.name} : chiffre d'affaires ${f(act)}, ${up ? "au-dessus" : "en dessous"} des ${f(r.cons)} attendus`;
+  const n = { tk: s.tk, cat: "resultats", title, text: pick(R, T.resultats.text), mag, sent: Math.max(-1, Math.min(1, surprise / 6)), hl: 360 };
+  if (R() < .2) n.sentEff = -n.sent * .6; // « vendre la nouvelle »
+  x.eps *= 1 + act / 400;
+  publish(S, out, n);
+  x.res = drawResult(R, s);
+}
+// Révision d'un analyste : le consensus se rapproche (un peu) du vrai chiffre. C'est un indice pour qui suit l'action.
+function revision(S, R, out, s) {
+  const x = S.st[s.tk], r = x.res; if (!r) return false;
+  const d = r.act - r.cons; if (Math.abs(d) < 1) return false;
+  const nc = Math.round((r.cons + d * (.2 + .3 * R())) * 2) / 2; if (nc === r.cons) return false;
+  const up = nc > r.cons; r.cons = nc;
+  publish(S, out, { tk: s.tk, cat: "analyste", title: `Les analystes ${up ? "relèvent" : "abaissent"} leurs attentes pour ${s.name} : ${nc >= 0 ? "+" : "−"}${Math.abs(nc).toFixed(1).replace(".", ",")} % attendus`,
+    text: "Révision du consensus avant les prochains résultats.", mag: (up ? 1 : -1) * .004, sent: up ? .3 : -.3, hl: 240 });
+  return true;
+}
+
 function hourly(S, R, out) {
+  for (const s of STOCKS) S.st[s.tk].res ??= drawResult(R, s); // premier consensus publié dès la première heure
+  // Chiffres réels : un écart à la normale qui change fait bouger la valeur de l'entreprise, et c'est annoncé.
+  for (const tk in LINKS) {
+    const sg = S.sig?.[tk], x = S.st[tk]; if (!sg || typeof sg.z !== "number") continue;
+    const d = sg.z - (x.z ?? 0); if (Math.abs(d) < .03) continue;
+    x.z = sg.z;
+    publish(S, out, { tk, cat: "reel", title: `${BY[tk].name} : ${sg.txt}`, text: LINKS[tk].src + ".", mag: LINKS[tk].beta * d, sent: Math.max(-1, Math.min(1, d * 6)), hl: 360 });
+  }
   // Macro : marches aléatoires lentes, rappelées vers leur moyenne.
   S.g += .02 * (1.5 - S.g) + gauss(R) * .04; S.pi += .02 * (2.4 - S.pi) + gauss(R) * .03;
   for (const k in S.sent) { S.sent[k] = S.sent[k].filter(([, t0, hl]) => S.t - t0 < 6 * hl); if (!S.sent[k].length) delete S.sent[k] } // effets éteints
@@ -272,7 +337,7 @@ function hourly(S, R, out) {
   // Volatilité en grappes (GARCH sur les rendements horaires).
   for (const s of STOCKS) {
     const x = S.st[s.tk], p = priceOf(x), r = Math.log(p / x.h0), sh2 = (s.si * s.si) / 24;
-    x.gh = Math.min(4, Math.max(.5, Math.sqrt((sh2 * .02 + .08 * r * r + .90 * x.gh * x.gh * sh2) / sh2)));
+    x.gh = Math.min(2.5, Math.max(.6, Math.sqrt((sh2 * .05 + .05 * r * r + .90 * x.gh * x.gh * sh2) / sh2)));
     x.h0 = p;
     // Réalisateur de figures : environ une tous les 3 jours par action.
     if (!x.pat && R() < 1 / 72) x.pat = startFigure(S, R, s, x);
@@ -418,7 +483,7 @@ function runCrisis(S, out) {
 
 /* ===== Un tick ===== */
 function tick(S, R, out, pending) {
-  const t = ++S.t, m = gameMin(t), hour = (m % DAY) / 60, act = activity(hour), reg = REGIMES[S.reg];
+  const t = ++S.t, m = t, hour = hourOf(m), act = activity(hour), reg = REGIMES[S.reg];
   if (m % 60 === 0) hourly(S, R, out);
   runCrisis(S, out);
 
@@ -426,15 +491,15 @@ function tick(S, R, out, pending) {
   for (const s of STOCKS) {
     if (S.next[s.tk] <= t) {
       if (S.next[s.tk]) { const w = { ...COMMON, ...PRODUCT[s.tk] }, tot = Object.values(w).reduce((a, b) => a + b, 0); let u = R() * tot, cat; for (cat in w) if ((u -= w[cat]) < 0) break; companyNews(S, R, out, s, cat) }
-      S.next[s.tk] = t + Math.ceil(-Math.log(1 - R()) * 480 / reg.news);
+      S.next[s.tk] = t + Math.ceil(-Math.log(1 - R()) * 960 / reg.news);
     }
-    if (resultsAt(s.i, Math.floor(m / DAY)) === m) companyNews(S, R, out, s, "resultats");
+    if (resultsAt(s.i, Math.floor(m / DAY)) === m) results(S, R, out, s);
   }
   for (const sec of Object.keys(SECTORS)) {
     const key = "sec:" + sec;
     if (S.next[key] <= t) {
       if (S.next[key]) { const up = R() < .5, mag = (up ? 1 : -1) * (.005 + R() * .02); publish(S, out, { sector: sec, cat: "secteur", title: fill(pick(R, SECTOR_NEWS[up ? "up" : "down"]), { S: SECTORS[sec].name }), mag, sent: mag * 15, hl: 360 }) }
-      S.next[key] = t + Math.ceil(-Math.log(1 - R()) * 720 / reg.news);
+      S.next[key] = t + Math.ceil(-Math.log(1 - R()) * 1440 / reg.news);
     }
   }
   if (S.next.mkt <= t) { if (S.next.mkt) macroNews(S, R, out); S.next.mkt = t + Math.ceil(-Math.log(1 - R()) * 1440 / reg.news) }
@@ -448,8 +513,8 @@ function tick(S, R, out, pending) {
   S.follow = S.follow.filter(f => f.t > t);
 
   // Facteurs communs : marché (tendance du régime) et secteurs.
-  const mk = reg.drift / 60 + gauss(R) * .01 / Math.sqrt(DAY) * reg.vol;
-  const sk = Object.fromEntries(Object.keys(SECTORS).map(k => [k, gauss(R) * .008 / Math.sqrt(DAY) * reg.vol]));
+  const mk = reg.drift / 60 + gauss(R) * .006 / Math.sqrt(DAY) * reg.vol;
+  const sk = Object.fromEntries(Object.keys(SECTORS).map(k => [k, gauss(R) * .005 / Math.sqrt(DAY) * reg.vol]));
   const sentM = sentOf(S, "mkt", t), sentS = Object.fromEntries(Object.keys(SECTORS).map(k => [k, sentOf(S, "sec:" + k, t)]));
   const fear = 15 * Math.sqrt(S.vix / VIX_BASE), yr = 365 * DAY;
 
@@ -493,7 +558,7 @@ function tick(S, R, out, pending) {
       q *= 1 - Math.max(.1, .35 * reg.mm);
       const wq = whaleFlow(S, R, out, s, Lt), pq = pending[s.tk] ?? 0;
       q += wq + pq; v += Math.abs(wq) + Math.abs(pq);
-      const imp = q ? impact(S, s, q, act) : 0;
+      const qb = q - pq, imp = (qb ? impact(S, s, qb, act) : 0) + (pq ? playerImpact(S, s, pq) : 0);
       x.lp += PERM * imp + f; x.tmp = x.tmp * Math.exp(-1 / TAU) + (1 - PERM) * imp;
     }
     const p = priceOf(x), last = x.h[x.h.length - 1];
@@ -509,7 +574,7 @@ function tick(S, R, out, pending) {
       publish(S, out, { tk: s.tk, cat: "suspension", title: `Séance suspendue sur ${s.name} après un mouvement de ${pctTxt(p / x.h[x.h.length - 61] - 1).replace(/^(\d)/, "+$1")}`, sent: 0, mag: 0, hl: 30 });
     }
     cap += p * s.shares; vol += v;
-    out.ticks.push({ t, tk: s.tk, p: +p.toPrecision(7), v: Math.round(v), halt: halted || x.halt > t });
+    out.ticks.push({ t: realOf(t), tk: s.tk, p: +p.toPrecision(7), v: Math.round(v), halt: halted || x.halt > t });
   }
   const idx = cap / DIV, ri = Math.log(idx / S.idx);
   S.vix += (ri * ri - S.vix) / 120; S.idx = idx; S.idxHi = Math.max(idx, S.idxHi * (1 - 1 / 2880));
@@ -518,9 +583,11 @@ function tick(S, R, out, pending) {
     S.haltAll = t + 15; S.cbAll = t;
     publish(S, out, { cat: "suspension", title: "AUR-12 : chute de plus de 7 %, toute la cote est suspendue 15 minutes", sent: -.3, mag: 0, hl: 60 });
   }
-  out.ticks.push({ t, tk: INDEX, p: +idx.toPrecision(7), v: Math.round(vol), halt: allHalt,
-    x: { reg: S.reg, vixa: Math.round(fear * 10) / 10, r: Math.round(S.r * 100) / 100, g: Math.round(S.g * 100) / 100, pi: Math.round(S.pi * 100) / 100,
-      eps: Object.fromEntries(STOCKS.map(s => [s.tk, +S.st[s.tk].eps.toPrecision(4)])) } });
+  out.ticks.push({ t: realOf(t), tk: INDEX, p: +idx.toPrecision(7), v: Math.round(vol), halt: allHalt,
+    x: { reg: S.reg, regAge: S.regAge, vixa: Math.round(fear * 10) / 10, r: Math.round(S.r * 100) / 100, g: Math.round(S.g * 100) / 100, pi: Math.round(S.pi * 100) / 100,
+      eps: Object.fromEntries(STOCKS.map(s => [s.tk, +S.st[s.tk].eps.toPrecision(4)])),
+      cons: Object.fromEntries(STOCKS.map(s => [s.tk, S.st[s.tk].res?.cons ?? null])), // consensus des analystes (le vrai chiffre reste caché)
+      sig: S.sig } });
 }
 
 function macroNews(S, R, out) {

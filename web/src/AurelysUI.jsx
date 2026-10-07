@@ -1,6 +1,6 @@
 // Bourse d'Aurelys : tableau de bord, liste des actions, actualités, carte thermique, fiche entreprise, carte de position.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { STOCKS, BY, SECTORS, REGIMES, CHARACTERS, INDEX, FEE, CAP_MULT, gameClock, calendar, sma, bollinger, rsi } from "../supabase/functions/_shared/aurelys.js";
+import { STOCKS, BY, SECTORS, REGIMES, CHARACTERS, INDEX, FEE, CAP_MULT, LINKS, SPM, DAY, EPOCH_S, gameClock, gameMin, calendar, sma, bollinger, rsi } from "../supabase/functions/_shared/aurelys.js";
 import { dayOpen } from "./aurelys.js";
 import { STORIES } from "./aurelys-stories.js";
 import { W, sW, nf0, nf2, pct, cls, clock } from "./format.js";
@@ -9,9 +9,15 @@ import { Spark, PositionChart } from "./charts.jsx";
 
 export const px = v => v == null || isNaN(v) ? "—" : nf2.format(v);
 const sec = ms => ms / 1000;
-const inMin = ms => { const m = Math.max(0, Math.round(ms / 60000)); return m < 1 ? "maintenant" : m < 60 ? `dans ${m} min` : `dans ${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}` };
+// Tout s'affiche en temps d'Aurelys (1 min de jeu = 5 s réelles), sauf « il y a … » des actualités, en temps réel.
+const gdur = ms => { const m = Math.max(0, Math.floor(ms / 1000 / SPM)), d = Math.floor(m / DAY), h = Math.floor(m % DAY / 60);
+  return d ? `${d} j ${h} h` : h ? `${h} h ${String(m % 60).padStart(2, "0")}` : `${m} min` };
+// « aujourd'hui 14:45 », « demain 09:00 », « jour 14 · 16:00 » (jour et heure d'Aurelys).
+const gwhen = (atMs, nowMs) => { const a = gameClock(atMs / 1000), n = gameClock(nowMs / 1000), d = a.day - n.day;
+  return `${d === 0 ? "aujourd'hui" : d === 1 ? "demain" : `jour ${a.day}`} ${a.hm}` };
+const signed = v => `${v >= 0 ? "+" : "−"}${nf2.format(Math.abs(v)).replace(/,?0+$/, "")} %`;
 const agoTxt = ms => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `il y a ${s} s` : s < 3600 ? `il y a ${Math.floor(s / 60)} min` : `il y a ${Math.floor(s / 3600)} h` };
-// Derniers cours pour une mini-courbe : bougies d'une minute, ou cours à la seconde tant qu'il y a peu de bougies.
+// Derniers cours pour une mini-courbe : bougies d'une heure d'Aurelys, ou cours minute par minute tant qu'il y a peu de bougies.
 const closesOf = (aur, tk, n) => { const c = (aur.candles[tk] ?? []).slice(-n).map(k => k[4]); return c.length >= 5 ? c : (aur.ticks[tk] ?? []).map(k => k[1]) };
 const chgOf = (aur, tk, now) => { const p = aur.quotes[tk]?.p, o = dayOpen(aur, tk, sec(now)); return p && o ? p / o - 1 : 0 };
 
@@ -24,12 +30,24 @@ function AurBar({ aur, now }) {
   const c = gameClock(sec(now)), reg = REGIMES[aur.x?.reg ?? "calme"], idx = aur.quotes[INDEX]?.p, ch = chgOf(aur, INDEX, now);
   return (
     <div className="aur-bar">
-      <span className="aur-clock mono" title="Heure d'Aurelys : 1 seconde réelle = 1 minute de jeu"><small>Aurelys · jour {c.day}</small>{c.hm}</span>
-      <span className="aur-reg" title="Humeur du marché"><i aria-hidden="true">{reg.icon}</i>{reg.name}</span>
+      <span className="aur-clock mono" title="Heure d'Aurelys : une journée dure 2 h réelles"><small>Aurelys · jour {c.day}</small>{c.hm}</span>
+      <span className="aur-reg" title={REG_TXT[aur.x?.reg ?? "calme"]}><i aria-hidden="true">{reg.icon}</i>{reg.name}</span>
       <span className="r mono"><b>AUR-12 {px(idx)}</b><small className={cls(ch)}>{pct(ch)} jour</small></span>
     </div>
   );
 }
+
+// L'humeur du marché n'est pas le cours du jour : elle dit comment les investisseurs se comportent en ce moment.
+const REG_TXT = {
+  calme: "Calme : peu de surprises, les cours suivent la valeur des entreprises.",
+  euphorie: "Euphorie : les acheteurs se bousculent, les tendances s'emballent. Une bulle peut se former.",
+  nervosite: "Nervosité : les investisseurs hésitent, les cours bougent plus fort dans les deux sens.",
+  krach: "Krach : panique, les ventes l'emportent. Les coupe-circuits peuvent suspendre la cote.",
+  reprise: "Reprise : les acheteurs reviennent après une baisse. L'indice peut encore être dans le rouge sur la journée.",
+};
+// Nouvelles qui comptent : mises en avant (badge, bandeau), les autres restent dans le fil.
+const MAJOR = new Set(["resultats", "essai", "scandale", "produit", "taux", "crise", "baleine", "suspension", "reel", "macro"]);
+const isMajor = n => MAJOR.has(n.cat) || Math.abs(n.sent) >= .7;
 
 const VIEWS = [["board", "Tableau de bord"], ["list", "Actions"], ["news", "Actualités"], ["heat", "Carte"]];
 export function AurelysMarket({ aur, now, bets, onPick, onDetail }) {
@@ -37,8 +55,9 @@ export function AurelysMarket({ aur, now, bets, onPick, onDetail }) {
   const live = aur.live;
   return (
     <section>
-      <div className="feed-info"><i className={"pulse" + (live ? "" : " off")} aria-hidden="true" />{live ? "Bourse fictive, simulée en continu par des bots et les joueurs" : "Connexion au marché…"} · 1 s réelle = 1 min d'Aurelys</div>
+      <div className="feed-info"><i className={"pulse" + (live ? "" : " off")} aria-hidden="true" />{live ? "Bourse fictive, simulée en continu par des bots et les joueurs" : "Connexion au marché…"} · un jour d'Aurelys = 2 h réelles</div>
       <AurBar aur={aur} now={now} />
+      <Flash aur={aur} now={now} onDetail={onDetail} />
       <div className="chips" role="group" aria-label="Vue">
         {VIEWS.map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}
       </div>
@@ -51,21 +70,35 @@ export function AurelysMarket({ aur, now, bets, onPick, onDetail }) {
   );
 }
 
+// Bandeau d'une nouvelle majeure toute fraîche (moins de 2 min réelles).
+function Flash({ aur, now, onDetail }) {
+  const n = aur.news.find(n => isMajor(n) && now - n.at < 120000);
+  if (!n) return null;
+  const tone = n.sent > .15 ? "up" : n.sent < -.15 ? "down" : "flat";
+  return <button type="button" className={"flash " + tone} onClick={() => n.tk && onDetail(n.tk)}><b>{CAT[n.cat] ?? "Flash"}</b><span>{n.title}</span></button>;
+}
+
+// Prochain rendez-vous, avec le consensus des analystes pour les résultats.
+const CalRow = ({ e, aur, now }) => {
+  const c = e.tk ? aur.x?.cons?.[e.tk] : null;
+  return <div className="row"><span>{e.title}{c != null && <small className="cons"> · attendu {signed(c)}</small>}</span><b className="mono">{gwhen(e.at, now)}</b></div>;
+};
+
 function Board({ aur, now, onDetail, onNews }) {
-  const x = aur.x, reg = REGIMES[x?.reg ?? "calme"], idx = closesOf(aur, INDEX, 180);
-  // Palmarès figé une minute (une heure d'Aurelys) pour ne pas bouger sous le doigt.
-  const slot = Math.floor(now / 60000);
+  const x = aur.x, reg = REGIMES[x?.reg ?? "calme"], idx = closesOf(aur, INDEX, 36);
+  // Palmarès figé une heure d'Aurelys (5 min réelles) pour ne pas bouger sous le doigt.
+  const slot = Math.floor(now / 300000);
   const movers = useMemo(() => STOCKS.map(s => ({ s, c: chgOf(aur, s.tk, now) })).sort((a, b) => b.c - a.c), [slot, aur.ok]); // eslint-disable-line
-  const cal = calendar(sec(now), 4), last = aur.news.slice(0, 3);
+  const cal = calendar(sec(now), 4), last = aur.news.filter(isMajor).slice(0, 3);
   return (
     <div className="aur-board">
       <div className="panel">
-        <h2>AUR-12 <span className="muted">3 dernières heures</span></h2>
+        <h2>AUR-12 <span className="muted">36 dernières heures d'Aurelys</span></h2>
         {idx.length > 1 ? <Spark path={idx} t={idx.length - 1} h={80} /> : <p className="muted small">Chargement…</p>}
-        <p className="muted small">Moyenne des 12 sociétés, pondérée par leur capitalisation (1 000 au lancement).</p>
+        <p className="muted small">Moyenne des 13 sociétés, pondérée par leur capitalisation (1 000 au lancement).</p>
       </div>
       <div className="tiles">
-        <div className="tile"><small>Régime</small><b>{reg.icon} {reg.name}</b></div>
+        <div className="tile wide-tile"><small>Humeur du marché{x?.regAge != null ? ` · depuis ${x.regAge < 1 ? "moins d'une heure" : `${x.regAge} h`}` : ""}</small><b>{reg.icon} {reg.name}</b><p className="muted small">{REG_TXT[x?.reg ?? "calme"]}</p></div>
         <div className="tile"><small>Peur (VIXA)</small><b className="mono">{x ? nf0.format(x.vixa) : "—"}</b></div>
         <div className="tile"><small>Taux directeur</small><b className="mono">{x ? nf2.format(x.r) + " %" : "—"}</b></div>
         <div className="tile"><small>Croissance · inflation</small><b className="mono">{x ? `${nf2.format(x.g)} · ${nf2.format(x.pi)} %` : "—"}</b></div>
@@ -79,11 +112,13 @@ function Board({ aur, now, onDetail, onNews }) {
       </div>
       <div className="panel">
         <h2>À venir</h2>
-        {cal.map(e => <div key={e.m + (e.tk ?? "")} className="row"><span>{e.title}</span><b className="mono">{gameClock(e.at / 1000).hm} · {inMin(e.at - now)}</b></div>)}
+        {cal.map(e => <CalRow key={e.m + (e.tk ?? "")} e={e} aur={aur} now={now} />)}
+        <p className="muted small">Le cours réagit à l'écart entre le chiffre publié et ce qui était attendu. Les indices sortent avant : commandes, rumeurs, révisions des analystes.</p>
       </div>
       <div className="panel">
         <h2>Dernières actualités <button type="button" className="btn ghost" onClick={onNews}>Tout voir</button></h2>
         {last.map(n => <NewsItem key={n.id} n={n} now={now} onDetail={onDetail} />)}
+        {!last.length && <p className="muted small">Les premières nouvelles arrivent.</p>}
       </div>
     </div>
   );
@@ -99,7 +134,7 @@ function List({ aur, now, bets, onPick, onDetail }) {
         return (
           <div key={s.tk} className={"mrow" + (mine(s.tk) ? " mine" : "")}>
             <button type="button" className="name who as-link" onClick={() => onDetail(s.tk)} aria-label={`Fiche de ${s.name}`}>
-              <TkIcon tk={s.tk} /><span><b>{s.name}</b><small>{q?.halt ? "cotation suspendue" : STORIES[s.tk].what}</small></span>
+              <TkIcon tk={s.tk} /><span><b>{s.name}{LINKS[s.tk] && <i className="real-tag" title={LINKS[s.tk].src}>réel</i>}</b><small>{q?.halt ? "cotation suspendue" : STORIES[s.tk].what}</small></span>
             </button>
             {v.length > 1 ? <Spark path={v} t={v.length - 1} /> : <span />}
             <span className="r mono"><b>{px(q?.p)}</b><small className={cls(c)}>{q ? pct(c) : ""}</small></span>
@@ -115,20 +150,20 @@ function List({ aur, now, bets, onPick, onDetail }) {
 }
 
 const CAT = { resultats: "Résultats", essai: "Essai clinique", contrat: "Contrat", scandale: "Scandale", pdg: "Déclaration", analyste: "Analyste", rumeur: "Rumeur",
-  produit: "Produit", meteo: "Météo", baleine: "Baleine", crise: "Crise", marche: "Marché", macro: "Macro", taux: "Banque Centrale", secteur: "Secteur", suspension: "Suspension" };
+  produit: "Produit", meteo: "Météo", baleine: "Baleine", crise: "Crise", marche: "Marché", macro: "Macro", taux: "Banque Centrale", secteur: "Secteur", suspension: "Suspension", reel: "Chiffre réel" };
 function NewsItem({ n, now, onDetail }) {
   const tone = n.sent > .15 ? "up" : n.sent < -.15 ? "down" : "flat", s = n.tk ? BY[n.tk] : null;
   return (
-    <article className="news">
+    <article className={"news" + (isMajor(n) ? " major" : "")}>
       <span className={"nbadge " + tone} aria-label={tone === "up" ? "bonne nouvelle" : tone === "down" ? "mauvaise nouvelle" : "neutre"}>{tone === "up" ? "▲" : tone === "down" ? "▼" : "●"}</span>
       <div>
         <p className="ntitle">{n.title}</p>
         {n.body && <p className="muted small">{n.body}</p>}
         <p className="nmeta">
           {s ? <button type="button" className="as-link ntk" onClick={() => onDetail(s.tk)}>{s.tk}</button> : n.sector ? <span>{SECTORS[n.sector]?.name}</span> : null}
-          <span>{CAT[n.cat] ?? n.cat}</span>
+          <span className={isMajor(n) ? "major-tag" : ""}>{CAT[n.cat] ?? n.cat}</span>
           {n.fiab < .5 && <span className="warn-tag">Rumeur non confirmée</span>}
-          <span className="mono">{gameClock(n.at / 1000).hm} · {agoTxt(now - n.at)}</span>
+          <span className="mono" title="Heure d'Aurelys, puis temps réel écoulé">{gameClock(n.at / 1000).hm} à Aurelys · {agoTxt(now - n.at)}</span>
         </p>
       </div>
     </article>
@@ -136,19 +171,20 @@ function NewsItem({ n, now, onDetail }) {
 }
 
 function News({ aur, now, onDetail }) {
-  const [f, setF] = useState("Tout"), [shown, setShown] = useState(null);
+  const [f, setF] = useState("Tout"), [shown, setShown] = useState(null), [major, setMajor] = useState(false);
   const top = aur.news[0]?.id ?? 0, lim = shown ?? top;
   useEffect(() => { if (shown == null && top) setShown(top) }, [top, shown]);
   const fresh = aur.news.filter(n => n.id > lim).length;
-  const list = aur.news.filter(n => n.id <= lim && (f === "Tout" || n.sector === f || BY[n.tk]?.sector === f || (f === "Marché" && !n.tk && !n.sector)));
+  const list = aur.news.filter(n => n.id <= lim && (!major || isMajor(n)) && (f === "Tout" || n.sector === f || BY[n.tk]?.sector === f || (f === "Marché" && !n.tk && !n.sector)));
   return (
     <div>
       <div className="panel">
         <h2>Calendrier</h2>
-        {calendar(sec(now), 6).map(e => <div key={e.m + (e.tk ?? "")} className="row"><span>{e.title}</span><b className="mono">{gameClock(e.at / 1000).hm} · {inMin(e.at - now)}</b></div>)}
+        {calendar(sec(now), 6).map(e => <CalRow key={e.m + (e.tk ?? "")} e={e} aur={aur} now={now} />)}
         <p className="muted small">Avant un rendez-vous, le marché est nerveux : la volatilité monte.</p>
       </div>
       <div className="chips" role="group" aria-label="Filtre">
+        <button type="button" aria-pressed={major} onClick={() => setMajor(v => !v)}>★ Majeures</button>
         {["Tout", "Marché", ...Object.keys(SECTORS)].map(k => <button key={k} type="button" aria-pressed={f === k} onClick={() => setF(k)}>{SECTORS[k]?.name ?? k}</button>)}
       </div>
       {fresh > 0 && <button type="button" className="btn fresh" onClick={() => setShown(top)}>↑ {fresh} nouvelle{fresh > 1 ? "s" : ""}</button>}
@@ -157,35 +193,55 @@ function News({ aur, now, onDetail }) {
   );
 }
 
+// Découpe un rectangle (en %) en tuiles d'aire proportionnelle aux poids, en gardant des tuiles proches du carré.
+function squarify(items, x, y, w, h) {
+  const out = [], tot = items.reduce((a, i) => a + i.w, 0); let rest = items.map(i => ({ ...i, a: i.w / tot * w * h }));
+  while (rest.length) {
+    const side = Math.min(w, h), row = [rest[0]]; let worst = r => { const s = r.reduce((a, i) => a + i.a, 0); return Math.max(...r.map(i => Math.max(side * side * i.a / (s * s), s * s / (side * side * i.a)))) };
+    while (row.length < rest.length && worst([...row, rest[row.length]]) <= worst(row)) row.push(rest[row.length]);
+    const s = row.reduce((a, i) => a + i.a, 0), t = s / side; let o = 0;
+    for (const i of row) { const l = i.a / t; out.push(w >= h ? { ...i, x, y: y + o, w: t, h: l } : { ...i, x: x + o, y, w: l, h: t }); o += l }
+    if (w >= h) { x += t; w -= t } else { y += t; h -= t }
+    rest = rest.slice(row.length);
+  }
+  return out;
+}
 function Heat({ aur, now, onDetail }) {
+  const tiles = squarify([...STOCKS].map(s => ({ s, w: (aur.quotes[s.tk]?.p ?? s.p0) * s.shares })).sort((a, b) => b.w - a.w), 0, 0, 100, 100);
   return (
-    <div className="heat">
-      {STOCKS.map(s => {
-        const c = chgOf(aur, s.tk, now), a = Math.min(.85, .12 + Math.abs(c) / .05 * .7);
-        return (
-          <button key={s.tk} type="button" className="hcell" onClick={() => onDetail(s.tk)} style={{ background: c >= 0 ? `rgba(31, 203, 139, ${a})` : `rgba(240, 75, 92, ${a})` }} aria-label={`${s.name} ${pct(c)}`}>
-            <b>{s.tk}</b><small>{s.name}</small><span className="mono">{c >= 0 ? "▲" : "▼"} {pct(c)}</span>
-          </button>
-        );
-      })}
-    </div>
+    <>
+      <div className="heat map">
+        {tiles.map(({ s, x, y, w, h }) => {
+          const c = chgOf(aur, s.tk, now), a = Math.min(.85, .12 + Math.abs(c) / .05 * .7);
+          return (
+            <button key={s.tk} type="button" className="hcell" onClick={() => onDetail(s.tk)} aria-label={`${s.name} ${pct(c)}`}
+              style={{ left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%`, background: c >= 0 ? `rgba(31, 203, 139, ${a})` : `rgba(240, 75, 92, ${a})` }}>
+              <b>{s.tk}</b>{w * h > 300 && <small>{s.name}</small>}<span className="mono">{c >= 0 ? "▲" : "▼"} {pct(c)}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="muted small">Taille d'une case : capitalisation de l'entreprise. Couleur : variation depuis le début du jour d'Aurelys.</p>
+    </>
   );
 }
 
 /* ===== Fiche entreprise ===== */
 const MM = [["mm20", "MM 20", "#c98500"], ["mm50", "MM 50", "#3987e5"], ["boll", "Bollinger", "var(--muted)"], ["rsi", "RSI", "var(--ink)"]];
-const FRAMES = [[5, "5 s"], [60, "1 min"], [300, "5 min"], [900, "15 min"]];
-// Regroupe des bougies (ou des cours [t, p, v]) par tranches de `g` secondes.
+// Unités en minutes d'Aurelys. 1 min et 15 min : cours minute par minute ; 1 h et plus : bougies d'une heure.
+const FRAMES = [[1, "1 min"], [15, "15 min"], [60, "1 h"], [240, "4 h"], [1440, "1 j"]];
+// Regroupe des bougies (ou des cours [t, p, v]) par tranches de `g` minutes d'Aurelys (t en secondes réelles).
 function group(rows, g, isTick) {
-  const out = [];
+  const out = [], span = g * SPM;
   for (const r of rows) {
-    const [t, o, h, l, c, v] = isTick ? [r[0], r[1], r[1], r[1], r[1], r[2]] : r, m = t - t % g, k = out[out.length - 1];
+    const [t, o, h, l, c, v] = isTick ? [r[0], r[1], r[1], r[1], r[1], r[2]] : r, m = t - (t - EPOCH_S) % span, k = out[out.length - 1];
     if (k && k.t === m) { k.h = Math.max(k.h, h); k.l = Math.min(k.l, l); k.c = c; k.v += v } else out.push({ t: m, o, h, l, c, v });
   }
   return out.slice(-80);
 }
 
-function AurChart({ cs, last, ind, marks, onMark }) {
+const gLabel = (t, g) => { const c = gameClock(t); return g >= 60 ? `j${c.day} ${c.hm}` : c.hm };
+function AurChart({ cs, g, last, ind, marks, onMark }) {
   const [hover, setHover] = useState(null), box = useRef(null);
   if (!cs.length) return <div className="candles empty"><p className="muted small">Chargement du graphique…</p></div>;
   const closes = cs.map(k => k.c), m20 = sma(closes, 20), m50 = sma(closes, 50), bb = bollinger(closes, 20);
@@ -195,7 +251,7 @@ function AurChart({ cs, last, ind, marks, onMark }) {
   const H = 100, PH = 78, Y = v => 4 + (1 - (v - lo) / r) * (PH - 8), w = 100 / cs.length, X = i => i * w + w / 2;
   const vmax = Math.max(...cs.map(k => k.v), 1), VY = v => H - v / vmax * (H - PH - 4);
   const line = a => a.map((v, i) => v == null ? null : `${X(i).toFixed(2)},${Y(v).toFixed(2)}`).filter(Boolean).map((p, i) => (i ? "L" : "M") + p).join("");
-  const t0 = cs[0].t, t1 = cs[cs.length - 1].t + (cs[1] ? cs[1].t - cs[0].t : 60);
+  const t0 = cs[0].t, t1 = cs[cs.length - 1].t + g * SPM;
   const at = e => { const b = box.current.getBoundingClientRect(), i = Math.floor((e.clientX - b.left - 10) / (b.width - 80) * cs.length); setHover(Math.max(0, Math.min(cs.length - 1, i))) };
   const hk = hover != null ? cs[hover] : null;
   return (
@@ -222,9 +278,9 @@ function AurChart({ cs, last, ind, marks, onMark }) {
         <span className="ax ax-hi mono">{px(hi)}</span>
         <span className="ax ax-lo mono">{px(lo)}</span>
         {last != null && <span className="ax last mono" style={{ top: `calc(10px + (100% - 32px) * ${Y(last) / 100})` }}>{px(last)}</span>}
-        <span className="ax t0 mono">{clock(t0 * 1000)}</span>
-        <span className="ax t1 mono">{clock(cs[cs.length - 1].t * 1000)}</span>
-        {hk && <span className="tip mono">{clock(hk.t * 1000)} · O {px(hk.o)} H {px(hk.h)} B {px(hk.l)} C {px(hk.c)} · vol. {nf0.format(hk.v)}</span>}
+        <span className="ax t0 mono">{gLabel(t0, g)}</span>
+        <span className="ax t1 mono">{gLabel(cs[cs.length - 1].t, g)}</span>
+        {hk && <span className="tip mono">{gLabel(hk.t, g)} · O {px(hk.o)} H {px(hk.h)} B {px(hk.l)} C {px(hk.c)} · vol. {nf0.format(hk.v)}</span>}
       </div>
       {ind.rsi && <RsiPanel v={rsi(closes)} />}
     </>
@@ -244,16 +300,39 @@ function RsiPanel({ v }) {
   );
 }
 
-export function AurelysDetail({ tk, aur, api, now, onPick, onClose }) {
+// Alertes de prix : « préviens-moi si le cours passe au-dessus (ou en dessous) de… ». Leur nombre dépend du logement.
+function Alerts({ tk, last, alerts, setAlerts, max }) {
+  const [v, setV] = useState(""), mine = alerts.filter(a => a.tk === tk), full = alerts.length >= max, price = Number(String(v).replace(",", "."));
+  const add = above => { if (price > 0 && !full) { setAlerts(l => [...l, { tk, above, price }]); setV("") } };
+  return (
+    <div className="panel alerts">
+      <p className="small"><b>Alerte de prix</b> · {alerts.length}/{max} utilisée{alerts.length > 1 ? "s" : ""} (plus avec un plus grand logement)</p>
+      {mine.map((a, i) => <p key={i} className="small row"><span>{a.above ? "Au-dessus de" : "En dessous de"} <b className="mono">{px(a.price)}</b></span>
+        <button type="button" className="btn ghost" onClick={() => setAlerts(l => l.filter(x => x !== a))}>Retirer</button></p>)}
+      {!full && <div className="add-row">
+        <input inputMode="decimal" placeholder={last ? px(last) : "Prix"} value={v} onChange={e => setV(e.target.value)} aria-label="Prix de l'alerte" />
+        <button type="button" className="btn" disabled={!(price > 0)} onClick={() => add(true)}>▲ Au-dessus</button>
+        <button type="button" className="btn" disabled={!(price > 0)} onClick={() => add(false)}>▼ En dessous</button>
+      </div>}
+    </div>
+  );
+}
+
+export function AurelysDetail({ tk, aur, api, now, onPick, onClose, alerts = [], setAlerts, alertsMax = 1 }) {
   const s = BY[tk], q = aur.quotes[tk], c = chgOf(aur, tk, now);
-  const [g, setG] = useState(() => (aur.candles[tk] ?? []).length >= 10 ? 60 : 5), [ind, setInd] = useState({ mm20: true, mm50: false, boll: false, rsi: false }), [long, setLong] = useState([]), [mark, setMark] = useState(null);
+  const [g, setG] = useState(15), [ind, setInd] = useState({ mm20: true, mm50: false, boll: false, rsi: false }), [long, setLong] = useState([]), [mins, setMins] = useState([]), [mark, setMark] = useState(null);
+  // Assez d'historique pour 80 bougies et une MM 50 : bougies d'une heure d'Aurelys, ou cours des 2 dernières heures réelles.
   useEffect(() => {
-    if (g < 300) return; let on = true;
-    const load = () => api.aurHistory(tk, 1440).then(h => on && setLong((h[tk] ?? []).map(r => r.map(Number)))).catch(() => {});
+    let on = true;
+    const need = Math.ceil(Math.max(24, 130 * g / 60) * 60 * SPM / 60); // minutes réelles
+    const load = () => Promise.all([api.aurHistory(tk, need), g < 60 ? api.aurTicks(tk, 120) : null])
+      .then(([h, k]) => { if (!on) return; setLong((h[tk] ?? []).map(r => r.map(Number))); if (k) setMins(k.map(r => [Number(r[0]), Number(r[1]), Number(r[2])])) }).catch(() => {});
     load(); const id = setInterval(load, 60000); return () => { on = false; clearInterval(id) };
   }, [api, tk, g]);
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
-  const cs = g === 5 ? group(aur.ticks[tk] ?? [], 5, true) : g === 60 ? group(aur.candles[tk] ?? [], 60) : group(long, g);
+  const live = aur.ticks[tk] ?? [], lastMin = mins.length ? mins[mins.length - 1][0] : 0;
+  const cs = g < 60 ? group([...mins, ...live.filter(k => k[0] > lastMin)], g, true) : group([...long, ...(aur.candles[tk] ?? []).filter(k => k[0] > (long.at(-1)?.[0] ?? 0))], g);
+  const vol = realizedVol(long), cons = aur.x?.cons?.[tk], sig = aur.x?.sig?.[tk], nextRes = calendar(sec(now), 40).find(e => e.tk === tk);
   const eps = aur.x?.eps?.[tk], news = aur.news.filter(n => n.tk === tk || n.sector === s.sector || (!n.tk && !n.sector));
   const people = CHARACTERS.filter(p => p.tk === tk);
   return (
@@ -268,12 +347,22 @@ export function AurelysDetail({ tk, aur, api, now, onPick, onClose }) {
         <div className="chips legend" role="group" aria-label="Indicateurs">
           {MM.map(([k, l, col]) => <button key={k} type="button" aria-pressed={ind[k]} onClick={() => setInd(x => ({ ...x, [k]: !x[k] }))}><i style={{ background: col }} aria-hidden="true" />{l}</button>)}
         </div>
-        <AurChart cs={cs} last={q?.p} ind={ind} marks={aur.news.filter(n => n.tk === tk)} onMark={setMark} />
-        {mark && <p className="small mark-note"><b>{gameClock(mark.at / 1000).hm}</b> {mark.title}</p>}
+        <AurChart cs={cs} g={g} last={q?.p} ind={ind} marks={aur.news.filter(n => n.tk === tk)} onMark={setMark} />
+        {mark && <p className="small mark-note"><b>{gwhen(mark.at, now)}</b> {mark.title}</p>}
         <div className="qbtns">
           <button type="button" className="buy" disabled={!q || q.halt} onClick={() => onPick(tk, "up")}><span>▲ Hausse</span></button>
           <button type="button" className="sell" disabled={!q || q.halt} onClick={() => onPick(tk, "down")}><span>▼ Baisse</span></button>
         </div>
+        {setAlerts && <Alerts tk={tk} last={q?.p} alerts={alerts} setAlerts={setAlerts} max={alertsMax} />}
+        {nextRes && <div className="panel cons-box">
+          <p className="small"><b>Prochains résultats</b> · {gwhen(nextRes.at, now)}</p>
+          <p className="small">{cons != null ? <>Les analystes attendent un chiffre d'affaires en hausse de <b className="mono">{signed(cons)}</b> sur un an. Le cours réagira à l'écart avec ce chiffre.</> : "Le consensus des analystes arrive."}</p>
+        </div>}
+        {LINKS[tk] && <div className="panel real-box">
+          <p className="small"><b>Branchée sur du réel</b> · {LINKS[tk].src}.</p>
+          <p className="small">{sig ? <>Dernier relevé : {sig.txt}. {sig.z > .02 ? "Au-dessus de la normale : bon pour l'entreprise." : sig.z < -.02 ? "Sous la normale : mauvais pour l'entreprise." : "Proche de la normale."}</> : "Premier relevé en attente."}</p>
+          <p className="muted small">Ces chiffres sont réels et à venir : celui qui anticipe (une sortie de jeu, une canicule, un long week-end) a un temps d'avance.</p>
+        </div>}
         <div className="story">
           <p className="small"><b>{STORIES[tk].what}</b> · fondée en {STORIES[tk].since}</p>
           <p className="small">{STORIES[tk].story}</p>
@@ -284,6 +373,7 @@ export function AurelysDetail({ tk, aur, api, now, onPick, onClose }) {
           <div className="row"><span>PER</span><b>{q && eps ? nf2.format(q.p / eps) : "—"}</b></div>
           <div className="row"><span>Rendement du dividende</span><b>{q && s.div ? pct(s.div / 100 * s.p0 / q.p) : "aucun"}</b></div>
           <div className="row"><span>Volatilité habituelle</span><b>{nf2.format(s.sig * 100)} % par jour d'Aurelys</b></div>
+          <div className="row"><span>Volatilité mesurée (dernier jour)</span><b>{vol == null ? "—" : `${nf2.format(vol * 100)} %`}</b></div>
           <div className="row"><span>Liquidité · bêta</span><b>{s.liq} · {nf2.format(s.beta)}</b></div>
         </div>
         {people.map(p => <p key={p.name} className="small"><b>{p.name}</b>, {p.role.toLowerCase()} : {p.bio}</p>)}
@@ -295,6 +385,13 @@ export function AurelysDetail({ tk, aur, api, now, onPick, onClose }) {
   );
 }
 
+// Volatilité réalisée sur les 24 dernières bougies d'une heure, ramenée à un jour d'Aurelys.
+function realizedVol(cs) {
+  const c = cs.slice(-25).map(k => k[4]); if (c.length < 8) return null;
+  const r = c.slice(1).map((v, i) => Math.log(v / c[i])), m = r.reduce((a, b) => a + b, 0) / r.length;
+  return Math.sqrt(r.reduce((a, b) => a + (b - m) ** 2, 0) / (r.length - 1) * 24);
+}
+
 /* ===== Position ===== */
 // Valeur en direct (frais de clôture déduits, hors impact de l'ordre de clôture) et seuil de liquidation.
 export const aurLive = (b, q, ticks) => {
@@ -303,12 +400,12 @@ export const aurLive = (b, q, ticks) => {
   const p = q?.p ?? b.entry, closeFee = b.stake * b.lev * FEE, value = hit ? 0 : Math.max(0, tradeValue(b, p) - closeFee);
   return { px: p, value, net: value - b.stake - b.fees, closeFee, lq, hit, halt: q?.halt };
 };
-const since = ms => { const m = Math.floor(ms / 60000); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}` };
 
 export function AurelysCard({ b, aur, now, onClose, Facts }) {
   const q = aur.quotes[b.aur], ticks = aur.ticks[b.aur], x = aurLive(b, q, ticks), t0 = Date.parse(b.created_at), [busy, setBusy] = useState(false);
-  const cs = (aur.candles[b.aur] ?? []).filter(k => k[0] * 1000 > t0 - 60000);
-  const pts = [[t0, b.entry], ...(now - t0 < 540000 ? (ticks ?? []).filter(k => k[0] * 1000 > t0).map(k => [k[0] * 1000, k[1]]) : cs.map(k => [k[0] * 1000 + 59000, k[4]])), [now, x.px]];
+  // Cours minute par minute tant qu'on les a (dernière heure réelle), sinon bougies d'une heure d'Aurelys.
+  const cs = (aur.candles[b.aur] ?? []).filter(k => k[0] * 1000 > t0 - 300000), recent = (ticks ?? []).filter(k => k[0] * 1000 > t0);
+  const pts = [[t0, b.entry], ...((ticks?.[0]?.[0] ?? Infinity) * 1000 <= t0 ? recent.map(k => [k[0] * 1000, k[1]]) : cs.map(k => [k[0] * 1000 + 299000, k[4]])), [now, x.px]];
   const d = x.lq / x.px - 1;
   return (
     <article className={"pos " + (x.net >= 0 ? "gain" : "loss")}>
@@ -317,15 +414,15 @@ export function AurelysCard({ b, aur, now, onClose, Facts }) {
         <span className={"side " + b.dir}>{b.dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×{b.lev}</span>
       </div>
       <div className="pos-pnl mono"><span className={cls(x.net)}>{sW(x.net)}</span><span className={cls(x.net)}>{pct(x.net / b.stake)}</span></div>
-      <PositionChart id={b.id} entry={b.entry} dir={b.dir} pts={pts} x0={t0} x1={Math.max(now, t0 + 120000)} />
+      <PositionChart id={b.id} entry={b.entry} dir={b.dir} pts={pts} x0={t0} x1={Math.max(now, t0 + 60 * SPM * 1000)} />
       <Facts items={[
         ["Mise", `${W(b.stake)} · ×${b.lev}`],
         ["Valeur (frais déduits)", W(x.value), cls(x.net)],
-        ["Entrée", `${px(b.entry)} · ${clock(t0)}`],
+        ["Entrée", `${px(b.entry)} · ${gwhen(t0, now)}`],
         ["Cours", `${px(x.px)} (${pct(x.px / b.entry - 1)})`, cls((x.px / b.entry - 1) * (b.dir === "up" ? 1 : -1))],
         ["Liquidation", `${px(x.lq)} (${pct(d)})`, Math.abs(d) < .03 ? "down warn" : ""],
         ["Frais", `${W(b.fees)} payés + ${W(x.closeFee)}`],
-        ["Ouverte depuis", since(now - t0)],
+        ["Ouverte depuis", `${gdur(now - t0)} d'Aurelys`],
         ["Clôture", x.halt ? "à la reprise de la cotation" : "quand tu veux"],
       ]} />
       {x.hit

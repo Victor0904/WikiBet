@@ -3,7 +3,7 @@ export const STORIES = {
   NXR: { what: "Puces et intelligence artificielle", since: "2011 · Port-Aurel",
     story: "Deux étudiantes en mathématiques, Lena Kost et Aya Merin, lancent Nexora dans un garage du quartier des docks. Leur assistant « Nexo » équipe aujourd'hui un téléphone sur deux du pays. L'action a été multipliée par vingt en cinq ans : beaucoup pensent que c'est trop." },
   PXF: { what: "Jeux vidéo", since: "2004 · Valmeyre",
-    story: "Son jeu culte « Lanterne », vendu à 40 millions d'exemplaires, fait encore vivre le studio. Depuis, chaque sortie est un pari : un succès fait bondir l'action, un flop la fait plonger. Tout le monde attend « Lanterne 3 »." },
+    story: "Son jeu culte « Lanterne », vendu à 40 millions d'exemplaires, fait encore vivre le studio. Depuis, chaque sortie est un pari : un succès fait bondir l'action, un flop la fait plonger. Ses ventes suivent le nombre réel de joueurs connectés sur Steam." },
   OMB: { what: "Médicaments contre les maladies rares", since: "1962 · Haut-Ombre",
     story: "Le laboratoire a commencé par des sirops contre la toux, dans les montagnes du Haut-Ombre. Il cherche aujourd'hui des traitements contre les maladies rares, baptisés OMB suivi d'un numéro. Un essai réussi peut doubler sa valeur, un échec la faire fondre." },
   HLV: { what: "Électricité : barrages, éolien, gaz", since: "1998 · Brennes",
@@ -24,4 +24,6 @@ export const STORIES = {
     story: "Une petite société qui exploite un gisement de lithium dans le désert de Sel-Rouge. Vélisse est son premier client. Peu d'actions s'échangent : un seul gros acheteur peut faire bondir le cours. Le Kraken l'a bien compris." },
   KST: { what: "Avions et hélicoptères", since: "1934 · Aérodrome d'Orme",
     story: "Kestrel construit des avions depuis les débuts de l'aviation d'Aurelys et équipe l'armée de l'air. Ses contrats durent des années : un grand contrat d'État peut remplir l'usine pour dix ans." },
+  OND: { what: "Plateforme de streaming en direct", since: "2016 · Port-Aurel",
+    story: "Trois anciens commentateurs de jeux vidéo ont lancé Ondéo pour diffuser leurs parties depuis une cave de Port-Aurel. Ses revenus suivent l'audience des lives : quand les spectateurs affluent, la publicité se vend mieux. L'action suit les vrais chiffres des grands lives Twitch francophones." },
 };

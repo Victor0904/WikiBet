@@ -50,6 +50,18 @@ test("cosmétiques : équipé à l'achat, un seul par catégorie, titre affiché
   assert.equal((await db.query("select title from leaderboard()")).rows[0].title, null);
 });
 
+test("faillite : les objets revendables et les bonus comptent, pas de W infinis", async () => {
+  const db = await freshDb();
+  await login(db, A, "alice");
+  for (const id of ["lampe", "plante", "tapis", "ecran2", "chaise", "neon"]) await buy(db, id); // 9 200 W de déco
+  await db.query("update profiles set cash = 300 where id = $1", [A]);
+  await assert.rejects(db.query("select restart()"), /pas en faillite/, "5 520 W de revente : pas de faillite");
+  for (const id of ["lampe", "plante", "tapis", "ecran2", "chaise", "neon"]) await db.query("select sell_item($1)", [id]);
+  await db.query("update profiles set cash = 1000 where id = $1", [A]);
+  await db.query("select restart()");
+  assert.equal(await cash(db, A), 10000);
+});
+
 test("bonus cote boostée : +20 % sur le prochain duel seulement", async () => {
   const db = await freshDb();
   await setClock(db, 3, 100);
@@ -65,6 +77,7 @@ test("bonus cote boostée : +20 % sur le prochain duel seulement", async () => {
 
 test("bonus assurance : une position liquidée rend 50 % de la mise, une seule fois", async () => {
   const db = await freshDb();
+  await setClock(db, 3, 100); // en pleine séance : pas de salaire de fin de séance pendant le test
   await db.query("insert into streamers values ('zerator', 'ZeratoR', null)");
   await db.query("insert into stream_ticks (login, at, viewers, live) values ('zerator', now() - interval '1 minute', 10000, true)");
   await login(db, A, "alice");
@@ -95,4 +108,17 @@ test("bonus salaire doublé : 1 000 W par séance pendant l'heure active ; la fa
   await db.query("update profiles set cash = 100 where id = $1", [A]);
   await db.query("select restart()");
   assert.equal((await inv(db, A)).plante.qty, 1, "les objets survivent à la faillite");
+});
+
+test("trophées : meilleur trade, krach, mains de diamant, million", async () => {
+  const db = await freshDb();
+  await login(db, A, "alice");
+  const got = async () => Object.fromEntries((await db.query("select id, got, detail from trophies($1)", [A])).rows.map(r => [r.id, r]));
+  assert.equal(Object.values(await got()).filter(t => t.got).length, 0, "rien au départ");
+  await db.query(`insert into bets (user_id, session, day, kind, stake, aur, lev, status, payout, reg, created_at, closed_at) values
+    ($1, 0, 0, 'aurelys', 1000, 'NXR', 1, 'won', 2500, 'krach', now() - interval '3 hours', now())`, [A]);
+  await db.query("update profiles set cash = 2000000 where id = $1", [A]);
+  const t = await got();
+  assert.ok(t.best.got && t.krach.got && t.diamant.got && t.million.got);
+  assert.match(t.best.detail, /^\+1.?499 W · NXR$/, "cadre du meilleur trade : gain net (frais d'ouverture compris)");
 });

@@ -125,7 +125,7 @@ export function Friends({ api, say, onVisit, onBack }) {
         <b>{f.pseudo}{f.guild && <i className="gtag">{f.guild}</i>}</b>
         {f.state === "ami" && <small className="mono">jour <span className={cls(f.today)}>{sW(f.today)}</span> · total <span className={cls(f.total)}>{sW(f.total)}</span></small>}
       </button>
-      <span className="facts">{acts}</span>
+      <span className="f-acts">{acts}</span>
     </div>
   );
   return (
@@ -195,7 +195,7 @@ function GuildView({ api, me, g, mine, canJoin, run, onVisit }) {
               <b>{m.pseudo}{m.owner && <small className="accent"> · fondateur</small>}</b>
               <small className="mono">jour <span className={cls(m.today)}>{sW(m.today)}</span> · total <span className={cls(m.total)}>{sW(m.total)}</span></small>
             </button>
-            <span className="facts">{boss && m.id !== me.id && <button type="button" className="btn ghost" onClick={() => run(() => api.guildKick(m.id), `${m.pseudo} a quitté la guilde.`)}>Exclure</button>}</span>
+            <span className="f-acts">{boss && m.id !== me.id && <button type="button" className="btn ghost" onClick={() => run(() => api.guildKick(m.id), `${m.pseudo} a quitté la guilde.`)}>Exclure</button>}</span>
           </div>
         ))}
       </div>

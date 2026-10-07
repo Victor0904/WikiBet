@@ -58,6 +58,15 @@ On joue d'abord sans compte (connexion anonyme). Dans Mon compte, le joueur lie 
 2. **Sign In / Providers → Apple** : il faut un compte Apple Developer. Créer un Services ID (Sign in with Apple, domaine du site, retour `https://<projet>.supabase.co/auth/v1/callback`) et une clé ; coller le Services ID et le secret dans Supabase.
 3. **Sign In / Providers → Allow manual linking** : nécessaire pour lier Apple à une partie anonyme.
 
+## Déployer une version d'Aurelys
+
+Toujours la fonction d'abord, puis la base : la nouvelle fonction sait reprendre un état d'avant (elle repart des derniers cours).
+
+```bash
+npx supabase functions deploy aurelys --use-api
+echo y | npx supabase db push
+```
+
 ## Tests
 
 ```bash

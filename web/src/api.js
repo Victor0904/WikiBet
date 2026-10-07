@@ -9,9 +9,9 @@ export const normBoard = r => ({ ...r, cash: Number(r.cash), patrimoine: Number(
 export const normGuild = g => ({ ...g, id: Number(g.id) });
 export const normStream = s => ({ ...s, ts: (s.ts || []).map(Number), vs: (s.vs || []).map(Number) });
 
-export async function connect(engine) {
+export async function connect() {
   const url = import.meta.env.VITE_SUPABASE_URL, key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !key) return (await import("./demo.js")).demoApi(engine);
+  if (!url || !key) return (await import("./demo.js")).demoApi();
 
   // Retour d'un lien e-mail ou d'Apple : lien de nouveau mot de passe, ou erreur à afficher. Lu avant que Supabase ne nettoie l'adresse.
   const back = new URLSearchParams(location.hash.slice(1) + "&" + location.search.slice(1));
@@ -65,11 +65,11 @@ export async function connect(engine) {
     streamBoard: async () => (await rpc("stream_board", { p_minutes: 120 })).map(normStream),
     openMarkets: async () => (await rpc("open_markets")).map(normMarket),
     betQuestion: ({ market, side, stake }) => rpc("bet_question", { p_market: market, p_side: side, p_stake: stake }),
-    // Ordres crypto : la fonction serveur lit le vrai prix chez Coinbase au moment de l'ordre.
-    cryptoOrder: body => invoke("crypto", body),
     // Bourse d'Aurelys : cours jusqu'à maintenant (jamais au-delà), bougies, actualités publiées, ordres par le serveur.
     aurFeed: since => rpc("aur_feed", { p_since: since ? new Date(since * 1000).toISOString() : null }),
     aurHistory: (tk, minutes) => rpc("aur_history", { p_tk: tk, p_minutes: minutes }),
+    aurTicks: (tk, minutes) => rpc("aur_ticks_of", { p_tk: tk, p_minutes: minutes }),
+    aurXp: () => rpc("my_aur_xp"),
     aurNews: () => rows(sb.from("aur_news").select("*").order("id", { ascending: false }).limit(150)),
     aurOrder: body => invoke("aurelys", body),
     restart: () => rpc("restart"),
@@ -87,6 +87,7 @@ export async function connect(engine) {
     guildLeave: () => rpc("guild_leave"),
     guildKick: id => rpc("guild_kick", { p_user: id }),
     shopItems: () => rows(sb.from("shop_items").select("*").order("sort")),
+    trophies: user => rpc("trophies", { p_user: user }),
     inventoryOf: user => rows(sb.from("inventory").select("item_id,qty,equipped").eq("user_id", user).gt("qty", 0)),
     profileOf: async user => (await rows(sb.from("profiles").select("id,pseudo,cash,bankruptcies").eq("id", user).maybeSingle())) ?? null,
     buyItem: id => rpc("buy_item", { p_item: id }),
