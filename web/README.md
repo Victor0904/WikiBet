@@ -34,6 +34,15 @@ npx supabase db push
 
 La migration planifie l'appel de `twitch-poll` chaque minute (pg_cron + pg_net). Le Client Secret ne quitte jamais Supabase.
 
+### Bourse d'Aurelys
+
+La simulation tourne dans la fonction `aurelys`, appelée toutes les 10 s par pg_cron :
+
+```bash
+npx supabase functions deploy aurelys --use-api
+npx supabase db push
+```
+
 ## Comment c'est construit
 
 - `src/engine.js` : le moteur, partagé par le front, le seed et les tests. Il calcule l'horloge des séances, les cours minute par minute (pont brownien seedé) et les duels. Tout est déterministe.

@@ -6,6 +6,9 @@ import { TradeChart, PositionChart, Spark } from "./charts.jsx";
 import { nf0, nf2, W, sW, clock, pct, cls, HOME_NAMES, THEMES, DEFAULT_ACCENT } from "./format.js";
 import { useCrypto, BY_SYM, usd, FEE } from "./crypto.js";
 import { CryptoMarket, CryptoDetail, CryptoCard, cryptoLive, CoinIcon } from "./CryptoUI.jsx";
+import { useAurelys } from "./aurelys.js";
+import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
+import { BY as AUR, slipEstimate } from "../supabase/functions/_shared/aurelys.js";
 import { Dock, Segmented, SubHeader } from "./nav.jsx";
 import { MoreMenu, HowTo, Account, Legal } from "./pages.jsx";
 const QG = lazy(() => import("./QG.jsx")); // Three.js n'est chargé qu'à l'ouverture du QG
@@ -82,7 +85,7 @@ function Game({ api, engine }) {
   const [me, setMe] = useState(undefined), [bets, setBets] = useState([]), [board, setBoard] = useState([]);
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
   const crypto = useCrypto(), [detail, setDetail] = useState(null);
-  const [marketView, setMarketView] = useState("crypto"), [liveSrc, setLiveSrc] = useState("twitch"), [posView, setPosView] = useState("open"), [more, setMore] = useState(null);
+  const [marketView, setMarketView] = useState("crypto"), [aurDetail, setAurDetail] = useState(null), [liveSrc, setLiveSrc] = useState("twitch"), [posView, setPosView] = useState("open"), [more, setMore] = useState(null);
   // « Comment jouer » s'ouvre tout seul à la première visite.
   const [firstVisit, setFirstVisit] = useState(() => { try { return !localStorage.getItem("wb-howto") } catch { return false } });
   const [pref, setPref] = useState({ lev: 5, shorizon: "15", stake: 500 });
@@ -108,9 +111,11 @@ function Game({ api, engine }) {
   const loadStreams = useCallback(() => Promise.all([api.streamBoard(), api.openMarkets().catch(() => [])]).then(([b, m]) => { setStreams(b); setMarkets(m) }).catch(() => {}), [api]);
   useEffect(() => { loadStreams(); const id = setInterval(loadStreams, 20000); return () => clearInterval(id) }, [loadStreams]);
   const byLogin = useMemo(() => Object.fromEntries(streams.map(x => [x.login, x])), [streams]);
+  // Bourse d'Aurelys : cours à la seconde quand on la regarde ou qu'on y a une position, sinon toutes les 10 s.
+  const aur = useAurelys(api, (tab === "market" && marketView === "aurelys") || !!aurDetail || bets.some(b => b.status === "open" && b.kind === "aurelys"));
 
   // Règlement : au changement de phase, quand une position arrive à échéance ou se fait liquider, et toutes les 15 s.
-  const due = bets.filter(b => b.status === "open" && (b.kind === "trade" ? liveTrade(engine, b, s).due : b.kind === "stream" ? liveStream(b, byLogin[b.login], now).due : b.kind === "question" ? now >= Date.parse(b.end_at) : b.session < s.k || !s.playing)).length;
+  const due = bets.filter(b => b.status === "open" && b.kind !== "crypto" && b.kind !== "aurelys" && (b.kind === "trade" ? liveTrade(engine, b, s).due : b.kind === "stream" ? liveStream(b, byLogin[b.login], now).due : b.kind === "question" ? now >= Date.parse(b.end_at) : b.session < s.k || !s.playing)).length;
   const settle = useCallback(() => api.settle().then(refresh).catch(() => {}), [api, refresh]);
   useEffect(() => { if (due) settle() }, [due, settle]);
   useEffect(() => { settle() }, [s.k, s.playing, settle]);
@@ -129,8 +134,9 @@ function Game({ api, engine }) {
   useEffect(() => { document.documentElement.style.setProperty("--accent", accent) }, [accent]);
   const openStake = open.reduce((a, b) => a + b.stake, 0);
   const objectsValue = catalog.filter(i => i.kind !== "bonus" && (inv[i.id]?.qty ?? 0) > 0).reduce((a, i) => a + Math.floor(i.price * .6), 0);
-  const positions = open.filter(b => b.kind === "trade" || b.kind === "stream" || b.kind === "crypto");
+  const positions = open.filter(b => b.kind === "trade" || b.kind === "stream" || b.kind === "crypto" || b.kind === "aurelys");
   const pnl = positions.length ? Math.round(positions.reduce((a, b) => a + (b.kind === "crypto" ? cryptoLive(b, crypto.quotes[b.sym], crypto.candles[b.sym]).net
+    : b.kind === "aurelys" ? aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).net
     : (b.kind === "trade" ? liveTrade(engine, b, s) : liveStream(b, byLogin[b.login], now)).value - b.stake), 0)) : null;
   const visitQG = async row => {
     if (row.id === me.id) { setVisit(null); setTab("qg"); return }
@@ -141,8 +147,9 @@ function Game({ api, engine }) {
   if (me === null) return <Onboarding api={api} onDone={refresh} />;
 
   const go = t => { setTab(t); if (t !== "more") setMore(null); window.scrollTo({ top: 0 }) };
-  const closeTrade = b => run(() => b.kind === "crypto" ? api.cryptoOrder({ action: "close", id: b.id }) : api.closeTrade(b.id),
-    r => `Clôturée : ${sW(r.payout - r.stake - (r.kind === "crypto" ? r.stake * r.lev * FEE : 0))}${r.kind === "crypto" ? ` (frais ${W(r.fees)})` : ""}`); // crypto : les frais d'ouverture s'ajoutent à la mise
+  const feeOpen = r => r.kind === "crypto" || r.kind === "aurelys" ? r.stake * r.lev * FEE : 0; // frais d'ouverture, en plus de la mise
+  const closeTrade = b => run(() => b.kind === "crypto" ? api.cryptoOrder({ action: "close", id: b.id }) : b.kind === "aurelys" ? api.aurOrder({ action: "close", id: b.id }) : api.closeTrade(b.id),
+    r => `Clôturée : ${sW(r.payout - r.stake - feeOpen(r))}${feeOpen(r) ? ` (frais ${W(r.fees)})` : ""}`);
   const howtoDone = () => { try { localStorage.setItem("wb-howto", "1") } catch { } setFirstVisit(false); setMore(null); setTab("market") };
   const patrimoine = me.cash + openStake + objectsValue;
   const showHowto = firstVisit || (tab === "more" && more === "howto");
@@ -159,18 +166,19 @@ function Game({ api, engine }) {
 
       <div className="layout">
         <aside className="rail">
-          <Positions engine={engine} s={s} now={now} byLogin={byLogin} crypto={crypto} bets={open} onClose={closeTrade} />
+          <Positions engine={engine} s={s} now={now} byLogin={byLogin} crypto={crypto} aur={aur} bets={open} onClose={closeTrade} />
           {!s.playing && <SessionResults engine={engine} s={s} bets={bets} />}
         </aside>
 
         <main className="main">
           <div key={showHowto ? "howto" : tab + (more ?? "")} className="view-anim">
           {showHowto ? <HowTo first={firstVisit} onBack={firstVisit ? howtoDone : () => setMore(null)} /> : <>
-          {(tab === "market" || tab === "live") && <MiniTicker engine={engine} s={s} now={now} byLogin={byLogin} crypto={crypto} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
+          {(tab === "market" || tab === "live") && <MiniTicker engine={engine} s={s} now={now} byLogin={byLogin} crypto={crypto} aur={aur} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
 
           {tab === "market" && <>
-            <Segmented label="Marché" value={marketView} onChange={setMarketView} options={[["crypto", "Crypto"], ["wiki", "Wikipédia"], ["duels", "Duels"]]} />
+            <Segmented label="Marché" value={marketView} onChange={setMarketView} options={[["crypto", "Crypto"], ["aurelys", "Aurelys"], ["wiki", "Wiki"], ["duels", "Duels"]]} />
             {marketView === "crypto" ? <CryptoMarket {...crypto} bets={open} onPick={(sym, dir) => setTicket({ kind: "crypto", sym, dir })} onDetail={setDetail} />
+            : marketView === "aurelys" ? <AurelysMarket aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onDetail={setAurDetail} />
             : marketView === "wiki"
               ? <Market engine={engine} s={s} bets={open} onPick={(tk, dir) => setTicket({ kind: "trade", tk, dir })} />
               : <Duels engine={engine} s={s} onPick={(duel, side) => setTicket({ kind: "duel", duel, side })} />}
@@ -185,7 +193,7 @@ function Game({ api, engine }) {
             <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` · ${open.length}` : ""}`], ["history", "Historique"]]} />
             {posView === "open" ? <>
               {!s.playing && <SessionResults engine={engine} s={s} bets={bets} />}
-              {open.length ? <Positions vertical engine={engine} s={s} now={now} byLogin={byLogin} crypto={crypto} bets={open} onClose={closeTrade} />
+              {open.length ? <Positions vertical engine={engine} s={s} now={now} byLogin={byLogin} crypto={crypto} aur={aur} bets={open} onClose={closeTrade} />
                 : <div className="empty-state"><b>Aucun pari en cours</b><p className="muted">Prends position sur un article ou réponds à une question en direct.</p>
                     <div className="empty-acts"><button type="button" className="btn primary" onClick={() => go("market")}>Marché</button><button type="button" className="btn" onClick={() => go("live")}>Live</button></div></div>}
             </> : <History engine={engine} byLogin={byLogin} bets={bets.filter(b => b.status !== "open")} />}
@@ -213,10 +221,12 @@ function Game({ api, engine }) {
       <Dock tab={showHowto && firstVisit ? null : tab} setTab={t => { if (firstVisit) howtoDone(); go(t) }} badge={open.length} />
 
       {detail && <CryptoDetail sym={detail} quotes={crypto.quotes} onClose={() => setDetail(null)} onPick={(sym, dir) => { setDetail(null); setTicket({ kind: "crypto", sym, dir }) }} />}
-      {ticket && <Ticket engine={engine} crypto={crypto} s={s} now={now} byLogin={byLogin} me={me} ticket={ticket} pref={pref} setPref={setPref} onClose={() => setTicket(null)}
+      {aurDetail && <AurelysDetail tk={aurDetail} aur={aur} api={api} now={now} onClose={() => setAurDetail(null)} onPick={(tk, dir) => { setAurDetail(null); setTicket({ kind: "aurelys", tk, dir }) }} />}
+      {ticket && <Ticket engine={engine} crypto={crypto} aur={aur} s={s} now={now} byLogin={byLogin} me={me} ticket={ticket} pref={pref} setPref={setPref} onClose={() => setTicket(null)}
         onSubmit={async args => {
           const opened = b => `Position ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} ouverte · ${W(b.stake)}`;
           const r = ticket.kind === "crypto" ? await run(() => api.cryptoOrder({ action: "open", ...args }), b => `${opened(b)} à ${usd(b.entry)} (frais ${W(b.fees)})`)
+            : ticket.kind === "aurelys" ? await run(() => api.aurOrder({ action: "open", ...args }), b => `${opened(b)} à ${aurPx(b.entry)} (frais ${W(b.fees)})`)
             : ticket.kind === "trade" ? await run(() => api.openTrade(args), opened)
             : ticket.kind === "stream" ? await run(() => api.openStream(args), opened)
             : ticket.kind === "question" ? await run(() => api.betQuestion(args), b => `Pari validé : ${b.side === "yes" ? "Oui" : "Non"} à ${nf2.format(b.odds)} · ${W(b.stake)}`)
@@ -231,10 +241,11 @@ function Game({ api, engine }) {
 }
 
 // Bande compacte de mes paris en cours, en haut du Marché et du Live (sur mobile) : un appui ouvre l'onglet Positions.
-function MiniTicker({ engine, s, now, byLogin, crypto, bets, onOpen }) {
+function MiniTicker({ engine, s, now, byLogin, crypto, aur, bets, onOpen }) {
   if (!bets.length) return null;
   const chip = b => {
     if (b.kind === "crypto") { const net = cryptoLive(b, crypto.quotes[b.sym], crypto.candles[b.sym]).net; return [b.sym, sW(net), cls(net)] }
+    if (b.kind === "aurelys") { const net = aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).net; return [b.aur, sW(net), cls(net)] }
     if (b.kind === "trade") { const net = liveTrade(engine, b, s).value - b.stake; return [engine.BY[b.tk].name, sW(net), cls(net)] }
     if (b.kind === "stream") { const net = liveStream(b, byLogin[b.login], now).value - b.stake; return [byLogin[b.login]?.display_name ?? b.login, sW(net), cls(net)] }
     if (b.kind === "question") { const st = byLogin[b.login], cur = st?.viewers ?? b.entry, win = (b.side === "yes") === (cur > b.threshold); return [st?.display_name ?? b.login, b.side === "yes" ? "Oui" : "Non", win ? "up" : "down"] }
@@ -277,10 +288,11 @@ function SessionBar({ s, now, engine }) {
 }
 
 /* Mes positions en direct : toujours visibles, en tête sur mobile et dans la colonne de gauche sur grand écran. */
-function Positions({ engine, s, now, byLogin, crypto, bets, onClose, vertical }) {
+function Positions({ engine, s, now, byLogin, crypto, aur, bets, onClose, vertical }) {
   if (!bets.length && !vertical) return <div className="panel empty-pos"><h2>Mes positions</h2><p className="muted">Aucune position ouverte. Choisis un article et prends position à la hausse ou à la baisse.</p></div>;
   const list = [...bets].sort((a, b) => (b.kind !== "duel") - (a.kind !== "duel") || b.id - a.id);
   const cards = list.map(b => b.kind === "crypto" ? <CryptoCard key={b.id} b={b} q={crypto.quotes[b.sym]} cs={crypto.candles[b.sym]} now={now} onClose={onClose} Facts={Facts} />
+    : b.kind === "aurelys" ? <AurelysCard key={b.id} b={b} aur={aur} now={now} onClose={onClose} Facts={Facts} />
     : b.kind === "trade" ? <TradeCard key={b.id} engine={engine} s={s} now={now} b={b} onClose={onClose} />
     : b.kind === "stream" ? <StreamCard key={b.id} b={b} st={byLogin[b.login]} now={now} onClose={onClose} />
     : b.kind === "question" ? <QuestionCard key={b.id} b={b} st={byLogin[b.login]} now={now} />
@@ -547,6 +559,12 @@ function History({ engine, byLogin, bets }) {
             <span className="r mono"><b className={cls(net - b.stake * b.lev * FEE)}>{sW(net - b.stake * b.lev * FEE)}</b><small>mise {W(b.stake)}</small></span>
           </div>
         );
+        if (b.kind === "aurelys") return (
+          <div key={b.id} className="hrow">
+            <span><b>{AUR[b.aur]?.name ?? b.aur} {b.dir === "up" ? "▲" : "▼"} ×{b.lev} · Aurelys</b><small>{clock(Date.parse(b.created_at))} → {b.exit_at ? clock(Date.parse(b.exit_at)) : "—"} · {aurPx(b.entry)} → {b.exit != null ? aurPx(b.exit) : "—"} · frais {W(b.fees)}{b.payout === 0 ? " · liquidée" : ""}{b.insured ? " · assurée" : ""}</small></span>
+            <span className="r mono"><b className={cls(net - b.stake * b.lev * FEE)}>{sW(net - b.stake * b.lev * FEE)}</b><small>mise {W(b.stake)}</small></span>
+          </div>
+        );
         if (b.kind === "question") return (
           <div key={b.id} className="hrow">
             <span><b>{byLogin[b.login]?.display_name ?? b.login} · plus de {nf0.format(b.threshold)} à {clock(Date.parse(b.end_at))} : {b.side === "yes" ? "Oui" : "Non"}</b><small>chiffre final {b.exit != null ? nf0.format(b.exit) : "—"} · cote {nf2.format(b.odds)}</small></span>
@@ -601,18 +619,41 @@ function Rain({ kind, at }) {
   );
 }
 
-function Ticket({ engine, crypto, s, now, byLogin, me, ticket, pref, setPref, onClose, onSubmit }) {
+function Ticket({ engine, crypto, aur, s, now, byLogin, me, ticket, pref, setPref, onClose, onSubmit }) {
   const [stake, setStake] = useState(pref.stake), [busy, setBusy] = useState(false), [dir, setDir] = useState(ticket.dir), [side, setSide] = useState(ticket.side);
   const isTrade = ticket.kind === "trade", isStream = ticket.kind === "stream", isPos = isTrade || isStream;
   const st = isStream ? byLogin[ticket.login] : null;
   const set = p => setPref(x => ({ ...x, ...p }));
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
-  const isQ = ticket.kind === "question", isCrypto = ticket.kind === "crypto";
-  const fee = isCrypto ? stake * pref.lev * FEE : 0;
-  const open = isCrypto ? !!crypto.quotes[ticket.sym] : isQ ? Date.parse(ticket.market.closes_at) - 300000 > now : isStream ? !!st?.live : s.playing;
+  const isQ = ticket.kind === "question", isCrypto = ticket.kind === "crypto", isAur = ticket.kind === "aurelys";
+  const fee = isCrypto || isAur ? stake * pref.lev * FEE : 0;
+  const aq = isAur ? aur.quotes[ticket.tk] : null, overCap = isAur && stake * pref.lev > aurCap(ticket.tk);
+  const open = isAur ? !!aq && !aq.halt && !overCap : isCrypto ? !!crypto.quotes[ticket.sym] : isQ ? Date.parse(ticket.market.closes_at) - 300000 > now : isStream ? !!st?.live : s.playing;
   const ok = stake > 0 && stake + fee <= me.cash && open;
   let body, title, cta;
-  if (isCrypto) {
+  if (isAur) {
+    const p = aq?.p ?? 0, sl = slipEstimate(ticket.tk, stake * pref.lev, now / 1000, aur.x?.reg), entry = p * (1 + (dir === "up" ? sl : -sl)), b = { entry, lev: pref.lev, dir, stake };
+    title = AUR[ticket.tk].name;
+    cta = `${dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×${pref.lev} · ${W(stake)}`;
+    body = <>
+      <div className="seg" role="group" aria-label="Sens">
+        <button type="button" aria-pressed={dir === "up"} className="buy" onClick={() => setDir("up")}>▲ Hausse</button>
+        <button type="button" aria-pressed={dir === "down"} className="sell" onClick={() => setDir("down")}>▼ Baisse</button>
+      </div>
+      <label>Levier</label>
+      <div className="seg" role="group" aria-label="Levier">{LEVS.map(v => <button key={v} type="button" aria-pressed={pref.lev === v} onClick={() => set({ lev: v })}>×{v}</button>)}</div>
+      <div className="rows mono">
+        <div className="row"><span>Cours actuel</span><b>{aurPx(p)}</b></div>
+        <div className="row"><span>Impact de ton ordre (estimé)</span><b>{dir === "up" ? "+" : "−"}{nf2.format(sl * 100)} %</b></div>
+        <div className="row"><span>Prix d'exécution estimé</span><b>{aurPx(entry)}</b></div>
+        <div className="row"><span>1 % de variation</span><b>±{W(stake * pref.lev / 100)}</b></div>
+        <div className="row"><span>Frais d'ouverture (0,1 %)</span><b>{W(fee)}</b></div>
+        <div className="row"><span>Liquidation à</span><b>{aurPx(liqPrice(b))}</b></div>
+        <div className="row"><span>Plafond sur cette action</span><b>{W(aurCap(ticket.tk))} engagés</b></div>
+      </div>
+      <p className="muted small">Ton ordre fait bouger le cours : plus il est gros, et plus l'action est peu liquide, plus tu paies cher (même chose à la clôture). Le prix exact est calculé par le serveur. La position reste ouverte jusqu'à ce que tu la clôtures, ou jusqu'à la liquidation.</p>
+    </>;
+  } else if (isCrypto) {
     const q = crypto.quotes[ticket.sym], px = q?.price ?? 0, b = { entry: px, lev: pref.lev, dir, stake };
     title = BY_SYM[ticket.sym].name;
     cta = `${dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×${pref.lev} · ${W(stake)}`;
@@ -699,7 +740,7 @@ function Ticket({ engine, crypto, s, now, byLogin, me, ticket, pref, setPref, on
     <div className="scrim" onClick={e => e.target === e.currentTarget && onClose()}>
       <form className="sheet" role="dialog" aria-modal="true" aria-label={title} onSubmit={async e => {
         e.preventDefault(); if (!ok) return; setBusy(true); set({ stake });
-        await onSubmit(isCrypto ? { sym: ticket.sym, dir, lev: pref.lev, stake }
+        await onSubmit(isAur ? { tk: ticket.tk, dir, lev: pref.lev, stake } : isCrypto ? { sym: ticket.sym, dir, lev: pref.lev, stake }
           : isTrade ? { tk: ticket.tk, dir, lev: pref.lev, stake }
           : isStream ? { login: ticket.login, dir, lev: pref.lev, stake, horizon: pref.shorizon }
           : isQ ? { market: ticket.market.id, side, stake }
@@ -711,9 +752,11 @@ function Ticket({ engine, crypto, s, now, byLogin, me, ticket, pref, setPref, on
         <label htmlFor="stake">Mise</label>
         <div className="stake"><input id="stake" className="mono" type="number" inputMode="numeric" min="1" step="1" value={stake} onChange={e => setStake(Math.max(0, Math.floor(+e.target.value || 0)))} /><span>W</span></div>
         <div className="chips">{[100, 500, 1000].map(v => <button key={v} type="button" onClick={() => setStake(v)}>{nf0.format(v)}</button>)}<button type="button" onClick={() => setStake(Math.floor(me.cash))}>Max</button></div>
-        {!open && <p className="error small">{isQ ? "Les paris sur cette question sont fermés." : isStream ? "Ce streamer n'est plus en live." : "Séance fermée, reprise dans quelques secondes."}</p>}
+        {overCap && <p className="error small">Au plus {W(aurCap(ticket.tk))} engagés (mise × levier) sur cette action.</p>}
+        {isAur && aq?.halt && <p className="error small">Cotation suspendue, reprise dans quelques secondes.</p>}
+        {!open && !isAur && <p className="error small">{isQ ? "Les paris sur cette question sont fermés." : isStream ? "Ce streamer n'est plus en live." : "Séance fermée, reprise dans quelques secondes."}</p>}
         {stake + fee > me.cash && <p className="error small">Solde insuffisant : il te manque {W(stake + fee - me.cash)}{fee ? " (frais compris)" : ""}.</p>}
-        <button type="submit" className={"btn big " + (isPos || isCrypto ? (dir === "up" ? "buy" : "sell") : isQ ? (side === "yes" ? "buy" : "sell") : "primary")} disabled={!ok || busy}>{cta}</button>
+        <button type="submit" className={"btn big " + (isPos || isCrypto || isAur ? (dir === "up" ? "buy" : "sell") : isQ ? (side === "yes" ? "buy" : "sell") : "primary")} disabled={!ok || busy}>{cta}</button>
       </form>
     </div>
   );

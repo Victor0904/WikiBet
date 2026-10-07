@@ -22,6 +22,12 @@ export async function connect(engine) {
   const uid = session.user.id;
   const rpc = async (fn, args) => { const { data, error } = await sb.rpc(fn, args); if (error) throw new Error(error.message); return data };
   const rows = async q => { const { data, error } = await q; if (error) throw new Error(error.message); return data };
+  const invoke = async (fn, body) => {
+    const { data, error } = await sb.functions.invoke(fn, { body });
+    if (error) { let msg = error.message; try { msg = (await error.context.json()).error ?? msg } catch { } throw new Error(msg) }
+    if (data?.error) throw new Error(data.error);
+    return normBet(data);
+  };
 
   // Écart entre l'horloge du téléphone et celle du serveur, pour que tout le monde voie la même minute.
   const t0 = Date.now(), st = await rpc("server_time"), offset = Date.parse(st) - (t0 + Date.now()) / 2;
@@ -39,12 +45,12 @@ export async function connect(engine) {
     openMarkets: async () => (await rpc("open_markets")).map(normMarket),
     betQuestion: ({ market, side, stake }) => rpc("bet_question", { p_market: market, p_side: side, p_stake: stake }),
     // Ordres crypto : la fonction serveur lit le vrai prix chez Coinbase au moment de l'ordre.
-    cryptoOrder: async body => {
-      const { data, error } = await sb.functions.invoke("crypto", { body });
-      if (error) { let msg = error.message; try { msg = (await error.context.json()).error ?? msg } catch { } throw new Error(msg) }
-      if (data?.error) throw new Error(data.error);
-      return normBet(data);
-    },
+    cryptoOrder: body => invoke("crypto", body),
+    // Bourse d'Aurelys : cours jusqu'à maintenant (jamais au-delà), bougies, actualités publiées, ordres par le serveur.
+    aurFeed: since => rpc("aur_feed", { p_since: since ? new Date(since * 1000).toISOString() : null }),
+    aurHistory: (tk, minutes) => rpc("aur_history", { p_tk: tk, p_minutes: minutes }),
+    aurNews: () => rows(sb.from("aur_news").select("*").order("id", { ascending: false }).limit(150)),
+    aurOrder: body => invoke("aurelys", body),
     restart: () => rpc("restart"),
     settle: () => rpc("settle"),
     myBets: async minSession => (await rows(sb.from("bets").select("*").eq("user_id", uid).or(`status.eq.open,session.gte.${minSession}`).order("id", { ascending: false }))).map(normBet),

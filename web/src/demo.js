@@ -6,11 +6,12 @@ import stub from "./demo-stub.sql?raw";
 const migrations = Object.entries(import.meta.glob("../supabase/migrations/*.sql", { query: "?raw", import: "default", eager: true })).sort(([a], [b]) => a.localeCompare(b)).map(([, sql]) => sql);
 import { seedRows } from "./seed.js";
 import { normBet, normStream, normMarket, normBoard } from "./api.js";
+import { initState, advance, slip } from "../supabase/functions/_shared/aurelys.js";
 
 const UID = "00000000-0000-4000-8000-000000000001";
 
 export async function demoApi(engine) {
-  const db = new PGlite("idb://wikibourse-demo-6"); // changer le numéro quand la migration change
+  const db = new PGlite("idb://wikibourse-demo-7"); // changer le numéro quand la migration change
   const ready = (await db.query("select to_regclass('public.bets') is not null as ok")).rows[0].ok;
   if (!ready) {
     await db.exec(stub);
@@ -25,6 +26,23 @@ export async function demoApi(engine) {
   const listeners = new Set();
   const all = async (sql, args) => { try { return (await db.query(sql, args)).rows } catch (e) { throw new Error(e.message) } };
   const act = async (sql, args) => { const [r] = await all(sql, args); listeners.forEach(f => f()); return r };
+
+  // Bourse d'Aurelys : en démo, la simulation tourne dans le navigateur tant que la page est ouverte (5 s d'avance).
+  let S = (await all("select state from aur_state"))[0]?.state ?? null, from = S?.t ?? null, busy = false;
+  const step = async () => {
+    if (busy) return; busy = true;
+    try {
+      const until = Math.floor(Date.now() / 1000) + 5;
+      S ??= initState(Date.now() / 1000);
+      if (S.t < until) {
+        const out = advance(S, until, await all("select * from aur_take_orders()"));
+        await db.query("select aur_store($1, $2, $3, $4)", [from, S, JSON.stringify(out.ticks), JSON.stringify(out.news)]);
+        from = S.t;
+      }
+      if ((await all("select aur_settle() as n"))[0].n) listeners.forEach(f => f());
+    } catch (e) { console.error(e) } finally { busy = false }
+  };
+  await step(); setInterval(step, 2000);
 
   return {
     mode: "demo", uid: UID,
@@ -46,6 +64,14 @@ export async function demoApi(engine) {
       return normBet(body.action === "open"
         ? await act("select * from crypto_open($1, $2, $3, $4, $5, $6)", [UID, body.sym, body.dir, body.lev, body.stake, px])
         : await act("select * from crypto_close($1, $2, $3)", [UID, body.id, px]));
+    },
+    aurFeed: async since => (await all("select aur_feed($1) as f", [since ? new Date(since * 1000).toISOString() : null]))[0].f,
+    aurHistory: async (tk, minutes) => (await all("select aur_history($1, $2) as h", [tk, minutes]))[0].h,
+    aurNews: () => all("select * from aur_news where t <= now() order by id desc limit 150"),
+    aurOrder: async body => {
+      if (body.action === "open") return normBet(await act("select * from aur_open($1, $2, $3, $4, $5, $6)", [UID, body.tk, body.dir, body.lev, body.stake, slip(S, body.tk, body.stake * body.lev)]));
+      const [b] = await all("select aur, stake, lev from bets where id = $1", [body.id]);
+      return normBet(await act("select * from aur_close($1, $2, $3)", [UID, body.id, slip(S, b.aur, b.stake * b.lev)]));
     },
     restart: () => act("select * from restart()"),
     settle: async () => (await all("select settle() as n"))[0].n,
