@@ -97,8 +97,8 @@ test("question du jour : le pic d'aujourd'hui battra-t-il celui d'hier ?", async
   await db.query("select settle()");
   const { rows: [m] } = await db.query("select * from stream_markets where kind = 'peak'");
   assert.equal(m.threshold, 1200000);
-  const { rows: [o] } = await db.query("select * from open_markets() where kind = 'peak'");
-  assert.ok(new Date(o.bet_until) - new Date(Number(d) * 1000) === 18 * 3600e3, "paris ouverts jusqu'à 18 h");
+  assert.ok(new Date(m.bet_until) - new Date(Number(d) * 1000) === 18 * 3600e3, "paris ouverts jusqu'à 18 h");
+  await db.query("update stream_markets set bet_until = now() + interval '1 hour' where id = $1", [m.id]); // le test peut tourner après 18 h
   const { rows: [b] } = await db.query("select * from bet_question($1, 'yes', 100)", [m.id]);
   await db.query("update stream_markets set closes_at = now() - interval '1 second' where id = $1", [m.id]);
   await db.query("insert into stream_ticks (login, at, viewers, live) values ('steam:730', now() - interval '10 minutes', 1250000, true)");

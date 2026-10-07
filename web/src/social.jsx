@@ -1,17 +1,10 @@
-// Comptes (e-mail, Apple), classement des gains, amis et guildes.
+// Comptes (e-mail), classement des gains, amis et guildes.
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 const City = lazy(() => import("./City.jsx")); // Three.js n'est chargé qu'à l'ouverture d'une ville
 import { W, sW, cls } from "./format.js";
 import { Segmented, SubHeader } from "./nav.jsx";
 
 // ===== Comptes =====
-const APPLE = "M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.3-1.8-1.4-.1-2.8.8-3.5.8s-1.8-.8-3-.8c-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 6.9 1.2 9.2.8 1.1 1.7 2.3 2.9 2.3 1.1 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.2.9-1.3 1.2-2.5 1.3-2.6-.1 0-2.4-.9-2.4-3.7zM14.1 5.9c.6-.8 1.1-1.8.9-2.9-.9 0-2 .6-2.7 1.4-.6.7-1.1 1.7-.9 2.8 1 .1 2.1-.5 2.7-1.3z";
-export const AppleButton = ({ label, onClick }) => (
-  <button type="button" className="btn apple" onClick={onClick}>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d={APPLE} fill="currentColor" /></svg>{label}
-  </button>
-);
-
 // Petit formulaire : un état « en cours », un message de réussite ou d'erreur.
 function useAct() {
   const [busy, setBusy] = useState(false), [msg, setMsg] = useState(null);
@@ -20,14 +13,12 @@ function useAct() {
   return [act, busy, out];
 }
 
-// Se connecter à un compte existant (Apple ou e-mail et mot de passe).
+// Se connecter à un compte existant (e-mail et mot de passe).
 export function LoginPanel({ account, warn }) {
   const [email, setEmail] = useState(""), [pw, setPw] = useState(""), [act, busy, out] = useAct();
   return (
     <form className="auth" onSubmit={e => { e.preventDefault(); act(() => account.emailSignIn(email, pw)) }}>
       {warn && <p className="muted small">Ta partie actuelle n'a pas de compte : elle sera remplacée par celle du compte.</p>}
-      <AppleButton label="Se connecter avec Apple" onClick={() => act(() => account.appleSignIn())} />
-      <span className="or">ou</span>
       <input type="email" autoComplete="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)} required />
       <input type="password" autoComplete="current-password" placeholder="Mot de passe" value={pw} onChange={e => setPw(e.target.value)} required />
       <button className="btn primary" type="submit" disabled={busy}>Se connecter</button>
@@ -44,7 +35,7 @@ export function AccountLink({ account }) {
   const [email, setEmail] = useState(""), [pw, setPw] = useState(""), [act, busy, out] = useAct();
   useEffect(() => { account.user().then(setU).catch(() => setU(null)) }, [account]);
   if (!u) return null;
-  const apple = u.identities?.some(i => i.provider === "apple"), mail = u.identities?.some(i => i.provider === "email");
+  const mail = u.identities?.some(i => i.provider === "email");
   const needPw = account.recovery || (mail && !u.user_metadata?.pw);
   return (
     <div className="panel auth-panel">
@@ -60,7 +51,6 @@ export function AccountLink({ account }) {
       ) : u.is_anonymous ? (login ? <><LoginPanel account={account} warn /><button type="button" className="link" onClick={() => setLogin(false)}>Retour</button></> : <>
         <p className="muted">Ta partie n'est liée à aucun compte. Lie-la pour la garder et la retrouver sur un autre appareil.</p>
         {u.new_email && <p className="accent">Lien envoyé à {u.new_email}. Ouvre-le pour confirmer ton e-mail.</p>}
-        <AppleButton label="Continuer avec Apple" onClick={() => act(() => account.appleLink())} />
         {form ? (
           <form className="auth" onSubmit={e => { e.preventDefault(); act(() => account.emailLink(email), `Lien envoyé à ${email}. Ouvre-le, puis choisis ton mot de passe.`) }}>
             <input type="email" autoComplete="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
@@ -70,8 +60,7 @@ export function AccountLink({ account }) {
         {out}
         <button type="button" className="link" onClick={() => setLogin(true)}>Déjà un compte ? Se connecter</button>
       </>) : <>
-        <p className="muted">Connecté{apple ? " avec Apple" : ""}{u.email ? ` · ${u.email}` : ""}. Ta partie est sauvegardée.</p>
-        {!apple && <AppleButton label="Lier aussi Apple" onClick={() => act(() => account.appleLink())} />}
+        <p className="muted">Connecté{u.email ? ` · ${u.email}` : ""}. Ta partie est sauvegardée.</p>
         <button type="button" className="btn" disabled={busy} onClick={() => act(() => account.signOut())}>Se déconnecter</button>
         {out}
       </>}

@@ -13,7 +13,7 @@ import { initState, advance, slip } from "../supabase/functions/_shared/aurelys.
 const UID = "00000000-0000-4000-8000-000000000001";
 
 export async function demoApi() {
-  const db = new PGlite("idb://wikibourse-demo-11"); // changer le numéro quand la migration change
+  const db = new PGlite("idb://wikibourse-demo-12"); // changer le numéro quand la migration change
   const ready = (await db.query("select to_regclass('public.bets') is not null as ok")).rows[0].ok;
   if (!ready) {
     await db.exec(stub);
@@ -39,6 +39,7 @@ export async function demoApi() {
       if (S.t < until) {
         const out = advance(S, until, await all("select * from aur_take_orders()"));
         await db.query("select aur_store($1, $2, $3, $4)", [from, S, JSON.stringify(out.ticks), JSON.stringify(out.news)]);
+        if (out.listing.length) await db.query("select aur_listing($1)", [JSON.stringify(out.listing)]);
         from = S.t;
       }
       if ((await all("select aur_settle() as n"))[0].n) listeners.forEach(f => f());
@@ -62,9 +63,14 @@ export async function demoApi() {
     aurHistory: async (tk, minutes) => (await all("select aur_history($1, $2) as h", [tk, minutes]))[0].h,
     aurTicks: async (tk, minutes) => (await all("select aur_ticks_of($1, $2) as k", [tk, minutes]))[0].k,
     aurXp: async () => (await all("select my_aur_xp() as n"))[0].n,
+    aurStocks: () => all("select * from aur_stocks order by status, tk"),
+    aurSubscribe: (tk, amount) => act("select * from aur_subscribe($1, $2)", [tk, amount]),
+    myHoldings: () => all("select * from my_holdings()"),
     aurNews: () => all("select * from aur_news where t <= now() order by id desc limit 150"),
     aurOrder: async body => {
       if (body.action === "open") return normBet(await act("select * from aur_open($1, $2, $3, $4, $5, $6)", [UID, body.tk, body.dir, body.lev, body.stake, slip(S, body.tk, body.stake * body.lev)]));
+      if (body.action === "buy") return act("select * from aur_buy($1, $2, $3, $4)", [UID, body.tk, body.amount, slip(S, body.tk, body.amount)]);
+      if (body.action === "sell") { const [{ p }] = await all("select holding_price($1) as p", [body.tk]); return act("select * from aur_sell($1, $2, $3, $4)", [UID, body.tk, body.qty, slip(S, body.tk, body.qty * p)]) }
       const [b] = await all("select aur, stake, lev from bets where id = $1", [body.id]);
       return normBet(await act("select * from aur_close($1, $2, $3)", [UID, body.id, slip(S, b.aur, b.stake * b.lev)]));
     },

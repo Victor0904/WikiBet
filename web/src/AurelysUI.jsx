@@ -1,8 +1,8 @@
 // Bourse d'Aurelys : tableau de bord, liste des actions, actualités, carte thermique, fiche entreprise, carte de position.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { STOCKS, BY, SECTORS, REGIMES, CHARACTERS, INDEX, FEE, CAP_MULT, LINKS, SPM, DAY, EPOCH_S, gameClock, gameMin, calendar, sma, bollinger, rsi } from "../supabase/functions/_shared/aurelys.js";
+import { STOCKS, BY, SECTORS, REGIMES, CHARACTERS, INDEX, FEE, CAP_MULT, LINKS, IPO, SPM, DAY, EPOCH_S, gameClock, gameMin, calendar, sma, bollinger, rsi } from "../supabase/functions/_shared/aurelys.js";
 import { dayOpen } from "./aurelys.js";
-import { STORIES } from "./aurelys-stories.js";
+import { STORIES } from "../supabase/functions/_shared/aurelys-stories.js";
 import { W, sW, nf0, nf2, pct, cls, clock } from "./format.js";
 import { tradeValue, liqPrice } from "./engine.js";
 import { Spark, PositionChart } from "./charts.jsx";
@@ -20,6 +20,10 @@ const agoTxt = ms => { const s = Math.max(0, Math.round(ms / 1000)); return s < 
 // Derniers cours pour une mini-courbe : bougies d'une heure d'Aurelys, ou cours minute par minute tant qu'il y a peu de bougies.
 const closesOf = (aur, tk, n) => { const c = (aur.candles[tk] ?? []).slice(-n).map(k => k[4]); return c.length >= 5 ? c : (aur.ticks[tk] ?? []).map(k => k[1]) };
 const chgOf = (aur, tk, now) => { const p = aur.quotes[tk]?.p, o = dayOpen(aur, tk, sec(now)); return p && o ? p / o - 1 : 0 };
+
+// Fiche d'une entreprise : histoire écrite à la main (cote principale) ou générée par le moteur (jeunes pousses).
+const info = tk => STORIES[tk] ?? BY[tk] ?? {};
+const paras = t => (t ?? "").split("\n\n").filter(Boolean);
 
 export const TkIcon = ({ tk, size = 34 }) => (
   <span className="coin-icon tk-icon" style={{ background: BY[tk]?.color ?? "var(--panel2)", width: size, height: size, fontSize: size * .3 }} aria-hidden="true">{tk}</span>
@@ -49,9 +53,9 @@ const REG_TXT = {
 const MAJOR = new Set(["resultats", "essai", "scandale", "produit", "taux", "crise", "baleine", "suspension", "reel", "macro"]);
 const isMajor = n => MAJOR.has(n.cat) || Math.abs(n.sent) >= .7;
 
-const VIEWS = [["board", "Tableau de bord"], ["list", "Actions"], ["news", "Actualités"], ["heat", "Carte"]];
-export function AurelysMarket({ aur, now, bets, onPick, onDetail }) {
-  const [view, setView] = useState("board");
+const VIEWS = [["board", "Tableau de bord"], ["list", "Actions"], ["news", "Journal"], ["heat", "Carte"]];
+export function AurelysMarket({ aur, now, bets, onPick, onDetail, onSubscribe }) {
+  const [view, setView] = useState("board"), [read, setRead] = useState(null);
   const live = aur.live;
   return (
     <section>
@@ -61,10 +65,11 @@ export function AurelysMarket({ aur, now, bets, onPick, onDetail }) {
       <div className="chips" role="group" aria-label="Vue">
         {VIEWS.map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}
       </div>
-      {view === "board" ? <Board aur={aur} now={now} onDetail={onDetail} onNews={() => setView("news")} />
-        : view === "list" ? <List aur={aur} now={now} bets={bets} onPick={onPick} onDetail={onDetail} />
-        : view === "news" ? <News aur={aur} now={now} onDetail={onDetail} />
+      {view === "board" ? <Board aur={aur} now={now} onDetail={onDetail} onNews={() => setView("news")} onRead={setRead} />
+        : view === "list" ? <List aur={aur} now={now} bets={bets} onPick={onPick} onDetail={onDetail} onSubscribe={onSubscribe} onRead={setRead} />
+        : view === "news" ? <News aur={aur} now={now} onDetail={onDetail} onRead={setRead} />
         : <Heat aur={aur} now={now} onDetail={onDetail} />}
+      {read && <Article n={read} now={now} onClose={() => setRead(null)} onDetail={tk => { setRead(null); onDetail(tk) }} />}
       <p className="fine">Marché entièrement fictif : entreprises, personnages, cours et actualités sont simulés. Les prix naissent des ordres de bots (fondamentalistes, suiveurs de tendance, contrariens, chartistes, petits porteurs), de baleines et des joueurs : un gros ordre fait bouger le cours. Frais de 0,1 % du montant engagé à l'ouverture et à la clôture.</p>
     </section>
   );
@@ -84,12 +89,12 @@ const CalRow = ({ e, aur, now }) => {
   return <div className="row"><span>{e.title}{c != null && <small className="cons"> · attendu {signed(c)}</small>}</span><b className="mono">{gwhen(e.at, now)}</b></div>;
 };
 
-function Board({ aur, now, onDetail, onNews }) {
+function Board({ aur, now, onDetail, onNews, onRead }) {
   const x = aur.x, reg = REGIMES[x?.reg ?? "calme"], idx = closesOf(aur, INDEX, 36);
   // Palmarès figé une heure d'Aurelys (5 min réelles) pour ne pas bouger sous le doigt.
   const slot = Math.floor(now / 300000);
   const movers = useMemo(() => STOCKS.map(s => ({ s, c: chgOf(aur, s.tk, now) })).sort((a, b) => b.c - a.c), [slot, aur.ok]); // eslint-disable-line
-  const cal = calendar(sec(now), 4), last = aur.news.filter(isMajor).slice(0, 3);
+  const cal = calendar(sec(now), 4, aur.young), last = aur.news.filter(isMajor).slice(0, 3);
   return (
     <div className="aur-board">
       <div className="panel">
@@ -117,48 +122,88 @@ function Board({ aur, now, onDetail, onNews }) {
       </div>
       <div className="panel">
         <h2>Dernières actualités <button type="button" className="btn ghost" onClick={onNews}>Tout voir</button></h2>
-        {last.map(n => <NewsItem key={n.id} n={n} now={now} onDetail={onDetail} />)}
+        {last.map(n => <NewsItem key={n.id} n={n} now={now} onDetail={onDetail} onRead={onRead} />)}
         {!last.length && <p className="muted small">Les premières nouvelles arrivent.</p>}
       </div>
     </div>
   );
 }
 
-function List({ aur, now, bets, onPick, onDetail }) {
+function List({ aur, now, bets, onPick, onDetail, onSubscribe, onRead }) {
   const mine = tk => bets.some(b => b.kind === "aurelys" && b.aur === tk);
+  const row = s => {
+    const q = aur.quotes[s.tk], c = chgOf(aur, s.tk, now), v = closesOf(aur, s.tk, 60), young = !STORIES[s.tk];
+    return (
+      <div key={s.tk} className={"mrow" + (mine(s.tk) ? " mine" : "")}>
+        <button type="button" className="name who as-link" onClick={() => onDetail(s.tk)} aria-label={`Fiche de ${s.name}`}>
+          <TkIcon tk={s.tk} /><span><b>{s.name}{LINKS[s.tk] && <i className="real-tag" title={LINKS[s.tk].src}>réel</i>}{young && <i className="risk-tag">risqué</i>}</b><small>{q?.halt ? "cotation suspendue" : info(s.tk).what}</small></span>
+        </button>
+        {v.length > 1 ? <Spark path={v} t={v.length - 1} /> : <span />}
+        <span className="r mono"><b>{px(q?.p)}</b><small className={cls(c)}>{q ? pct(c) : ""}</small></span>
+        <span className="act">
+          <button type="button" className="buy" disabled={!q || q.halt} onClick={() => onPick(s.tk, "up")} aria-label={`Hausse sur ${s.name}`}>▲</button>
+          <button type="button" className="sell" disabled={!q || q.halt} onClick={() => onPick(s.tk, "down")} aria-label={`Baisse sur ${s.name}`}>▼</button>
+        </span>
+      </div>
+    );
+  };
+  const news = tk => aur.news.find(n => n.tk == null && n.cat === "ipo" && n.title.startsWith(BY[tk]?.name));
   return (
-    <div className="market">
-      <div className="mrow head"><span>Société</span><span /><span className="r">Cours · jour</span><span /></div>
-      {STOCKS.map(s => {
-        const q = aur.quotes[s.tk], c = chgOf(aur, s.tk, now), v = closesOf(aur, s.tk, 60);
-        return (
-          <div key={s.tk} className={"mrow" + (mine(s.tk) ? " mine" : "")}>
-            <button type="button" className="name who as-link" onClick={() => onDetail(s.tk)} aria-label={`Fiche de ${s.name}`}>
-              <TkIcon tk={s.tk} /><span><b>{s.name}{LINKS[s.tk] && <i className="real-tag" title={LINKS[s.tk].src}>réel</i>}</b><small>{q?.halt ? "cotation suspendue" : STORIES[s.tk].what}</small></span>
-            </button>
-            {v.length > 1 ? <Spark path={v} t={v.length - 1} /> : <span />}
-            <span className="r mono"><b>{px(q?.p)}</b><small className={cls(c)}>{q ? pct(c) : ""}</small></span>
-            <span className="act">
-              <button type="button" className="buy" disabled={!q || q.halt} onClick={() => onPick(s.tk, "up")} aria-label={`Hausse sur ${s.name}`}>▲</button>
-              <button type="button" className="sell" disabled={!q || q.halt} onClick={() => onPick(s.tk, "down")} aria-label={`Baisse sur ${s.name}`}>▼</button>
-            </span>
-          </div>
-        );
-      })}
-    </div>
+    <>
+      {aur.rounds.length > 0 && <>
+        <h3 className="sec">Levées de fonds <span className="muted small">avant l'entrée en bourse</span></h3>
+        {aur.rounds.map(d => (
+          <article key={d.tk} className="panel round">
+            <div className="round-h"><TkIcon tk={d.tk} size={30} /><span><b>{d.name}</b><small className="muted">{d.what} · {SECTORS[d.sector]?.name}</small></span>
+              <span className="r mono"><b>{px(d.roundPrice)} Ꜷ</b><small>clôture {d.roundEnds ? gwhen(d.roundEnds, now) : "—"}</small></span></div>
+            <p className="small">{d.story}</p>
+            <div className="empty-acts">
+              <button type="button" className="btn primary" onClick={() => onSubscribe(d.tk)}>Souscrire</button>
+              {news(d.tk) && <button type="button" className="btn" onClick={() => onRead(news(d.tk))}>Lire l'annonce</button>}
+            </div>
+            <p className="muted small">Réservé aux joueurs qui ont {W(IPO.minWealth)} de patrimoine, {IPO.maxShare * 100} % du patrimoine au plus. Le premier cours peut être bien au-dessus… ou en dessous.</p>
+          </article>
+        ))}
+      </>}
+      <h3 className="sec">Cote principale</h3>
+      <div className="market">
+        <div className="mrow head"><span>Société</span><span /><span className="r">Cours · jour</span><span /></div>
+        {STOCKS.map(row)}
+      </div>
+      <h3 className="sec">Jeunes pousses <span className="muted small">très volatiles, radiées sous {Math.round(IPO.delist * 100)} % de leur prix d'introduction</span></h3>
+      {aur.young.length ? <div className="market">{aur.young.map(row)}</div> : <p className="muted small">Aucune pour l'instant : la prochaine levée de fonds arrive.</p>}
+    </>
   );
 }
 
 const CAT = { resultats: "Résultats", essai: "Essai clinique", contrat: "Contrat", scandale: "Scandale", pdg: "Déclaration", analyste: "Analyste", rumeur: "Rumeur",
-  produit: "Produit", meteo: "Météo", baleine: "Baleine", crise: "Crise", marche: "Marché", macro: "Macro", taux: "Banque Centrale", secteur: "Secteur", suspension: "Suspension", reel: "Chiffre réel" };
-function NewsItem({ n, now, onDetail }) {
+  produit: "Produit", meteo: "Météo", baleine: "Baleine", crise: "Crise", marche: "Marché", macro: "Macro", taux: "Banque Centrale", secteur: "Secteur", suspension: "Suspension", reel: "Chiffre réel",
+  ipo: "Introduction en bourse", faillite: "Faillite" };
+// Un article du Courrier d'Aurelys, lu en entier.
+function Article({ n, now, onClose, onDetail }) {
+  useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
+  const s = n.tk ? BY[n.tk] : null;
+  return (
+    <div className="scrim" onClick={e => e.target === e.currentTarget && onClose()}>
+      <article className="sheet paper" role="dialog" aria-modal="true" aria-label={n.title}>
+        <div className="sheet-h"><span className="paper-kicker">{CAT[n.cat] ?? n.cat}{n.fiab < .5 ? " · rumeur non confirmée" : ""}</span><button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button></div>
+        <h2 className="paper-title">{n.title}</h2>
+        <p className="paper-meta mono">Le Courrier d'Aurelys · {gwhen(n.at, now)} · {agoTxt(now - n.at)}</p>
+        {paras(n.body).map((p, i) => <p key={i} className={i ? "paper-p" : "paper-lead"}>{p}</p>)}
+        {s && BY[s.tk]?.status !== "round" && <button type="button" className="btn" onClick={() => onDetail(s.tk)}>Voir la fiche de {s.name}</button>}
+      </article>
+    </div>
+  );
+}
+
+function NewsItem({ n, now, onDetail, onRead }) {
   const tone = n.sent > .15 ? "up" : n.sent < -.15 ? "down" : "flat", s = n.tk ? BY[n.tk] : null;
   return (
     <article className={"news" + (isMajor(n) ? " major" : "")}>
       <span className={"nbadge " + tone} aria-label={tone === "up" ? "bonne nouvelle" : tone === "down" ? "mauvaise nouvelle" : "neutre"}>{tone === "up" ? "▲" : tone === "down" ? "▼" : "●"}</span>
       <div>
-        <p className="ntitle">{n.title}</p>
-        {n.body && <p className="muted small">{n.body}</p>}
+        <button type="button" className="as-link ntitle" onClick={() => onRead?.(n)}>{n.title}</button>
+        {n.body && <p className="muted small chapo">{paras(n.body)[0]}</p>}
         <p className="nmeta">
           {s ? <button type="button" className="as-link ntk" onClick={() => onDetail(s.tk)}>{s.tk}</button> : n.sector ? <span>{SECTORS[n.sector]?.name}</span> : null}
           <span className={isMajor(n) ? "major-tag" : ""}>{CAT[n.cat] ?? n.cat}</span>
@@ -170,17 +215,25 @@ function NewsItem({ n, now, onDetail }) {
   );
 }
 
-function News({ aur, now, onDetail }) {
+function News({ aur, now, onDetail, onRead }) {
   const [f, setF] = useState("Tout"), [shown, setShown] = useState(null), [major, setMajor] = useState(false);
   const top = aur.news[0]?.id ?? 0, lim = shown ?? top;
   useEffect(() => { if (shown == null && top) setShown(top) }, [top, shown]);
   const fresh = aur.news.filter(n => n.id > lim).length;
   const list = aur.news.filter(n => n.id <= lim && (!major || isMajor(n)) && (f === "Tout" || n.sector === f || BY[n.tk]?.sector === f || (f === "Marché" && !n.tk && !n.sector)));
+  const une = list.find(isMajor) ?? list[0], c = gameClock(now / 1000);
   return (
     <div>
+      <div className="paper-mast"><b>Le Courrier d'Aurelys</b><span className="mono">Jour {c.day} · édition de {c.hm}</span></div>
+      {une && <button type="button" className="paper-une" onClick={() => onRead(une)}>
+        <span className="paper-kicker">À la une · {CAT[une.cat] ?? une.cat}</span>
+        <span className="paper-title">{une.title}</span>
+        <span className="paper-lead">{paras(une.body)[0]}</span>
+        <span className="accent small">Lire l'article →</span>
+      </button>}
       <div className="panel">
         <h2>Calendrier</h2>
-        {calendar(sec(now), 6).map(e => <CalRow key={e.m + (e.tk ?? "")} e={e} aur={aur} now={now} />)}
+        {calendar(sec(now), 6, aur.young).map(e => <CalRow key={e.m + (e.tk ?? "")} e={e} aur={aur} now={now} />)}
         <p className="muted small">Avant un rendez-vous, le marché est nerveux : la volatilité monte.</p>
       </div>
       <div className="chips" role="group" aria-label="Filtre">
@@ -188,7 +241,7 @@ function News({ aur, now, onDetail }) {
         {["Tout", "Marché", ...Object.keys(SECTORS)].map(k => <button key={k} type="button" aria-pressed={f === k} onClick={() => setF(k)}>{SECTORS[k]?.name ?? k}</button>)}
       </div>
       {fresh > 0 && <button type="button" className="btn fresh" onClick={() => setShown(top)}>↑ {fresh} nouvelle{fresh > 1 ? "s" : ""}</button>}
-      <div className="news-list">{list.length ? list.map(n => <NewsItem key={n.id} n={n} now={now} onDetail={onDetail} />) : <p className="muted pad">Aucune actualité pour l'instant.</p>}</div>
+      <div className="news-list">{list.length ? list.filter(n => n !== une).map(n => <NewsItem key={n.id} n={n} now={now} onDetail={onDetail} onRead={onRead} />) : <p className="muted pad">Aucune actualité pour l'instant.</p>}</div>
     </div>
   );
 }
@@ -318,7 +371,7 @@ function Alerts({ tk, last, alerts, setAlerts, max }) {
   );
 }
 
-export function AurelysDetail({ tk, aur, api, now, onPick, onClose, alerts = [], setAlerts, alertsMax = 1 }) {
+export function AurelysDetail({ tk, aur, api, now, onPick, onInvest, onClose, alerts = [], setAlerts, alertsMax = 1 }) {
   const s = BY[tk], q = aur.quotes[tk], c = chgOf(aur, tk, now);
   const [g, setG] = useState(15), [ind, setInd] = useState({ mm20: true, mm50: false, boll: false, rsi: false }), [long, setLong] = useState([]), [mins, setMins] = useState([]), [mark, setMark] = useState(null);
   // Assez d'historique pour 80 bougies et une MM 50 : bougies d'une heure d'Aurelys, ou cours des 2 dernières heures réelles.
@@ -332,14 +385,14 @@ export function AurelysDetail({ tk, aur, api, now, onPick, onClose, alerts = [],
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
   const live = aur.ticks[tk] ?? [], lastMin = mins.length ? mins[mins.length - 1][0] : 0;
   const cs = g < 60 ? group([...mins, ...live.filter(k => k[0] > lastMin)], g, true) : group([...long, ...(aur.candles[tk] ?? []).filter(k => k[0] > (long.at(-1)?.[0] ?? 0))], g);
-  const vol = realizedVol(long), cons = aur.x?.cons?.[tk], sig = aur.x?.sig?.[tk], nextRes = calendar(sec(now), 40).find(e => e.tk === tk);
+  const vol = realizedVol(long), cons = aur.x?.cons?.[tk], sig = aur.x?.sig?.[tk], nextRes = calendar(sec(now), 40, aur.young).find(e => e.tk === tk);
   const eps = aur.x?.eps?.[tk], news = aur.news.filter(n => n.tk === tk || n.sector === s.sector || (!n.tk && !n.sector));
   const people = CHARACTERS.filter(p => p.tk === tk);
   return (
     <div className="scrim" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet detail" role="dialog" aria-modal="true" aria-label={s.name}>
         <div className="sheet-h">
-          <span className="who"><TkIcon tk={tk} size={38} /><span><b className="detail-name">{s.name}</b><small className="muted">{tk} · {SECTORS[s.sector].name}</small></span></span>
+          <span className="who"><TkIcon tk={tk} size={38} /><span><b className="detail-name">{s.name}</b><small className="muted">{tk} · {SECTORS[s.sector].name}{!STORIES[tk] ? " · jeune pousse" : ""}</small></span></span>
           <button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button>
         </div>
         <div className="detail-price"><b className="mono">{px(q?.p)}</b><span className={"mono " + cls(c)}>{q?.halt ? "cotation suspendue" : `${c >= 0 ? "▲" : "▼"} ${pct(c)} jour`}</span></div>
@@ -348,11 +401,12 @@ export function AurelysDetail({ tk, aur, api, now, onPick, onClose, alerts = [],
           {MM.map(([k, l, col]) => <button key={k} type="button" aria-pressed={ind[k]} onClick={() => setInd(x => ({ ...x, [k]: !x[k] }))}><i style={{ background: col }} aria-hidden="true" />{l}</button>)}
         </div>
         <AurChart cs={cs} g={g} last={q?.p} ind={ind} marks={aur.news.filter(n => n.tk === tk)} onMark={setMark} />
-        {mark && <p className="small mark-note"><b>{gwhen(mark.at, now)}</b> {mark.title}</p>}
+        {mark && <Article n={mark} now={now} onClose={() => setMark(null)} onDetail={() => setMark(null)} />}
         <div className="qbtns">
           <button type="button" className="buy" disabled={!q || q.halt} onClick={() => onPick(tk, "up")}><span>▲ Hausse</span></button>
           <button type="button" className="sell" disabled={!q || q.halt} onClick={() => onPick(tk, "down")}><span>▼ Baisse</span></button>
         </div>
+        <button type="button" className="btn invest-btn" disabled={!q || q.halt} onClick={() => onInvest(tk)}>Investir : acheter des actions (sans levier, à garder)</button>
         {setAlerts && <Alerts tk={tk} last={q?.p} alerts={alerts} setAlerts={setAlerts} max={alertsMax} />}
         {nextRes && <div className="panel cons-box">
           <p className="small"><b>Prochains résultats</b> · {gwhen(nextRes.at, now)}</p>
@@ -364,8 +418,8 @@ export function AurelysDetail({ tk, aur, api, now, onPick, onClose, alerts = [],
           <p className="muted small">Ces chiffres sont réels et à venir : celui qui anticipe (une sortie de jeu, une canicule, un long week-end) a un temps d'avance.</p>
         </div>}
         <div className="story">
-          <p className="small"><b>{STORIES[tk].what}</b> · fondée en {STORIES[tk].since}</p>
-          <p className="small">{STORIES[tk].story}</p>
+          <p className="small"><b>{info(tk).what}</b> · fondée en {info(tk).since}</p>
+          <p className="small">{info(tk).story}</p>
           <p className="small muted">{s.desc}</p>
         </div>
         <div className="rows mono">
@@ -378,7 +432,7 @@ export function AurelysDetail({ tk, aur, api, now, onPick, onClose, alerts = [],
         </div>
         {people.map(p => <p key={p.name} className="small"><b>{p.name}</b>, {p.role.toLowerCase()} : {p.bio}</p>)}
         <h2>Actualités</h2>
-        {news.slice(0, 8).map(n => <NewsItem key={n.id} n={n} now={now} onDetail={() => {}} />)}
+        {news.slice(0, 8).map(n => <NewsItem key={n.id} n={n} now={now} onDetail={() => {}} onRead={setMark} />)}
         {!news.length && <p className="muted small">Rien de neuf pour l'instant.</p>}
       </div>
     </div>

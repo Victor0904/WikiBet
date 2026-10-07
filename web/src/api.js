@@ -13,7 +13,7 @@ export async function connect() {
   const url = import.meta.env.VITE_SUPABASE_URL, key = import.meta.env.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) return (await import("./demo.js")).demoApi();
 
-  // Retour d'un lien e-mail ou d'Apple : lien de nouveau mot de passe, ou erreur à afficher. Lu avant que Supabase ne nettoie l'adresse.
+  // Retour d'un lien e-mail : lien de nouveau mot de passe, ou erreur à afficher. Lu avant que Supabase ne nettoie l'adresse.
   const back = new URLSearchParams(location.hash.slice(1) + "&" + location.search.slice(1));
   const recovery = back.get("type") === "recovery", authError = back.get("error_description");
   if (authError) history.replaceState(null, "", location.pathname);
@@ -43,7 +43,7 @@ export async function connect() {
   // Écart entre l'horloge du téléphone et celle du serveur, pour que tout le monde voie la même minute.
   const t0 = Date.now(), st = await rpc("server_time"), offset = Date.parse(st) - (t0 + Date.now()) / 2;
 
-  // Comptes : la partie anonyme devient un vrai compte en liant un e-mail ou Apple (même identifiant, rien n'est perdu).
+  // Comptes : la partie anonyme devient un vrai compte en liant un e-mail (même identifiant, rien n'est perdu).
   const home = location.origin + location.pathname;
   const auth = async (p, reload) => { const { data, error } = await p; if (error) throw new Error(authMsg(error)); if (reload) location.replace(home); return data };
 
@@ -53,8 +53,6 @@ export async function connect() {
       recovery, error: authError && authMsg({ message: authError }),
       landed: !!(back.get("type") || authError), // retour d'un lien : on ouvre Mon compte
       user: async () => (await sb.auth.getUser()).data.user,
-      appleSignIn: () => auth(sb.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: home } })),
-      appleLink: () => auth(sb.auth.linkIdentity({ provider: "apple", options: { redirectTo: home } })),
       emailLink: email => auth(sb.auth.updateUser({ email }, { emailRedirectTo: home })),
       setPassword: password => auth(sb.auth.updateUser({ password, data: { pw: true } }), true),
       emailSignIn: (email, password) => auth(sb.auth.signInWithPassword({ email, password }), true),
@@ -76,6 +74,9 @@ export async function connect() {
     aurHistory: (tk, minutes) => rpc("aur_history", { p_tk: tk, p_minutes: minutes }),
     aurTicks: (tk, minutes) => rpc("aur_ticks_of", { p_tk: tk, p_minutes: minutes }),
     aurXp: () => rpc("my_aur_xp"),
+    aurStocks: () => rows(sb.from("aur_stocks").select("*").order("status").order("tk")),
+    aurSubscribe: (tk, amount) => rpc("aur_subscribe", { p_tk: tk, p_amount: amount }),
+    myHoldings: () => rpc("my_holdings"),
     aurNews: () => rows(sb.from("aur_news").select("*").order("id", { ascending: false }).limit(150)),
     aurOrder: body => invoke("aurelys", body),
     restart: () => rpc("restart"),
@@ -120,9 +121,6 @@ export async function connect() {
 function authMsg(e) {
   const m = `${e.code ?? ""} ${e.message ?? ""}`;
   return /invalid_credentials|Invalid login/i.test(m) ? "E-mail ou mot de passe incorrect."
-    : /provider is not enabled|Unsupported provider/i.test(m) ? "La connexion Apple n'est pas encore activée sur le serveur."
-    : /manual_linking|Manual linking/i.test(m) ? "La liaison de compte n'est pas activée sur le serveur."
-    : /identity_already_exists|already linked/i.test(m) ? "Ce compte Apple est déjà lié à une autre partie : utilise « Se connecter »."
     : /email_exists|already been registered|already registered/i.test(m) ? "Cet e-mail a déjà un compte : connecte-toi."
     : /weak_password|at least 6/i.test(m) ? "Mot de passe trop court : 8 caractères au moins."
     : /email_not_confirmed|not confirmed/i.test(m) ? "Confirme d'abord ton e-mail avec le lien reçu."

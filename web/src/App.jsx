@@ -76,13 +76,14 @@ function Game({ api }) {
   const [me, setMe] = useState(undefined), [bets, setBets] = useState([]), [board, setBoard] = useState([]);
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
   const [aurDetail, setAurDetail] = useState(null), [liveSrc, setLiveSrc] = useState("twitch"), [posView, setPosView] = useState("open"), [more, setMore] = useState(null);
-  useEffect(() => { if (api.account?.landed) { setTab("more"); setMore("account") } }, [api]); // retour d'un lien e-mail ou d'Apple
+  useEffect(() => { if (api.account?.landed) { setTab("more"); setMore("account") } }, [api]); // retour d'un lien e-mail
   // « Comment jouer » s'ouvre tout seul à la première visite.
   const [firstVisit, setFirstVisit] = useState(() => { try { return !localStorage.getItem("wb-howto") } catch { return false } });
   const [pref, setPref] = useState({ lev: 5, shorizon: "15", stake: 500 });
   const say = useCallback((text, tone) => { setToast({ text, tone, at: Date.now() }) }, []);
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 2600); return () => clearTimeout(id) }, [toast]);
 
+  const [holds, setHolds] = useState([]), [invest, setInvest] = useState(null); // portefeuille d'actions (sans levier)
   const [catalog, setCatalog] = useState([]), [inv, setInv] = useState({}), [rain, setRain] = useState(0), [visit, setVisit] = useState(null);
   useEffect(() => { if (!catalog.length) api.shopItems().then(setCatalog).catch(() => {}) }, [api, board, catalog.length]); // réessaie à chaque rafraîchissement tant qu'il est vide
   const known = useRef(null); // statut de chaque pari au chargement précédent, pour fêter les gains
@@ -91,10 +92,10 @@ function Game({ api }) {
   const histFrom = k - Math.round(perks.hist * 1440 / 11); // séances de 11 min
   const refresh = useCallback(async () => {
     try {
-      const [m, b, l, i] = await Promise.all([api.me(), api.myBets(histFrom), api.leaderboard().catch(() => []), api.inventoryOf(api.uid).catch(() => [])]); // classement et QG : facultatifs, le jeu tourne sans
+      const [m, b, l, i, h] = await Promise.all([api.me(), api.myBets(histFrom), api.leaderboard().catch(() => []), api.inventoryOf(api.uid).catch(() => []), api.myHoldings().catch(() => [])]); // classement, QG, portefeuille : facultatifs, le jeu tourne sans
       const prev = known.current, won = prev ? b.filter(x => x.status === "won" && prev.get(x.id) === "open") : [];
       known.current = new Map(b.map(x => [x.id, x.status]));
-      setMe(m); setBets(b); setBoard(l); setInv(Object.fromEntries(i.map(r => [r.item_id, r])));
+      setMe(m); setBets(b); setBoard(l); setInv(Object.fromEntries(i.map(r => [r.item_id, r]))); setHolds(h.map(x => ({ ...x, qty: +x.qty, cost: +x.cost, price: +x.price })));
       if (won.length) { setToast({ text: `Gagné : ${sW(won.reduce((a, x) => a + x.payout - x.stake, 0))}`, tone: "up", at: Date.now() }); setRain(Date.now()) }
     } catch (e) { say(e.message, "down") }
   }, [api, histFrom, say]);
@@ -148,7 +149,8 @@ function Game({ api }) {
   const closeTrade = b => run(() => b.kind === "aurelys" ? api.aurOrder({ action: "close", id: b.id }) : api.closeTrade(b.id),
     r => `Clôturée : ${sW(r.payout - r.stake - feeOpen(r))}${feeOpen(r) ? ` (frais ${W(r.fees)})` : ""}`);
   const howtoDone = () => { try { localStorage.setItem("wb-howto", "1") } catch { } setFirstVisit(false); setMore(null); setTab("market") };
-  const patrimoine = me.cash + openStake + objectsValue;
+  const holdPx = h => h.status === "listed" || h.status === "core" ? aur.quotes[h.tk]?.p ?? h.price : h.price; // cours en direct
+  const patrimoine = me.cash + openStake + objectsValue + holds.reduce((a, h) => a + h.qty * holdPx(h), 0);
   const showHowto = firstVisit || (tab === "more" && more === "howto");
 
   return (
@@ -169,7 +171,7 @@ function Game({ api }) {
           {showHowto ? <HowTo first={firstVisit} onBack={firstVisit ? howtoDone : () => setMore(null)} /> : <>
           {(tab === "market" || tab === "live") && <MiniTicker now={now} byLogin={byLogin} aur={aur} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
 
-          {tab === "market" && <AurelysMarket aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onDetail={setAurDetail} />}
+          {tab === "market" && <AurelysMarket aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onDetail={setAurDetail} onSubscribe={tk => setInvest({ tk, mode: "round" })} />}
 
           {tab === "live" && <>
             <Segmented label="Live" value={liveSrc} onChange={setLiveSrc} options={[["twitch", "Twitch"], ["steam", "Steam"]]} />
@@ -177,8 +179,9 @@ function Game({ api }) {
           </>}
 
           {tab === "positions" && <>
-            <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` · ${open.length}` : ""}`], ["history", "Historique"]]} />
-            {posView === "open" ? <>
+            <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` · ${open.length}` : ""}`], ["folio", "Portefeuille"], ["history", "Historique"]]} />
+            {posView === "folio" ? <Portfolio holds={holds} px={holdPx} onSell={h => setInvest({ tk: h.tk, mode: "sell", qty: h.qty })} onBuy={tk => setInvest({ tk, mode: "buy" })} onMarket={() => go("market")} />
+            : posView === "open" ? <>
               {open.length ? <Positions vertical now={now} byLogin={byLogin} aur={aur} bets={open} onClose={closeTrade} />
                 : <div className="empty-state"><b>Aucun pari en cours</b><p className="muted">Prends position sur une action d'Aurelys ou réponds à une question en direct.</p>
                     <div className="empty-acts"><button type="button" className="btn primary" onClick={() => go("market")}>Marché</button><button type="button" className="btn" onClick={() => go("live")}>Live</button></div></div>}
@@ -208,7 +211,10 @@ function Game({ api }) {
 
       <Dock tab={showHowto && firstVisit ? null : tab} setTab={t => { if (firstVisit) howtoDone(); go(t) }} badge={open.length} />
 
-      {aurDetail && <AurelysDetail tk={aurDetail} aur={aur} api={api} now={now} alerts={alerts} setAlerts={setAlerts} alertsMax={perks.alerts} onClose={() => setAurDetail(null)} onPick={(tk, dir) => { setAurDetail(null); setTicket({ kind: "aurelys", tk, dir }) }} />}
+      {aurDetail && <AurelysDetail tk={aurDetail} aur={aur} api={api} now={now} alerts={alerts} setAlerts={setAlerts} alertsMax={perks.alerts} onClose={() => setAurDetail(null)} onPick={(tk, dir) => { setAurDetail(null); setTicket({ kind: "aurelys", tk, dir }) }}
+        onInvest={tk => { setAurDetail(null); setInvest({ tk, mode: "buy" }) }} />}
+      {invest && <InvestSheet {...invest} aur={aur} me={me} patrimoine={patrimoine} hold={holds.find(h => h.tk === invest.tk)} onClose={() => setInvest(null)}
+        onDone={async (args, ok) => { const r = await run(() => args.mode === "round" ? api.aurSubscribe(args.tk, args.amount) : api.aurOrder(args.mode === "buy" ? { action: "buy", tk: args.tk, amount: args.amount } : { action: "sell", tk: args.tk, qty: args.qty }), () => ok); if (r) setInvest(null) }} />}
       {ticket && <Ticket api={api} aur={aur} now={now} byLogin={byLogin} me={me} ticket={ticket} pref={pref} setPref={setPref} onClose={() => setTicket(null)}
         onSubmit={async args => {
           const opened = b => `Position ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} ouverte · ${W(b.stake)}`;
@@ -408,6 +414,7 @@ function History({ byLogin, bets }) {
         const label = b.kind === "trade" ? `${b.tk} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} · Wikipédia`
           : b.kind === "stream" ? `${byLogin[b.login]?.display_name ?? b.login} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} · Twitch`
           : b.kind === "crypto" ? `${b.sym} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} · crypto`
+          : b.kind === "invest" ? `${AUR[b.aur]?.name ?? b.aur} · actions vendues${b.payout === 0 ? " (faillite)" : ""}`
           : "Duel Wikipédia";
         if (b.kind === "aurelys") return (
           <div key={b.id} className="hrow">
@@ -434,6 +441,75 @@ function History({ byLogin, bets }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// Portefeuille : actions achetées sans levier (cote principale, jeunes pousses, levées en attente d'introduction).
+function Portfolio({ holds, px, onSell, onBuy, onMarket }) {
+  if (!holds.length) return <div className="empty-state"><b>Portefeuille vide</b><p className="muted">Ouvre la fiche d'une entreprise et choisis « Investir » : tu achètes des actions, sans levier, et tu les gardes aussi longtemps que tu veux. Certaines versent un dividende chaque jour d'Aurelys.</p>
+    <div className="empty-acts"><button type="button" className="btn primary" onClick={onMarket}>Marché</button></div></div>;
+  const tot = holds.reduce((a, h) => a + h.qty * px(h), 0), cost = holds.reduce((a, h) => a + h.cost, 0);
+  return (
+    <section>
+      <div className="panel folio-head"><span>Valeur du portefeuille</span><b className="mono">{W(tot)}</b><small className={"mono " + cls(tot - cost)}>{sW(tot - cost)} ({pct(tot / cost - 1)}) depuis l'achat</small></div>
+      <div className="history">
+        {holds.map(h => {
+          const p = px(h), val = h.qty * p, gain = val - h.cost, d = AUR[h.tk];
+          return (
+            <div key={h.tk} className="hrow folio-row">
+              <span><b>{d?.name ?? h.tk}{h.status === "round" ? " · levée en cours" : h.status === "listed" ? " · jeune pousse" : ""}</b>
+                <small>{nf2.format(h.qty)} actions · achat moyen {aurPx(h.cost / h.qty)} · cours {aurPx(p)}{d?.div ? ` · dividende ${nf2.format(d.div)} %/an` : ""}</small></span>
+              <span className="r mono"><b>{W(val)}</b><small className={cls(gain)}>{sW(gain)}</small></span>
+              {h.status !== "round" && <span className="folio-acts">
+                <button type="button" className="btn ghost" onClick={() => onBuy(h.tk)}>Acheter</button>
+                <button type="button" className="btn ghost" onClick={() => onSell(h)}>Vendre</button>
+              </span>}
+            </div>
+          );
+        })}
+      </div>
+      <p className="fine">Pas de levier, pas de liquidation : la valeur suit le cours. Les jeunes pousses peuvent faire faillite (sous 15 % de leur prix d'introduction), et leurs actions sont alors perdues. Frais de 0,1 % à l'achat et à la vente ; un gros ordre fait bouger le cours.</p>
+    </section>
+  );
+}
+
+// Acheter, vendre ou souscrire à une levée de fonds.
+function InvestSheet({ tk, mode, qty: q0, aur, me, patrimoine, hold, onClose, onDone }) {
+  const d = AUR[tk], round = mode === "round", sell = mode === "sell", [amount, setAmount] = useState(round ? 1000 : 500), [share, setShare] = useState(1), [busy, setBusy] = useState(false);
+  useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
+  const p = round ? d?.roundPrice : aur.quotes[tk]?.p ?? 0, qty = sell ? (q0 ?? 0) * share : 0;
+  const notional = sell ? qty * p : amount, sl = round ? 0 : slipEstimate(tk, notional, Date.now() / 1000, aur.x?.reg), fee = round ? 0 : notional * FEE;
+  const exec = p * (1 + (sell ? -sl : sl)), maxRound = Math.max(0, Math.floor(.2 * patrimoine - (hold?.cost ?? 0)));
+  const gate = round && patrimoine < 50000, ok = !busy && !gate && (sell ? qty > 0 : amount > 0 && amount + fee <= me.cash && (!round || amount <= maxRound));
+  const title = round ? `Souscrire à ${d?.name}` : sell ? `Vendre des actions ${d?.name}` : `Investir dans ${d?.name}`;
+  return (
+    <div className="scrim" onClick={e => e.target === e.currentTarget && onClose()}>
+      <form className="sheet" role="dialog" aria-modal="true" aria-label={title} onSubmit={async e => { e.preventDefault(); if (!ok) return; setBusy(true);
+        await onDone({ mode, tk, amount, qty }, round ? `Souscription de ${W(amount)} à ${d?.name}` : sell ? `Vendu ${nf2.format(qty)} actions` : `${W(amount)} investis dans ${d?.name}`); setBusy(false) }}>
+        <div className="sheet-h"><b>{title}</b><button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button></div>
+        {gate && <p className="error small">Les levées de fonds sont réservées aux joueurs qui ont 50 000 W de patrimoine (tu en as {W(patrimoine)}).</p>}
+        {sell ? <>
+          <label>Part à vendre</label>
+          <div className="seg" role="group" aria-label="Part à vendre">{[[.25, "25 %"], [.5, "50 %"], [1, "Tout"]].map(([v, l]) => <button key={v} type="button" aria-pressed={share === v} onClick={() => setShare(v)}>{l}</button>)}</div>
+        </> : <>
+          <label htmlFor="inv-amount">Montant</label>
+          <div className="stake"><input id="inv-amount" className="mono" type="number" inputMode="numeric" min="1" value={amount} onChange={e => setAmount(Math.max(0, Math.floor(+e.target.value || 0)))} /><span>W</span></div>
+          <div className="chips">{[500, 2000, 10000].map(v => <button key={v} type="button" onClick={() => setAmount(v)}>{nf0.format(v)}</button>)}
+            <button type="button" onClick={() => setAmount(round ? Math.min(maxRound, Math.floor(me.cash)) : Math.floor(me.cash / (1 + FEE)))}>Max</button></div>
+        </>}
+        <div className="rows mono">
+          <div className="row"><span>{round ? "Prix de la levée" : "Cours actuel"}</span><b>{aurPx(p)}</b></div>
+          {!round && <div className="row"><span>Impact de ton ordre (estimé)</span><b>{sell ? "−" : "+"}{nf2.format(sl * 100)} %</b></div>}
+          <div className="row"><span>{sell ? "Actions vendues" : "Actions obtenues (environ)"}</span><b>{nf2.format(sell ? qty : amount / (exec || 1))}</b></div>
+          {!round && <div className="row"><span>Frais (0,1 %)</span><b>{W(fee)}</b></div>}
+          {sell && <div className="row"><span>Tu recevras (environ)</span><b>{W(qty * exec - fee)}</b></div>}
+          {round && <div className="row"><span>Encore possible (20 % du patrimoine)</span><b>{W(maxRound)}</b></div>}
+        </div>
+        <p className="muted small">{round ? "Le premier cours sera fixé par le marché à l'introduction en bourse : il peut être bien au-dessus du prix de la levée… ou en dessous. Une jeune pousse peut aussi faire faillite."
+          : "Sans levier : ta mise suit le cours, sans liquidation. Le prix exact est calculé par le serveur."}</p>
+        <button type="submit" className={"btn big " + (sell ? "sell" : "buy")} disabled={!ok}>{round ? `Souscrire · ${W(amount)}` : sell ? `Vendre · ${W(qty * exec - fee)}` : `Acheter · ${W(amount)}`}</button>
+      </form>
     </div>
   );
 }

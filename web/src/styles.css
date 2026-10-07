@@ -485,9 +485,6 @@ button:active:not(:disabled) { transform: scale(.96) }
 .auth input, .add-row input { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; font-size: 16px; color: var(--ink); min-width: 0 }
 .auth-panel { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px }
 .auth-panel > p { margin: 0; font-size: 14px }
-.btn.apple { display: flex; align-items: center; justify-content: center; gap: 8px; background: #fff; color: #000; border-color: #fff; padding: 11px 14px; font-size: 15px }
-.btn.apple svg { width: 18px; height: 18px; margin-top: -2px }
-.or { text-align: center; color: var(--faint); font-size: 12px }
 .link { background: none; border: 0; color: var(--accent); font-size: 14px; padding: 6px 0; text-align: center }
 .link:disabled { color: var(--faint) }
 .small { font-size: 13px }
@@ -531,3 +528,30 @@ button:active:not(:disabled) { transform: scale(.96) }
 .city { display: flex; flex-direction: column; gap: 10px }
 .city p { margin: 0 }
 .city-scene { height: 380px; background: radial-gradient(ellipse at 50% 30%, #23304a 0%, var(--panel) 75%) }
+
+/* ===== Portefeuille, levées de fonds, journal ===== */
+.risk-tag { font: 600 10px var(--f-mono); font-style: normal; color: var(--down); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-left: 6px; vertical-align: 2px }
+.round { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; border-color: color-mix(in srgb, var(--accent) 45%, var(--line)) }
+.round p { margin: 0 }
+.round-h { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center }
+.round-h span:nth-child(2) { display: flex; flex-direction: column; min-width: 0 }
+.round-h .r small { display: block; font-size: 11px; color: var(--faint) }
+.invest-btn { width: 100%; margin-top: 6px }
+.folio-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px }
+.folio-head span { font-size: 12px; color: var(--faint); text-transform: uppercase; letter-spacing: .04em }
+.folio-head b { font-size: 24px }
+.folio-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px }
+.folio-acts { grid-column: 1 / -1; display: flex; gap: 6px; justify-content: flex-end }
+.paper-mast { display: flex; justify-content: space-between; align-items: baseline; border-top: 3px double var(--ink); border-bottom: 1px solid var(--ink); padding: 8px 2px; margin-bottom: 10px }
+.paper-mast b { font: italic 700 22px Georgia, "Times New Roman", serif; letter-spacing: .01em }
+.paper-mast span { font-size: 11px; color: var(--muted) }
+.paper-une { display: flex; flex-direction: column; gap: 6px; width: 100%; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 12px; color: inherit }
+.paper-kicker { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); font-weight: 600 }
+.paper-title { font: 700 21px/1.25 Georgia, "Times New Roman", serif; margin: 0 }
+.paper-lead { font: 15px/1.55 Georgia, "Times New Roman", serif; color: var(--ink) }
+.paper-p { font: 15px/1.6 Georgia, "Times New Roman", serif; color: var(--muted); margin: 0 }
+.paper-meta { font-size: 11px; color: var(--faint); margin: 0 }
+.sheet.paper { gap: 12px }
+.sheet.paper .paper-lead { margin: 0; font-weight: 600 }
+.ntitle.as-link { display: block; font-weight: 600; text-align: left }
+.chapo { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden }

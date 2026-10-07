@@ -92,6 +92,8 @@ async function tick(lead: number) {
     if (!from && row) await admin.from("aur_state").delete().eq("id", 1); // ancien format
     const { error } = await admin.rpc("aur_store", { p_from: from, p_state: S, p_ticks: out.ticks, p_news: out.news });
     if (error && !/conflit|duplicate/.test(error.message)) throw error; // un autre appel a déjà fait avancer le marché
+    // Annonces, introductions et radiations de jeunes pousses : seulement si ce pas a bien été enregistré.
+    if (!error && out.listing.length) must(await admin.rpc("aur_listing", { p_defs: out.listing }));
   }
   return { t: S.t, liquidated: must(await admin.rpc("aur_settle")) };
 }
@@ -111,8 +113,19 @@ Deno.serve(async req => {
 
     if (body.action === "open") {
       const lev = Number(body.lev), stake = Number(body.stake);
-      if (!BY[body.tk] || !["up", "down"].includes(body.dir) || ![1, 5, 10].includes(lev) || !(stake > 0)) return json({ error: "Ordre invalide." }, 400);
+      if (!(BY[body.tk] || row.state.extra?.[body.tk]) || !["up", "down"].includes(body.dir) || ![1, 5, 10].includes(lev) || !(stake > 0)) return json({ error: "Ordre invalide." }, 400);
       const { data, error } = await admin.rpc("aur_open", { p_user: user.id, p_tk: body.tk, p_dir: body.dir, p_lev: lev, p_stake: stake, p_slip: slip(row.state, body.tk, stake * lev) });
+      return error ? json({ error: error.message }, 400) : json(data);
+    }
+    // Portefeuille : acheter pour un montant, vendre une quantité (sans levier). L'impact se calcule comme pour un ordre.
+    if (body.action === "buy") {
+      const amount = Number(body.amount); if (!(amount > 0)) return json({ error: "Montant invalide." }, 400);
+      const { data, error } = await admin.rpc("aur_buy", { p_user: user.id, p_tk: body.tk, p_amount: amount, p_slip: slip(row.state, body.tk, amount) });
+      return error ? json({ error: error.message }, 400) : json(data);
+    }
+    if (body.action === "sell") {
+      const qty = Number(body.qty), { data: q } = await admin.rpc("holding_price", { p_tk: body.tk });
+      const { data, error } = await admin.rpc("aur_sell", { p_user: user.id, p_tk: body.tk, p_qty: qty, p_slip: slip(row.state, body.tk, qty * Number(q || 0)) });
       return error ? json({ error: error.message }, 400) : json(data);
     }
     if (body.action === "close") {
