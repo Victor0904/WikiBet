@@ -98,6 +98,7 @@ export async function demoApi() {
     cityCatalog: () => all("select * from city_catalog order by sort"),
     cityGive: (amount, kind) => act("select * from city_give($1, $2)", [amount, kind]),
     cityBuild: id => act("select * from city_build($1)", [id]),
+    cityBuyLand: () => act("select * from city_buy_land()"),
     shopItems: () => all("select * from shop_items order by sort"),
     trophies: user => all("select * from trophies($1)", [user]),
     inventoryOf: user => all("select item_id, qty, equipped from inventory where user_id = $1 and qty > 0", [user]),

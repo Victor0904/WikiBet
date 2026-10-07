@@ -123,10 +123,11 @@ export function createCity(parent, onPick) {
     renderer.setSize(w, h, false);
     Object.assign(camera, { left: -view * asp / 2, right: view * asp / 2, top: view / 2, bottom: -view / 2 }); camera.updateProjectionMatrix();
   }
-  function build({ members, buildings, accent, color = accent, name = "", tag = "", party = false }) {
+  function build({ members, buildings, accent, color = accent, name = "", tag = "", party = false, land = 0 }) {
     if (city) { scene.remove(city); city.traverse(o => { o.geometry?.dispose(); o.material?.emissiveMap?.dispose(); o.material?.dispose?.() }) }
     city = new THREE.Group(); lit = []; picks = []; movers = []; bulbs = []; online = [];
-    const n = members.length, ring = Math.max(1, Math.ceil(Math.sqrt(n + 9))), size = ring * 2.4 + 2; R = size / 2 + 1;
+    // Chaque parcelle achetée ajoute un anneau de terrain : la ville respire.
+    const n = members.length, ring = Math.max(3 + land, Math.ceil(Math.sqrt(n + 9))), size = ring * 2.4 + 2; R = size / 2 + 1;
     city.add(box(size + 2, .3, size + 2, mat(0x3d4a35), 0, -.3), box(size + 2.4, .2, size + 2.4, mat(0x2a2a2a), 0, -.45));
     // Rues en croix et place centrale.
     city.add(box(size + 2, .02, 1, mat(0x3a3d44)), box(1, .02, size + 2, mat(0x3a3d44)), box(8.4, .03, 8.4, mat(0xb8ad98)));
@@ -229,7 +230,7 @@ export function createCity(parent, onPick) {
   raf = requestAnimationFrame(loop);
   const ro = new ResizeObserver(frame); ro.observe(parent);
   return {
-    update(next) { const k = JSON.stringify([next.members, next.buildings, next.accent, next.color, next.name, next.party]); if (k !== key) { key = k; build(next) } daylight(next.hour) },
+    update(next) { const k = JSON.stringify([next.members, next.buildings, next.accent, next.color, next.name, next.party, next.land]); if (k !== key) { key = k; build(next) } daylight(next.hour) },
     snapshot(caption) {
       renderer.render(scene, camera);
       const src = renderer.domElement, c = document.createElement("canvas"); c.width = src.width; c.height = src.height + 90;

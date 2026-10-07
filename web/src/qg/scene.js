@@ -11,11 +11,11 @@ const km = (name, opts) => { const h = new THREE.Group(); h.userData.flat = true
 // Par logement : taille de la pièce, sol, murs, largeur de la fenêtre (part du mur du fond).
 // Petites pièces au départ (moins de vide), murs plus chauds : on doit avoir envie d'y être.
 const HOMES = [
-  { size: 4.8, floor: 0x7a5a40, wall: 0x4a4258, win: 0.4 },  // chambre
-  { size: 6.6, floor: 0x8a6a4b, wall: 0x3f3a52, win: 0.42 }, // studio
-  { size: 8, floor: 0x6e6258, wall: 0x2f3346, win: 0.6 },    // open space
-  { size: 9.5, floor: 0x4a3528, wall: 0x7a3b2e, win: 0.5 },  // loft (briques)
-  { size: 11.5, floor: 0xd4d0c8, wall: 0x1c2030, win: 0.9 }, // penthouse
+  { size: 6, floor: 0x7a5a40, wall: 0x4a4258, win: 0.4 },     // chambre
+  { size: 8.5, floor: 0x8a6a4b, wall: 0x3f3a52, win: 0.42 },  // studio
+  { size: 10.5, floor: 0x6e6258, wall: 0x2f3346, win: 0.55 }, // open space
+  { size: 12.5, floor: 0x4a3528, wall: 0x7a3b2e, win: 0.5 },  // loft (briques)
+  { size: 15, floor: 0xd4d0c8, wall: 0x1c2030, win: 0.9 },    // penthouse
 ];
 const WALL = [3.2, 3.2, 3.4, 3.8, 4.8]; // hauteur des murs par logement : le penthouse est en double hauteur
 
@@ -126,7 +126,7 @@ function buildItems(ids, S, accent, screens) {
   const wood = mat(0x7a5537), dark = mat(0x1a1d26), metal = mat(0x9aa3b5, { metalness: .6, roughness: .3 });
   const deskX = c + 2.3, deskZ = c + .9, top = .78;
   // Mobilier de base, offert : un lit (chambre et studio) et une affiche, pour que la pièce ne paraisse pas vide.
-  if (S < 7) {
+  if (S < 9) { // chambre et studio
     const sheet = mat(0xe9e2d4), wood2 = mat(0x5a3d28);
     out.push(km("bedDouble", { x: c + S - .9, z: c + S - 1.25, size: 2.05, ry: Math.PI / 2,
       fallback: group(box(1.25, .35, 2.1, wood2), box(1.15, .18, 2, sheet, 0, .35), box(1.15, .12, .45, mat(accent), 0, .53, -.7), box(1.25, .8, .1, wood2, 0, 0, -1.05)) }));
@@ -214,6 +214,20 @@ function structure(level, S, H, accent) {
   const c = -S / 2, out = [], A = new THREE.Color(accent), metal = mat(0x3a3f4a, { metalness: .6, roughness: .35 }), wood = mat(0x8a6a4b), white = mat(0xeeeae2);
   const glass = new THREE.MeshStandardMaterial({ color: 0xbfe6ff, transparent: true, opacity: .22, roughness: .1 });
   const pendant = (x, z, y) => { const l = new THREE.PointLight(0xffc98a, .9, 4); l.position.set(x, y - .4, z); out.push(cyl(.01, .01, .6, metal, x, y - .6, z), cyl(.05, .2, .2, mat(0x1a1a1a), x, y - .8, z), l) };
+  // Une maison bien habitée : coins verts, salon (télévision, canapé), salle à manger, éclairages. Les pièces sont grandes ;
+  // ces meubles remplissent l'espace sans gêner les objets achetés (placés le long des murs du fond et de gauche).
+  out.push(km("plantSmall3", { x: c + S - .4, z: c + S - .4, size: .45 }), km("pottedPlant", { x: c + .45, z: c + S - 1.3, size: .55 }));
+  if (level >= 1 && level < 4) { // salon au premier plan
+    const sx = c + S * (level === 1 ? .4 : .5), sz = c + S - .95;
+    out.push(km("loungeSofa", { x: sx, z: sz, size: 2.1, ry: Math.PI }), km("tableCoffee", { x: sx, z: sz - 1.15, size: 1 }),
+      km("cabinetTelevision", { x: sx, z: sz - 2.4, size: 1.3 }), km("televisionModern", { x: sx, z: sz - 2.45, y: .5, size: 1.1 }),
+      km("rugRectangle", { x: sx, z: sz - 1.2, size: 3 }), km("lampRoundFloor", { x: sx - 1.5, z: sz, size: .45 }), km("loungeChair", { x: sx + 1.6, z: sz - 1.2, size: .9, ry: -Math.PI / 2 }));
+  }
+  if (level >= 2) { // salle à manger
+    const tx = c + S * .74, tz = c + S * .52;
+    out.push(km("table", { x: tx, z: tz, size: 1.5 }), ...[[0, -.75, 0], [0, .75, Math.PI], [-1.05, 0, Math.PI / 2], [1.05, 0, -Math.PI / 2]].map(([dx, dz, ry]) => km("chairCushion", { x: tx + dx, z: tz + dz, size: .5, ry })),
+      km("bookcaseClosedWide", { x: c + S - .35, z: tz, size: 1.6, ry: -Math.PI / 2 }), km("speakerSmall", { x: c + S - .4, z: tz + 1.4, size: .35, ry: -Math.PI / 2 }));
+  }
   if (level === 1) { // studio : cuisine le long du mur du fond
     out.push(km("kitchenFridge", { x: c + S - .4, z: c + .4, size: .7 }), km("kitchenCabinet", { x: c + S - 1.1, z: c + .4, size: .7 }),
       km("kitchenStove", { x: c + S - 1.8, z: c + .4, size: .7 }), km("kitchenCoffeeMachine", { x: c + S - 1.1, z: c + .35, y: .78, size: .3 }));
@@ -234,7 +248,7 @@ function structure(level, S, H, accent) {
       const pool = new THREE.Mesh(new THREE.BoxGeometry(2.6, .05, 1.6), new THREE.MeshStandardMaterial({ color: 0x2fa4d9, emissive: 0x0b5a7a, roughness: .1, metalness: .2 }));
       pool.position.set(c + 6.6, .06, c + S - 1.4); out.push(pool, box(2.9, .06, 1.9, white, c + 6.6, -.02, c + S - 1.4));
       out.push(km("loungeDesignSofa", { x: c + 3.2, z: c + S - 1, size: 2.4, ry: Math.PI }), km("tableCoffeeGlass", { x: c + 3.2, z: c + S - 2.3, size: 1.2 }),
-        km("rugRound", { x: c + 3.2, z: c + S - 2, size: 3 }), km("lampSquareFloor", { x: c + 1.6, z: c + S - .6, size: .5 }));
+        km("rugRound", { x: c + 3.2, z: c + S - 2, size: 3 }), km("lampRoundFloor", { x: c + 1.6, z: c + S - .6, size: .5 }));
       const chand = new THREE.PointLight(0xfff0d0, 1.6, 8); chand.position.set(c + S * .45, H - 1, c + S * .5);
       out.push(cyl(.5, .3, .25, mat(0xe8c547, { metalness: .9, roughness: .2, emissive: 0x3a2a00 }), c + S * .45, H - 1, c + S * .5), chand, plantPot(c + .6, c + .6), plantPot(c + S - .6, c + S - .6));
     }

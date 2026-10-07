@@ -67,3 +67,15 @@ test("ville : entretien selon les membres actifs, la ville s'endort sans Trésor
   await db.query("select city_daily()");
   assert.equal(Math.round(await cash(db, B)), Math.round(before + 150000), "une seule fois par jour");
 });
+
+test("ville : parcelles achetées par le fondateur avec le Trésor, de plus en plus chères", async () => {
+  const { db, g } = await city();
+  await db.query("update guilds set treasury = 30000");
+  await assert.rejects(db.query("select city_buy_land()"), /fondateur/);
+  await as(db, A);
+  await db.query("select city_buy_land()");                                  // 6 000
+  await db.query("select city_buy_land()");                                  // 24 000
+  await assert.rejects(db.query("select city_buy_land()"), /Trésor insuffisant/); // 54 000
+  const { rows: [{ v }] } = await db.query("select city_view($1) as v", [g.id]);
+  assert.equal(v.land, 2); assert.equal(v.treasury, 0); assert.equal(v.land_cost, 54000);
+});

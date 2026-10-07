@@ -11,7 +11,7 @@ function Scene({ v, accent, now, onVisit, onReady, party }) {
   pick.current = onVisit;
   useEffect(() => { try { sc.current = createCity(ref.current, m => pick.current(m)); onReady?.(sc.current) } catch (e) { setErr(e.message) } return () => sc.current?.dispose() }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const hour = gameClock(now / 1000).hour;
-  useEffect(() => { sc.current?.update({ members: v.members, buildings: v.buildings, accent, hour, color: v.color, name: v.name, tag: v.tag, party }) }, [v, accent, hour, party]);
+  useEffect(() => { sc.current?.update({ members: v.members, buildings: v.buildings, accent, hour, color: v.color, name: v.name, tag: v.tag, party, land: v.land }) }, [v, accent, hour, party]);
   return <div className="qg-scene city-scene" ref={ref}>{err && <p className="muted small pad">La 3D n'est pas disponible sur cet appareil.</p>}</div>;
 }
 
@@ -55,6 +55,13 @@ export default function City({ api, guildId, me, mine, say, onVisit, accent }) {
         <b>Objectifs de la semaine {party && <span className="up">· atteints, feu d'artifice sur la ville !</span>}</b>
         {GOALS.map(([k, l, n]) => <div key={k} className="goal"><span className="small">{nf0.format(Math.min(v.goals?.[k] ?? 0, n))} / {nf0.format(n)} {l}</span><span className="timebar"><i style={{ width: `${Math.min(100, (v.goals?.[k] ?? 0) / n * 100)}%` }} /></span></div>)}
         <p className="muted small">Ensemble, avant lundi. Fenêtres allumées : membres connectés. Fanal vert : membre en gain aujourd'hui.</p>
+      </div>
+      <div className="panel land">
+        <b>Terrain de la ville · {v.land ?? 0} / 6 parcelles</b>
+        <p className="muted small">Chaque parcelle ajoute un anneau de terrain autour de la ville : plus d'espace, des parcs, de la place pour les futurs membres.</p>
+        {v.land_cost == null ? <span className="muted small">Toutes les parcelles sont achetées.</span>
+          : boss ? <button type="button" className="btn primary" disabled={v.treasury < v.land_cost} onClick={() => run(() => api.cityBuyLand(), "Nouvelle parcelle : la ville s'agrandit")}>Acheter une parcelle · {W(v.land_cost)}</button>
+          : <span className="muted small">Prochaine parcelle : {W(v.land_cost)} du Trésor (décidé par le fondateur).</span>}
       </div>
       {boss && <Identity v={v} api={api} run={run} />}
       <p className="muted small">Un immeuble par membre : son allure suit son logement. Touche-le pour visiter son QG. La nuit d'Aurelys, les fenêtres s'allument.</p>

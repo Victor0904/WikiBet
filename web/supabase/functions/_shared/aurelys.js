@@ -13,12 +13,12 @@ export const EPOCH_S = Date.UTC(2026, 9, 1) / 1000; // jour 1, 00:00 d'Aurelys
 export const INDEX = "AUR12";
 export const FEE = 0.001;                         // 0,1 % du montant engagé, à l'ouverture et à la clôture
 export const CAP_MULT = 20;                       // exposition max d'un joueur par action = 20 × liquidité par minute
-const Y = 0.38, PERM = 0.3, TAU = 5;              // impact : constante (0,34 puis 0,38 : marché plus vivant), part permanente, décroissance du temporaire (ticks)
+const Y = 0.43, PERM = 0.3, TAU = 5;              // impact : constante (0,34, 0,38 puis 0,43 : marché plus vivant), part permanente, décroissance du temporaire (ticks)
 const FLOW = 0.55, GAP = 0.5;                                      // taille des ordres des bots, en part de la liquidité
 const VIX_BASE = 1.7e-7;                          // variance par tick de l'indice en marché calme (calibrée)
 
 // Volatilité de toute la cote, relevée de moitié (choix de Victor : un marché plus vivant). Les fiches affichent la valeur relevée.
-const VOLX = 1.5;
+const VOLX = 2.5; // 1,5 puis 2,5 : Victor veut un marché qui bouge franchement chaque jour d'Aurelys
 const LIQ = { haute: 60000, moyenne: 20000, faible: 6000 }; // W échangés par minute de jeu, en journée
 // Profondeur du carnet face à l'ordre d'un joueur (W) : un ordre de cette taille fait bouger le cours d'environ 0,43 σ jour.
 // Volontairement faible, pour que « plus on achète, plus ça monte » se voie : 25 000 W sur Solarmine ≈ 1 % de hausse.
@@ -351,7 +351,9 @@ const addSent = (S, key, s, t, hl) => (S.sent[key] ??= []).push([s, t, hl]);
 const impactOf = (s, q, act, gh, reg, pre) => Math.sign(q) * Y * (s.si / Math.sqrt(DAY)) * gh * REGIMES[reg].vol ** .7 * pre * Math.sqrt(Math.abs(q) / (s.L * act));
 const impact = (S, s, q, act) => impactOf(s, q, act, S.st[s.tk].gh, S.reg, soonEvent(s, S.t) ? 1.5 : 1);
 // Ordres des joueurs : même loi, mais face à la profondeur du carnet (DEPTH) et à la volatilité journalière.
-const playerImpactOf = (s, q, gh, reg) => Math.sign(q) * Y * s.sig * gh * REGIMES[reg].vol ** .7 * Math.sqrt(Math.abs(q) / s.depth);
+// PIMP : l'impact des joueurs ne suit pas la hausse de volatilité de la cote (il reste « 25 000 W sur Solarmine ≈ 1,4 % »).
+const PIMP = .53;
+const playerImpactOf = (s, q, gh, reg) => Math.sign(q) * Y * PIMP * s.sig * gh * REGIMES[reg].vol ** .7 * Math.sqrt(Math.abs(q) / s.depth);
 const playerImpact = (S, s, q) => playerImpactOf(s, q, S.st[s.tk].gh, S.reg);
 // Écart de prix subi par un joueur pour un ordre de `notional` W : ce qu'il paie en plus à l'achat, en moins à la vente.
 // Prix moyen d'exécution : la moitié du mouvement qu'il provoque.
@@ -400,7 +402,7 @@ function companyNews(S, R, out, s, cat, signed) {
   if (cat === "analyste" && R() < .5 && revision(S, R, out, s)) return;
   const c = CATS[cat], sign = signed ?? c.sign ?? (hint || (R() < .5 ? -1 : 1));
   // Les petites nouvelles pèsent selon le tempérament de l'action ; les gros événements gardent leur ampleur.
-  const mag = sign * between(R, c.mag) * (c.big ? .8 : .4 * s.sig / .02);
+  const mag = sign * between(R, c.mag) * (c.big ? 1.2 : .4 * s.sig / .02);
   const pool = T[cat][sign > 0 ? "up" : "down"] ?? T[cat].up;
   let title = fill(pick(R, pool), { N: s.name, X: pctTxt(Math.abs(mag) * (1 + R())), K: 50 + Math.floor(R() * 50), M: (1 + R() * 3).toFixed(1).replace(".", ",") });
   if (cat === "pdg" && s.tk !== "VLS" && /Varesko/.test(title)) title = fill(pick(R, T.pdg[sign > 0 ? "up" : "down"].slice(2)), { N: s.name });

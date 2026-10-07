@@ -103,6 +103,7 @@ export async function connect() {
     cityCatalog: () => rows(sb.from("city_catalog").select("*").order("sort")),
     cityGive: (amount, kind) => rpc("city_give", { p_amount: amount, p_kind: kind }),
     cityBuild: id => rpc("city_build", { p_building: id }),
+    cityBuyLand: () => rpc("city_buy_land"),
     shopItems: () => rows(sb.from("shop_items").select("*").order("sort")),
     trophies: user => rpc("trophies", { p_user: user }),
     inventoryOf: user => rows(sb.from("inventory").select("item_id,qty,equipped").eq("user_id", user).gt("qty", 0)),
