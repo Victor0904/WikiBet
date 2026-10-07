@@ -68,7 +68,7 @@ export function useAurelys(api, active) {
   return data.current;
 }
 
-// Cours au début du jour d'Aurelys en cours (2 h réelles), pour la variation « du jour ».
+// Cours au début du jour d'Aurelys en cours (1 h réelle), pour la variation « du jour ».
 export function dayOpen(aur, tk, sec) {
   const start = sec - ((sec - EPOCH_S) % (DAY * SPM)), cs = aur.candles[tk] ?? [];
   const k = cs.find(c => c[0] >= start) ?? cs[cs.length - 1];

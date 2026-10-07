@@ -37,7 +37,7 @@ function AurBar({ aur, now }) {
   const c = gameClock(sec(now)), reg = REGIMES[aur.x?.reg ?? "calme"], idx = aur.quotes[INDEX]?.p, ch = chgOf(aur, INDEX, now);
   return (
     <div className="aur-bar">
-      <span className="aur-clock mono" title="Heure d'Aurelys : une journée dure 2 h réelles"><small>Aurelys · jour {c.day}</small>{c.hm}</span>
+      <span className="aur-clock mono" title="Heure d'Aurelys : une journée dure 1 h réelle"><small>Aurelys · jour {c.day}</small>{c.hm}</span>
       <span className="aur-reg" title={REG_TXT[aur.x?.reg ?? "calme"]}><i aria-hidden="true">{reg.icon}</i>{reg.name}</span>
       <span className="r mono"><b>AUR-12 {px(idx)}</b><small className={cls(ch)}>{pct(ch)} jour</small></span>
     </div>
@@ -62,7 +62,7 @@ export function AurelysMarket({ aur, now, bets, onPick, onDetail, onSubscribe })
   const live = aur.live;
   return (
     <section>
-      <div className="feed-info"><i className={"pulse" + (live ? "" : " off")} aria-hidden="true" />{live ? "Bourse fictive, simulée en continu par des bots et les joueurs" : "Connexion au marché…"} · un jour d'Aurelys = 2 h réelles</div>
+      <div className="feed-info"><i className={"pulse" + (live ? "" : " off")} aria-hidden="true" />{live ? "Bourse fictive, simulée en continu par des bots et les joueurs" : "Connexion au marché…"} · un jour d'Aurelys = 1 h réelle</div>
       <AurBar aur={aur} now={now} />
       <Flash aur={aur} now={now} onDetail={onDetail} />
       <div className="chips" role="group" aria-label="Vue">
@@ -193,7 +193,7 @@ const CAT = { resultats: "Résultats", essai: "Essai clinique", contrat: "Contra
   ipo: "Introduction en bourse", faillite: "Faillite" };
 // Levée de fonds : temps restant (heure réelle), part du temps écoulé, montant déjà souscrit.
 function RoundClock({ d, now, stats }) {
-  const start = d.roundEnds - 4 * 3600e3, left = Math.max(0, d.roundEnds - now), h = Math.floor(left / 3600e3), m = Math.floor(left / 60e3) % 60;
+  const start = d.roundEnds - IPO.roundDays * DAY * SPM * 1000, left = Math.max(0, d.roundEnds - now), h = Math.floor(left / 3600e3), m = Math.floor(left / 60e3) % 60;
   return (
     <div className="round-clock">
       <div className="round-stats mono">

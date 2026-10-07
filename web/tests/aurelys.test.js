@@ -135,8 +135,16 @@ test("aurelys : ×10 réservé aux joueurs qui ont clôturé 30 positions", asyn
   assert.equal((await open(db, "up", 10, 100)).lev, 10);
 });
 
-test("aurelys : bougies d'une heure d'Aurelys (5 min réelles)", async () => {
+test("aurelys : bougies d'une heure d'Aurelys (2 min 30 réelles)", async () => {
   const db = await freshDb();
-  const { rows: [{ a, b }] } = await db.query("select aur_hour(to_timestamp($1)) as a, aur_hour(to_timestamp($2)) as b", [EPOCH_S + 299, EPOCH_S + 300]);
+  const { rows: [{ a, b }] } = await db.query("select aur_hour(to_timestamp($1)) as a, aur_hour(to_timestamp($2)) as b", [EPOCH_S + 60 * SPM - 1, EPOCH_S + 60 * SPM]);
   assert.equal(new Date(a).getTime() / 1000, EPOCH_S); assert.equal(new Date(b).getTime() / 1000, EPOCH_S + 60 * SPM);
+});
+
+test("aurelys : un état calculé à l'ancienne échelle (5 s par minute) garde ses dates réelles", () => {
+  const S = initState(EPOCH_S + 1e6, 2); S.spm = 5; S.t = Math.floor(1e6 / 5); S.nextIpo = S.t + 100; S.whales.kraken.until = S.t + 50;
+  const realIpo = EPOCH_S + S.nextIpo * 5;
+  advance(S, EPOCH_S + 1e6 + 1);
+  assert.equal(S.spm, SPM);
+  assert.ok(Math.abs(EPOCH_S + S.nextIpo * SPM - realIpo) <= SPM, "la prochaine levée garde son heure réelle");
 });

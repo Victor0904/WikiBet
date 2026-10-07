@@ -1,6 +1,6 @@
 // Portefeuille d'actions (sans levier) : valeur dans le temps, répartition, une carte par ligne.
 import { useMemo, useRef, useState } from "react";
-import { BY } from "../supabase/functions/_shared/aurelys.js";
+import { BY, SPM } from "../supabase/functions/_shared/aurelys.js";
 import { TkIcon, px as aurPx } from "./AurelysUI.jsx";
 import { Spark } from "./charts.jsx";
 import { W, sW, nf0, nf2, pct, cls, clock } from "./format.js";
@@ -60,7 +60,7 @@ export default function Portfolio({ holds, aur, px, onSell, onBuy, onMarket }) {
         <div className="folio-total"><small>Valeur du portefeuille</small><b className="mono">{W(tot)}</b>
           <span className={"mono " + cls(gain)}>{gain >= 0 ? "▲" : "▼"} {sW(gain)} · {pct(gain / cost)}</span></div>
         <ValueChart pts={pts} cost={cost} />
-        <p className="muted small">Valeur des actions que tu détiens{pts.length > 1 ? `, sur les ${Math.max(1, Math.round((pts.at(-1)[0] - pts[0][0]) / 300))} dernières heures d'Aurelys` : ""}. Pointillé : ce que tu as investi.</p>
+        <p className="muted small">Valeur des actions que tu détiens{pts.length > 1 ? `, sur les ${Math.max(1, Math.round((pts.at(-1)[0] - pts[0][0]) / (60 * SPM)))} dernières heures d'Aurelys` : ""}. Pointillé : ce que tu as investi.</p>
       </div>
       <div className="tiles">
         <div className="tile"><small>Investi</small><b className="mono">{W(cost)}</b></div>

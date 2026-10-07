@@ -2,21 +2,23 @@
 // Les prix ne sont pas dessinés : ils naissent des ordres des bots, des baleines et des joueurs (loi de la racine carrée),
 // et ces ordres réagissent aux actualités, aux régimes de marché et à la valeur fondamentale cachée.
 // Partagé par la fonction serveur « aurelys » (Deno), le mode démo (navigateur) et l'écran. Aucune dépendance.
-// 1 tick = 1 minute de jeu = SPM secondes réelles (une journée d'Aurelys dure 2 h). S.t compte les minutes de jeu depuis EPOCH_S.
+// 1 tick = 1 minute de jeu = SPM secondes réelles (une journée d'Aurelys dure 1 h). S.t compte les minutes de jeu depuis EPOCH_S.
 // Tout l'aléatoire passe par un générateur dont la graine est dans l'état : le même état rejoue exactement la même suite.
 
 import { STORIES } from "./aurelys-stories.js";
 
 export const DAY = 1440;                          // minutes de jeu par jour d'Aurelys
-export const SPM = 5;                             // secondes réelles par minute de jeu : un jour d'Aurelys = 2 h réelles
+export const SPM = 2.5;                           // secondes réelles par minute de jeu : un jour d'Aurelys = 1 h réelle
 export const EPOCH_S = Date.UTC(2026, 9, 1) / 1000; // jour 1, 00:00 d'Aurelys
 export const INDEX = "AUR12";
 export const FEE = 0.001;                         // 0,1 % du montant engagé, à l'ouverture et à la clôture
 export const CAP_MULT = 20;                       // exposition max d'un joueur par action = 20 × liquidité par minute
-const Y = 0.34, PERM = 0.3, TAU = 5;              // impact : constante, part permanente, décroissance du temporaire (ticks)
+const Y = 0.38, PERM = 0.3, TAU = 5;              // impact : constante (0,34 puis 0,38 : marché plus vivant), part permanente, décroissance du temporaire (ticks)
 const FLOW = 0.55, GAP = 0.5;                                      // taille des ordres des bots, en part de la liquidité
 const VIX_BASE = 1.7e-7;                          // variance par tick de l'indice en marché calme (calibrée)
 
+// Volatilité de toute la cote, relevée de moitié (choix de Victor : un marché plus vivant). Les fiches affichent la valeur relevée.
+const VOLX = 1.5;
 const LIQ = { haute: 60000, moyenne: 20000, faible: 6000 }; // W échangés par minute de jeu, en journée
 // Profondeur du carnet face à l'ordre d'un joueur (W) : un ordre de cette taille fait bouger le cours d'environ 0,43 σ jour.
 // Volontairement faible, pour que « plus on achète, plus ça monte » se voie : 25 000 W sur Solarmine ≈ 1 % de hausse.
@@ -48,7 +50,8 @@ export const STOCKS = [
   ["SLM", "Solarmine Lithium", "matieres", 12.4, 70, .038, 1.3, "faible", .07, 21, 0, "#1FCB8B", "Petite minière, cible favorite des baleines."],
   ["KST", "Kestrel Aéro", "industrie", 88.7, 45, .018, .9, "moyenne", .05, 22, 1.6, "#C2A633", "Aéronautique et contrats d'État."],
   ["OND", "Ondéo Live", "loisirs", 24.5, 50, .03, 1.2, "moyenne", .08, 35, 0, "#7C5CFF", "Plateforme de streaming : vit de l'audience des lives."],
-].map(([tk, name, sector, p0, shares, sig, beta, liq, mu, per, div, color, desc], i) => {
+].map(([tk, name, sector, p0, shares, sig0, beta, liq, mu, per, div, color, desc], i) => {
+  const sig = sig0 * VOLX;
   const sm = 0.006 * beta, ss = 0.005; // part du marché et du secteur dans la volatilité
   return { i, tk, name, sector, p0, shares: shares * 1e6, sig, beta, liq, L: LIQ[liq], depth: DEPTH[liq], mu, per, div, color, desc,
     si: Math.sqrt(Math.max((0.3 * sig) ** 2, sig * sig - sm * sm - ss * ss)) };
@@ -113,10 +116,10 @@ const BOTS = STOCKS.map(makeBots), BOTS_X = {}; // les bots d'une nouvelle entre
 const botsOf = s => BOTS[s.i] ?? (BOTS_X[s.tk] ??= makeBots(s));
 
 /* ===== Entreprises qui entrent en bourse (et en sortent) ===== */
-// Le moteur crée lui-même de jeunes entreprises : annonce et levée de fonds (2 jours d'Aurelys), introduction en bourse,
+// Le moteur crée lui-même de jeunes entreprises : annonce et levée de fonds (3 jours d'Aurelys, 3 h réelles), introduction en bourse,
 // puis cotation très volatile. Sous 15 % du prix d'introduction, c'est la faillite : l'action est radiée.
 // Leur « qualité » cachée (q) décide du premier cours et de la croissance à long terme : là est le pari.
-export const IPO = { roundDays: 2, maxYoung: 5, delist: .15, minWealth: 50000, maxShare: .2 };
+export const IPO = { roundDays: 3, maxYoung: 5, delist: .15, minWealth: 50000, maxShare: .2 };
 const defOf = (S, tk) => BY[tk] ?? S.extra?.[tk];
 const listed = S => S.extra ? STOCKS.concat(Object.values(S.extra).filter(d => d.status === "listed")) : STOCKS;
 const NAME_A = ["Lumi", "Verd", "Nova", "Aqua", "Célest", "Terra", "Opti", "Bio", "Néo", "Flux", "Orbi", "Sola", "Voxa", "Hélio", "Mari", "Crista", "Alti", "Zéna", "Pyro", "Sylva"];
@@ -325,7 +328,7 @@ export function initState(nowSec, seed = 20261001, last = {}) {
   const t = gameMin(nowSec), p0 = s => last[s.tk] ?? s.p0;
   const I = STOCKS.reduce((a, s) => a + p0(s) * s.shares, 0) / DIV;
   return {
-    t, rs: seed | 0, nid: 1, sig: {}, extra: {}, nextIpo: t + DAY / 2,
+    t, rs: seed | 0, nid: 1, sig: {}, extra: {}, nextIpo: t + DAY / 2, spm: SPM,
     reg: "calme", regAge: 0, crisisCd: 0,
     r: 3.0, g: 1.5, pi: 2.4, vix: VIX_BASE, idx: I, idxHi: I, idxH: [],
     sent: {}, follow: [], crisis: null, flash: 0, haltAll: 0,
@@ -364,6 +367,7 @@ export function advance(S, untilSec, orders = [], signals = null) {
   const out = { ticks: [], news: [] }, target = gameMin(untilSec);
   if (signals) S.sig = signals;
   S.extra ??= {}; out.listing = [];
+  if ((S.spm ?? 5) !== SPM) rescale(S);
   if (target - S.t > 300) S.t = target - 1; // longue coupure : le marché reprend là où il s'était arrêté
   const pending = {};
   for (const o of orders) pending[o.tk] = (pending[o.tk] ?? 0) + Number(o.q);
@@ -373,7 +377,7 @@ export function advance(S, untilSec, orders = [], signals = null) {
 
 function publish(S, out, n) {
   const body = n.cat === "ipo" || n.cat === "faillite" ? n.text : article(S, n);
-  const item = { id: S.nid++, t: realOf(S.t), tk: n.tk ?? null, sector: n.sector ?? null, cat: n.cat, title: n.title, text: body,
+  const item = { id: S.nid++, t: Math.round(realOf(S.t)), tk: n.tk ?? null, sector: n.sector ?? null, cat: n.cat, title: n.title, text: body,
     sent: Math.round(n.sent * 100) / 100, fiab: n.fiab ?? 1 };
   out.news.push(item);
   const all = listed(S), hl = n.hl ?? 240, keys = n.tk ? (S.st[n.tk] ? [n.tk] : []) : n.sector ? all.filter(s => s.sector === n.sector).map(s => s.tk) : all.map(s => s.tk);
@@ -606,12 +610,31 @@ function runCrisis(S, out) {
   if (c.i >= steps.length) { S.crisis = null; S.crisisCd = S.t + 1440 * 20 }
 }
 
-// SPM cours de a vers b (le dernier vaut b) : marche aléatoire ramenée sur b (pont brownien), pas de σ par seconde.
-function bridge(R, a, b, sd) {
-  const w = [0]; for (let k = 1; k <= SPM; k++) w.push(w[k - 1] + gauss(R) * sd);
-  const la = Math.log(a), lb = Math.log(b), out = [];
-  for (let k = 1; k <= SPM; k++) out.push(k === SPM ? b : Math.exp(la + (lb - la) * k / SPM + w[k] - w[SPM] * k / SPM));
-  return out;
+// Cours de a vers b aux fractions `fr` de la minute (0 < f ≤ 1) : marche aléatoire ramenée sur b (pont brownien).
+// sd : écart type sur une minute entière.
+function bridge(R, a, b, sd, fr) {
+  const pts = [...fr, 1], w = []; let prev = 0, acc = 0;
+  for (const f of pts) { acc += gauss(R) * sd * Math.sqrt(f - prev); prev = f; w.push(acc) }
+  const la = Math.log(a), lb = Math.log(b), w1 = w[w.length - 1];
+  return fr.map((f, k) => f >= 1 ? b : Math.exp(la + (lb - la) * f + w[k] - w1 * f));
+}
+// Secondes réelles entières de la minute de jeu t, et leur place dans la minute (2 ou 3 secondes quand SPM = 2,5).
+const secondsOf = t => { const a = realOf(t - 1), out = []; for (let u = Math.floor(a) + 1; u <= realOf(t); u++) out.push(u); return { secs: out, fr: out.map(u => (u - a) / SPM) } };
+
+// L'état garde l'échelle de temps avec laquelle il a été calculé ; si elle change, ses dates (en minutes de jeu) sont
+// converties pour tomber aux mêmes heures réelles : une levée, une baleine ou une suspension ne sautent pas d'un coup.
+function rescale(S) {
+  const k = (S.spm ?? 5) / SPM, r = v => typeof v === "number" && v > 0 ? Math.round(v * k) : v;
+  S.t = r(S.t); for (const f of ["crisisCd", "flash", "haltAll", "cbAll", "nextIpo"]) S[f] = r(S[f]);
+  if (S.crisis) S.crisis.t0 = r(S.crisis.t0);
+  for (const w of Object.values(S.whales)) { w.until = r(w.until); w.hint = r(w.hint) }
+  for (const key in S.next) S.next[key] = r(S.next[key]);
+  for (const key in S.lastCo ?? {}) S.lastCo[key] = r(S.lastCo[key]);
+  S.follow.forEach(f => { f.t = r(f.t) });
+  for (const key in S.sent) S.sent[key].forEach(e => { e[1] = r(e[1]) });
+  for (const x of Object.values(S.st)) { x.halt = r(x.halt); x.cb = r(x.cb); if (x.pat) x.pat.t0 = r(x.pat.t0) }
+  for (const d of Object.values(S.extra ?? {})) for (const f of ["roundEnd", "born", "ipoAt", "delistedAt"]) d[f] = r(d[f]);
+  S.spm = SPM;
 }
 
 /* ===== Un tick ===== */
@@ -654,7 +677,7 @@ function tick(S, R, out, pending) {
   const fear = 15 * Math.sqrt(S.vix / VIX_BASE), yr = 365 * DAY;
 
   let cap = 0, vol = 0, allHalt = S.haltAll > t;
-  const sub = []; // cours de chaque seconde de la minute, par action (voir plus bas)
+  const sub = [], { secs, fr } = secondsOf(t); // cours de chaque seconde réelle de la minute (voir plus bas)
   for (const s of listed(S)) {
     const x = S.st[s.tk], sec = SECTORS[s.sector];
     // Valeur fondamentale : croissance (modulée par la macro), incertitude, facteurs communs.
@@ -712,9 +735,9 @@ function tick(S, R, out, pending) {
     if (BY[s.tk]) cap += p * s.shares; vol += v; // l'AUR-12 ne compte que la cote principale
     // Une minute d'Aurelys = SPM secondes : entre le cours précédent et le nouveau, un pont brownien donne un vrai cours
     // à chaque seconde (même volatilité, cours atteignables par les ordres et la liquidation).
-    const ps = bridge(R, last, p, halted ? 0 : s.sig / Math.sqrt(DAY * SPM)), hl = halted || x.halt > t;
+    const ps = bridge(R, last, p, halted ? 0 : s.sig / Math.sqrt(DAY), fr), hl = halted || x.halt > t;
     if (BY[s.tk]) sub.push({ s, ps });
-    ps.forEach((q, k) => out.ticks.push({ t: realOf(t - 1) + k + 1, tk: s.tk, p: +q.toPrecision(7), v: Math.round(v / SPM), halt: hl }));
+    ps.forEach((q, k) => out.ticks.push({ t: secs[k], tk: s.tk, p: +q.toPrecision(7), v: Math.round(v / secs.length), halt: hl }));
   }
   const idx = cap / DIV, ri = Math.log(idx / S.idx);
   S.vix += (ri * ri - S.vix) / 120; S.idx = idx; S.idxHi = Math.max(idx, S.idxHi * (1 - 1 / 2880));
@@ -723,8 +746,9 @@ function tick(S, R, out, pending) {
     S.haltAll = t + 15; S.cbAll = t;
     publish(S, out, { cat: "suspension", title: "AUR-12 : chute de plus de 7 %, toute la cote est suspendue 15 minutes", sent: -.3, mag: 0, hl: 60 });
   }
-  for (let k = 0; k < SPM - 1; k++) out.ticks.push({ t: realOf(t - 1) + k + 1, tk: INDEX, p: +(sub.reduce((a, { s, ps }) => a + ps[k] * s.shares, 0) / DIV).toPrecision(7), v: Math.round(vol / SPM), halt: allHalt });
-  out.ticks.push({ t: realOf(t), tk: INDEX, p: +idx.toPrecision(7), v: Math.round(vol / SPM), halt: allHalt,
+  const ip = k => +(sub.reduce((a, { s, ps }) => a + ps[k] * s.shares, 0) / DIV).toPrecision(7);
+  for (let k = 0; k < secs.length - 1; k++) out.ticks.push({ t: secs[k], tk: INDEX, p: ip(k), v: Math.round(vol / secs.length), halt: allHalt });
+  out.ticks.push({ t: secs[secs.length - 1], tk: INDEX, p: ip(secs.length - 1), v: Math.round(vol / secs.length), halt: allHalt,
     x: { reg: S.reg, regAge: S.regAge, vixa: Math.round(fear * 10) / 10, r: Math.round(S.r * 100) / 100, g: Math.round(S.g * 100) / 100, pi: Math.round(S.pi * 100) / 100,
       eps: Object.fromEntries(listed(S).map(s => [s.tk, +S.st[s.tk].eps.toPrecision(4)])),
       cons: Object.fromEntries(listed(S).map(s => [s.tk, S.st[s.tk].res?.cons ?? null])), // consensus des analystes (le vrai chiffre reste caché)
