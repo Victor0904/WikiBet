@@ -471,3 +471,7 @@ button:active:not(:disabled) { transform: scale(.96) }
 .rsi span { position: absolute; left: 10px; bottom: 2px; font-size: 11px; color: var(--muted) }
 @media (min-width: 640px) { .tiles { grid-template-columns: repeat(4, 1fr) } .heat { grid-template-columns: repeat(4, minmax(0, 1fr)) } }
 .detail > * { flex-shrink: 0 } /* la fiche défile au lieu d'écraser ses blocs */
+/* Bandeau de séance simplifié : état, temps restant, une phrase d'explication */
+.session { grid-template-columns: auto minmax(0, 1fr); margin: 0 0 12px }
+.session .count { justify-self: end; font-size: 14px; color: var(--ink) }
+.session .sub { grid-column: 1 / -1; grid-row: auto; font-size: 12.5px }

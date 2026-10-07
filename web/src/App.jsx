@@ -153,6 +153,7 @@ function Game({ api, engine }) {
   const howtoDone = () => { try { localStorage.setItem("wb-howto", "1") } catch { } setFirstVisit(false); setMore(null); setTab("market") };
   const patrimoine = me.cash + openStake + objectsValue;
   const showHowto = firstVisit || (tab === "more" && more === "howto");
+  const wikiView = tab === "market" && (marketView === "wiki" || marketView === "duels"); // les séances ne concernent que Wikipédia et les duels
 
   return (
     <div className="app">
@@ -161,8 +162,7 @@ function Game({ api, engine }) {
         {api.mode === "demo" && <span className="tag">démo</span>}
         <button type="button" className="cash mono" onClick={() => { setTab("more"); setMore("account") }} aria-label="Mon compte">{W(me.cash)}</button>
       </header>
-      <SessionBar s={s} now={now} engine={engine} />
-      {kickoff && <div className="kickoff">Coup d'envoi · {sessName(s.k)}</div>}
+      {kickoff && wikiView && <div className="kickoff">Coup d'envoi · {sessName(s.k)}</div>}
 
       <div className="layout">
         <aside className="rail">
@@ -177,6 +177,7 @@ function Game({ api, engine }) {
 
           {tab === "market" && <>
             <Segmented label="Marché" value={marketView} onChange={setMarketView} options={[["crypto", "Crypto"], ["aurelys", "Aurelys"], ["wiki", "Wiki"], ["duels", "Duels"]]} />
+            {wikiView && <SessionBar s={s} now={now} engine={engine} />}
             {marketView === "crypto" ? <CryptoMarket {...crypto} bets={open} onPick={(sym, dir) => setTicket({ kind: "crypto", sym, dir })} onDetail={setDetail} />
             : marketView === "aurelys" ? <AurelysMarket aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onDetail={setAurDetail} />
             : marketView === "wiki"
@@ -274,15 +275,15 @@ function Onboarding({ api, onDone }) {
   );
 }
 
+// Séance du Marché Wikipédia, en clair : ce qui se passe et le temps qui reste.
 function SessionBar({ s, now, engine }) {
-  const day = engine.dateOf(s.d + 1).toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
+  const day = engine.dateOf(s.d + 1).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" });
   return (
     <section className={"session " + (s.playing ? "live" : "pause")} aria-live="polite">
-      <span className="pill">{s.playing ? "En direct" : "Pause"}</span>
-      <span className="clock mono" title="Heure du marché simulé (9:00 → 17:30)"><small>marché</small>{s.playing ? hhmm(s.t) : "17:30"}</span>
-      <span className="sub">{sessName(s.k).replace("s", "S")} · vues du {day}</span>
-      <span className="count mono">{s.playing ? `fin dans ${mmss(s.endsAt - now)}` : `reprise dans ${mmss(s.nextAt - now)}`}</span>
+      <span className="pill">{s.playing ? "Séance en cours" : "Pause"}</span>
+      <span className="count mono">{s.playing ? `se termine dans ${mmss(s.endsAt - now)}` : `reprise dans ${mmss(s.nextAt - now)}`}</span>
       <span className="bar"><i style={{ width: `${s.playing ? s.off / (s.endsAt - s.startsAt) * 100 : 100}%` }} /></span>
+      <span className="sub">{s.playing ? "Tes positions Wikipédia se ferment à la fin de la séance." : "Résultats de la séance, la suivante arrive."} Une séance rejoue en 10 min les vues réelles du {day}.</span>
     </section>
   );
 }
