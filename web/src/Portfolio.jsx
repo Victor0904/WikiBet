@@ -60,7 +60,7 @@ export default function Portfolio({ holds, aur, px, onSell, onBuy, onMarket }) {
         <div className="folio-total"><small>Valeur du portefeuille</small><b className="mono">{W(tot)}</b>
           <span className={"mono " + cls(gain)}>{gain >= 0 ? "▲" : "▼"} {sW(gain)} · {pct(gain / cost)}</span></div>
         <ValueChart pts={pts} cost={cost} />
-        <p className="muted small">Valeur des actions que tu détiens{(pts.at(-1)?.[0] - pts[0]?.[0]) > 3 * 3600 ? ", sur les 36 dernières heures d'Aurelys" : ", sur les dernières minutes"}. Pointillé : ce que tu as investi.</p>
+        <p className="muted small">Valeur des actions que tu détiens{pts.length > 1 ? `, sur les ${Math.max(1, Math.round((pts.at(-1)[0] - pts[0][0]) / 300))} dernières heures d'Aurelys` : ""}. Pointillé : ce que tu as investi.</p>
       </div>
       <div className="tiles">
         <div className="tile"><small>Investi</small><b className="mono">{W(cost)}</b></div>

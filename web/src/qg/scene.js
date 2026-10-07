@@ -12,7 +12,7 @@ const HOMES = [
   { size: 9.5, floor: 0x4a3528, wall: 0x7a3b2e, win: 0.5 },  // loft (briques)
   { size: 11.5, floor: 0xd4d0c8, wall: 0x1c2030, win: 0.9 }, // penthouse
 ];
-const H = 3.2; // hauteur des murs
+const WALL = [3.2, 3.2, 3.4, 3.8, 4.8]; // hauteur des murs par logement : le penthouse est en double hauteur
 
 const mat = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: .7, metalness: 0, ...o });
 const glow = color => new THREE.MeshBasicMaterial({ color });
@@ -155,6 +155,38 @@ function buildItems(ids, S, accent, screens) {
   return out;
 }
 
+// Ce qui fait la différence entre les logements : cuisine, salle vitrée, mezzanine, piscine… (en plus des objets achetés).
+function structure(level, S, H, accent) {
+  const c = -S / 2, out = [], A = new THREE.Color(accent), metal = mat(0x3a3f4a, { metalness: .6, roughness: .35 }), wood = mat(0x8a6a4b), white = mat(0xeeeae2);
+  const glass = new THREE.MeshStandardMaterial({ color: 0xbfe6ff, transparent: true, opacity: .22, roughness: .1 });
+  const pendant = (x, z, y) => { const l = new THREE.PointLight(0xffc98a, .9, 4); l.position.set(x, y - .4, z); out.push(cyl(.01, .01, .6, metal, x, y - .6, z), cyl(.05, .2, .2, mat(0x1a1a1a), x, y - .8, z), l) };
+  if (level === 1) { // studio : cuisine le long du mur du fond
+    out.push(box(1.8, .9, .6, white, c + S - 1.3, 0, c + .35), box(1.8, .05, .62, wood, c + S - 1.3, .9, c + .35), box(.5, .5, .4, mat(0x2a2a2a), c + S - .7, 1.5, c + .3));
+  }
+  if (level === 2) { // open space : salle de réunion vitrée et coin café
+    out.push(box(2.4, 2.3, .05, glass, c + S - 1.6, 0, c + 2.6), box(.05, 2.3, 2.2, glass, c + S - 2.8, 0, c + 1.5),
+      box(1.6, .05, .8, wood, c + S - 1.5, .75, c + 1.5), ...[0, 1, 2].map(i => box(.35, .5, .35, mat(accent), c + S - 2 + i * .5, 0, c + 2)),
+      box(.6, 1, .5, metal, c + 2.9, 0, c + S - .4), plantPot(c + .5, c + S - .5));
+  }
+  if (level >= 3) { // loft et penthouse : mezzanine avec escalier, garde-corps et suspensions
+    const y = level >= 4 ? 2.5 : 2.1, w = S * .45, d = S * .32, x0 = c + S - w / 2, z0 = c + d / 2;
+    out.push(box(w, .15, d, wood, x0, y - .15, z0), box(w, .6, .04, glass, x0, y, z0 + d / 2), box(.04, .6, d, glass, x0 - w / 2, y, z0));
+    for (let i = 0; i < 4; i++) out.push(cyl(.06, .06, y - .15, metal, x0 - w / 2 + .1 + i * (w - .2) / 3, 0, z0 + d / 2 - .1));
+    const steps = 8; for (let i = 0; i < steps; i++) out.push(box(.8, .08, .32, wood, x0 - w / 2 - .5, (i + 1) * y / steps - .08, z0 + d / 2 + .9 - i * .3));
+    [0, 1, 2].forEach(i => pendant(c + 1.5 + i * 1.6, c + S * .55, H));
+    if (level >= 4) { // la chambre sur la mezzanine, une piscine intérieure, un salon et un lustre
+      out.push(box(1.4, .3, 2, mat(0x2a2030), x0 + .2, y, z0 - .1), box(1.3, .15, 1.9, white, x0 + .2, y + .3, z0 - .1), box(1.3, .1, .4, mat(accent), x0 + .2, y + .45, z0 - .8));
+      const pool = new THREE.Mesh(new THREE.BoxGeometry(2.6, .05, 1.6), new THREE.MeshStandardMaterial({ color: 0x2fa4d9, emissive: 0x0b5a7a, roughness: .1, metalness: .2 }));
+      pool.position.set(c + 6.6, .06, c + S - 1.4); out.push(pool, box(2.9, .06, 1.9, white, c + 6.6, -.02, c + S - 1.4));
+      out.push(box(2.2, .4, .9, mat(0x3d4f6e), c + 3.2, 0, c + S - 1.1), box(2.2, .5, .2, mat(0x3d4f6e), c + 3.2, .4, c + S - .7), box(1, .35, .6, wood, c + 3.2, 0, c + S - 2.2));
+      const chand = new THREE.PointLight(0xfff0d0, 1.6, 8); chand.position.set(c + S * .45, H - 1, c + S * .5);
+      out.push(cyl(.5, .3, .25, mat(0xe8c547, { metalness: .9, roughness: .2, emissive: 0x3a2a00 }), c + S * .45, H - 1, c + S * .5), chand, plantPot(c + .6, c + .6), plantPot(c + S - .6, c + S - .6));
+    }
+  }
+  return out;
+}
+function plantPot(x, z) { return group(cyl(.22, .17, .4, mat(0xc9b8a0)), ...[0, 1, 2, 3].map(i => ball(.25, mat(0x2f7d4a), Math.cos(i * 1.6) * .15, .65 + (i % 2) * .2, Math.sin(i * 1.6) * .15))).translateX(x).translateZ(z) }
+
 // Cadres des trophées sur le mur de gauche : nom et détail (le meilleur trade affiche son gain).
 function trophyFrames(list, S) {
   const c = -S / 2, out = [], gold = mat(0xe8c547, { metalness: .8, roughness: .3 });
@@ -189,22 +221,28 @@ export function createScene(parent, { interactive = true } = {}) {
   const controls = interactive && fine ? Object.assign(new OrbitControls(camera, renderer.domElement), { enablePan: false, enableZoom: false, minPolarAngle: .7, maxPolarAngle: 1.1, minAzimuthAngle: Math.PI / 4 - .5, maxAzimuthAngle: Math.PI / 4 + .5, enableDamping: true }) : null;
 
   function frame() {
-    const w = parent.clientWidth, h = parent.clientHeight, view = S * (w < 600 ? 1.02 : .9), asp = w / h; // la pièce entière, murs compris
+    const w = parent.clientWidth, h = parent.clientHeight, view = S * (w < 600 ? 1.02 : .9) + ((room?.userData.h ?? 3.2) - 3.2) * .8, asp = w / h; // la pièce entière, murs compris
     renderer.setSize(w, h, false);
     Object.assign(camera, { left: -view * asp / 2, right: view * asp / 2, top: view / 2, bottom: -view / 2 }); camera.updateProjectionMatrix();
   }
   function build({ level, items, accent, trophies = [] }) {
     if (room) { scene.remove(room); dispose(room) }
-    const home = HOMES[level] ?? HOMES[0]; S = home.size;
+    const home = HOMES[level] ?? HOMES[0]; S = home.size; const H = WALL[level] ?? 3.2;
     const c = -S / 2; room = new THREE.Group();
     const floor = box(S, .2, S, mat(home.floor, { roughness: .85 }), 0, -.2, 0); room.add(floor);
     room.add(box(S, H, .2, mat(home.wall), 0, 0, c - .1), box(.2, H, S, mat(home.wall), c - .1, 0, 0));
     if (level === 3) for (let y = .3; y < H; y += .3) room.add(box(S, .02, .01, mat(0x5c2a20), 0, y, c + .005)); // joints de briques
     const ww = S * home.win, win = new THREE.Mesh(new THREE.PlaneGeometry(ww, level >= 4 ? H - .4 : 1.6), new THREE.MeshBasicMaterial({ map: skyline(level) }));
     win.position.set(level >= 4 ? 0 : c + S - ww / 2 - .5, level >= 4 ? H / 2 : 1.75, c + .02); room.add(win);
+    if (level >= 4) { // baie panoramique aussi sur le mur de gauche
+      const w2 = new THREE.Mesh(new THREE.PlaneGeometry(S * .8, H - .4), new THREE.MeshBasicMaterial({ map: skyline(5) }));
+      w2.position.set(c + .02, H / 2, 0); w2.rotation.y = Math.PI / 2; room.add(w2);
+    }
+    structure(level, S, H, accent).forEach(o => room.add(o));
     buildItems(new Set(items), S, accent, screens).forEach(o => room.add(o));
     trophyFrames(trophies, S).forEach(o => room.add(o));
     const lamp = new THREE.PointLight(0xffc98a, 1.4, S * 1.6); lamp.position.set(0, H - .3, 0); room.add(lamp); // plafonnier chaud
+    room.userData.h = H;
     scene.add(room);
     camera.position.set(S * 1.1, S * 1.05, S * 1.1); camera.lookAt(0, 1.2, 0);
     if (controls) { controls.target.set(0, 1.2, 0); controls.update() }

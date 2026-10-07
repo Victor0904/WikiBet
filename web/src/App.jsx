@@ -43,11 +43,11 @@ const SRC = {
   },
   steam: {
     unit: "joueurs", name: "Steam", what: "le jeu",
-    info: "Joueurs connectés réels sur Steam, relevés chaque minute",
+    info: "Joueurs connectés réels sur Steam, relevés chaque minute (Steam met parfois plusieurs minutes à actualiser un jeu)",
     intro: "Le jeu aura-t-il plus de joueurs connectés que le seuil à l'heure dite ? Réponds Oui ou Non : la cote est figée au moment du pari. Paris fermés 5 min avant l'échéance.",
     demo: "Les jeux Steam ne sont disponibles qu'en ligne : la démo locale n'a pas accès à Steam.",
     end: "s'il n'y a plus de relevé, c'est le dernier chiffre connu qui compte",
-    fine: "Joueurs connectés réels (API publique de Steam), relevés chaque minute. Une question se règle sur le dernier chiffre Steam avant l'heure annoncée.",
+    fine: "Joueurs connectés réels (API publique de Steam), relevés chaque minute ; Steam actualise certains jeux moins souvent, l'heure du chiffre est indiquée. Une question se règle sur le dernier chiffre Steam avant l'heure annoncée.",
   },
 };
 // Question « pic du jour » : échéance à 23:59:59 (les questions à l'heure tombent sur des quarts d'heure ronds).
@@ -107,6 +107,9 @@ function Game({ api }) {
   const loadStreams = useCallback(() => Promise.all([api.streamBoard(), api.openMarkets().catch(() => [])]).then(([b, m]) => { setStreams(b); setMarkets(m) }).catch(() => {}), [api]);
   useEffect(() => { loadStreams(); const id = setInterval(loadStreams, 20000); return () => clearInterval(id) }, [loadStreams]);
   const byLogin = useMemo(() => Object.fromEntries(streams.map(x => [x.login, x])), [streams]);
+  // Bâtiments de ma guilde (l'observatoire affiche tendance et prévision des lives).
+  const [city, setCity] = useState({});
+  useEffect(() => { const load = () => api.myCity().then(setCity).catch(() => {}); load(); const id = setInterval(load, 60000); return () => clearInterval(id) }, [api]);
   // Bourse d'Aurelys : cours à la seconde quand on la regarde ou qu'on y a une position, sinon toutes les 10 s.
   // Alertes de prix (Aurelys) : gardées dans ce navigateur, nombre selon le logement.
   const [alerts, setAlerts] = useState(() => { try { return JSON.parse(localStorage.getItem("wb-alerts")) ?? [] } catch { return [] } });
@@ -176,7 +179,7 @@ function Game({ api }) {
 
           {tab === "live" && <>
             <Segmented label="Live" value={liveSrc} onChange={setLiveSrc} options={[["twitch", "Twitch"], ["steam", "Steam"]]} />
-            <Streams key={liveSrc} src={liveSrc} streams={streams} markets={markets} mode={api.mode} bets={open} now={now} onPick={(market, side) => setTicket({ kind: "question", market, side })} />
+            <Streams key={liveSrc} obs={city.observatoire ?? 0} src={liveSrc} streams={streams} markets={markets} mode={api.mode} bets={open} now={now} onPick={(market, side) => setTicket({ kind: "question", market, side })} />
           </>}
 
           {tab === "positions" && <>
@@ -214,7 +217,7 @@ function Game({ api }) {
 
       {aurDetail && <AurelysDetail tk={aurDetail} aur={aur} api={api} now={now} alerts={alerts} setAlerts={setAlerts} alertsMax={perks.alerts} onClose={() => setAurDetail(null)} onPick={(tk, dir) => { setAurDetail(null); setTicket({ kind: "aurelys", tk, dir }) }}
         onInvest={tk => { setAurDetail(null); setInvest({ tk, mode: "buy" }) }} />}
-      {invest && <InvestSheet {...invest} aur={aur} me={me} patrimoine={patrimoine} hold={holds.find(h => h.tk === invest.tk)} onClose={() => setInvest(null)}
+      {invest && <InvestSheet {...invest} api={api} aur={aur} me={me} hold={holds.find(h => h.tk === invest.tk)} onClose={() => setInvest(null)}
         onDone={async (args, ok) => { const r = await run(() => args.mode === "round" ? api.aurSubscribe(args.tk, args.amount) : api.aurOrder(args.mode === "buy" ? { action: "buy", tk: args.tk, amount: args.amount } : { action: "sell", tk: args.tk, qty: args.qty }), () => ok); if (r) setInvest(null) }} />}
       {ticket && <Ticket api={api} aur={aur} now={now} byLogin={byLogin} me={me} ticket={ticket} pref={pref} setPref={setPref} onClose={() => setTicket(null)}
         onSubmit={async args => {
@@ -352,7 +355,17 @@ function QuestionCard({ b, st, now }) {
   );
 }
 
-function Streams({ src, streams: all, markets: allMarkets, mode, bets, now, onPick }) {
+// Observatoire de guilde : tendance des 30 dernières minutes et prévision à l'échéance (même calcul que le serveur).
+function forecast(x, closesAt) {
+  const t0 = Date.parse(x.at) - 30 * 60000, pts = x.ts.map((t, i) => [t / 60000, Math.log(Math.max(1, x.vs[i]))]).filter(([t]) => t * 60000 >= t0);
+  if (pts.length < 3) return null;
+  const n = pts.length, mx = pts.reduce((a, p) => a + p[0], 0) / n, my = pts.reduce((a, p) => a + p[1], 0) / n;
+  const slope = Math.max(-.01, Math.min(.01, pts.reduce((a, [t, y]) => a + (t - mx) * (y - my), 0) / (pts.reduce((a, [t]) => a + (t - mx) ** 2, 0) || 1)));
+  const mins = Math.max(1, (Date.parse(closesAt) - Date.now()) / 60000), drift = Math.max(-.1, Math.min(.1, slope * Math.min(mins, 20) * .5));
+  return { per15: Math.exp(slope * 15) - 1, value: x.viewers * Math.exp(drift) };
+}
+
+function Streams({ obs = 0, src, streams: all, markets: allMarkets, mode, bets, now, onPick }) {
   const [slot, setSlot] = useState(null), frozen = useRef({ key: null, logins: [] }), S = SRC[src], mineSrc = login => (srcOf(login) === S);
   const streams = all.filter(x => mineSrc(x.login)), markets = allMarkets.filter(m => mineSrc(m.login));
   if (!streams.length) return <p className="muted pad">{mode === "demo" ? S.demo : `Aucun relevé ${S.name} pour l'instant. La relève tourne chaque minute, reviens dans un instant.`}</p>;
@@ -386,6 +399,7 @@ function Streams({ src, streams: all, markets: allMarkets, mode, bets, now, onPi
               <span className="r mono"><b>{nf0.format(x.viewers)}</b><small>chiffre de {clock(twitchAt(x))}</small></span>
             </div>
             {x.vs.length > 1 && <Spark path={x.vs} t={x.vs.length - 1} h={24} />}
+            {obs > 0 && m.kind !== "peak" && (() => { const f = forecast(x, m.closes_at); return f && <p className="obs small mono">Observatoire · tendance <span className={cls(f.per15)}>{pct(f.per15)}</span> / 15 min · prévision {nf0.format(Math.round(f.value))} à {clock(Date.parse(m.closes_at))}</p> })()}
             {m.kind === "peak"
               ? <p className="qtext">Pic d'aujourd'hui au-dessus de celui d'hier, <b className="mono">{nf0.format(m.threshold)}</b> {S.unit} ? <small className="muted">Paris jusqu'à {clock(Date.parse(m.bet_until))}, réglé à minuit.</small></p>
               : <p className="qtext">Plus de <b className="mono">{nf0.format(m.threshold)}</b> {S.unit} à <b className="mono">{clock(Date.parse(m.closes_at))}</b> ?</p>}
@@ -447,9 +461,12 @@ function History({ byLogin, bets }) {
 }
 
 // Acheter, vendre ou souscrire à une levée de fonds.
-function InvestSheet({ tk, mode, qty: q0, aur, me, patrimoine, hold, onClose, onDone }) {
+function InvestSheet({ api, tk, mode, qty: q0, aur, me, hold, onClose, onDone }) {
   const d = AUR[tk], round = mode === "round", sell = mode === "sell", [amount, setAmount] = useState(round ? 1000 : 500), [share, setShare] = useState(1), [busy, setBusy] = useState(false);
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
+  // Levées : on compte la richesse disponible (solde, mises, actions, objets revendables), pas les logements.
+  const [patrimoine, setWealth] = useState(0);
+  useEffect(() => { if (round) api.myWealth().then(w => setWealth(+w)).catch(() => {}) }, [api, round]);
   const p = round ? d?.roundPrice : aur.quotes[tk]?.p ?? 0, qty = sell ? (q0 ?? 0) * share : 0;
   const notional = sell ? qty * p : amount, sl = round ? 0 : slipEstimate(tk, notional, Date.now() / 1000, aur.x?.reg), fee = round ? 0 : notional * FEE;
   const exec = p * (1 + (sell ? -sl : sl)), maxRound = Math.max(0, Math.floor(.2 * patrimoine - (hold?.cost ?? 0)));
@@ -460,7 +477,7 @@ function InvestSheet({ tk, mode, qty: q0, aur, me, patrimoine, hold, onClose, on
       <form className="sheet" role="dialog" aria-modal="true" aria-label={title} onSubmit={async e => { e.preventDefault(); if (!ok) return; setBusy(true);
         await onDone({ mode, tk, amount, qty }, round ? `Souscription de ${W(amount)} à ${d?.name}` : sell ? `Vendu ${nf2.format(qty)} actions` : `${W(amount)} investis dans ${d?.name}`); setBusy(false) }}>
         <div className="sheet-h"><b>{title}</b><button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button></div>
-        {gate && <p className="error small">Les levées de fonds sont réservées aux joueurs qui ont 50 000 W de patrimoine (tu en as {W(patrimoine)}).</p>}
+        {gate && <p className="error small">Les levées de fonds demandent 50 000 W disponibles : solde, mises, actions et objets revendables, sans les logements (tu en as {W(patrimoine)}).</p>}
         {sell ? <>
           <label>Part à vendre</label>
           <div className="seg" role="group" aria-label="Part à vendre">{[[.25, "25 %"], [.5, "50 %"], [1, "Tout"]].map(([v, l]) => <button key={v} type="button" aria-pressed={share === v} onClick={() => setShare(v)}>{l}</button>)}</div>
@@ -476,7 +493,7 @@ function InvestSheet({ tk, mode, qty: q0, aur, me, patrimoine, hold, onClose, on
           <div className="row"><span>{sell ? "Actions vendues" : "Actions obtenues (environ)"}</span><b>{nf2.format(sell ? qty : amount / (exec || 1))}</b></div>
           {!round && <div className="row"><span>Frais (0,1 %)</span><b>{W(fee)}</b></div>}
           {sell && <div className="row"><span>Tu recevras (environ)</span><b>{W(qty * exec - fee)}</b></div>}
-          {round && <div className="row"><span>Encore possible (20 % du patrimoine)</span><b>{W(maxRound)}</b></div>}
+          {round && <div className="row"><span>Encore possible (20 % du disponible)</span><b>{W(maxRound)}</b></div>}
         </div>
         <p className="muted small">{round ? "Le premier cours sera fixé par le marché à l'introduction en bourse : il peut être bien au-dessus du prix de la levée… ou en dessous. Une jeune pousse peut aussi faire faillite."
           : "Sans levier : ta mise suit le cours, sans liquidation. Le prix exact est calculé par le serveur."}</p>

@@ -115,7 +115,7 @@ function Board({ aur, now, onDetail, onNews, onRead, onList }) {
         <button key={d.tk} type="button" className="panel round-teaser" onClick={onList}>
           <span className="paper-kicker">Introduction en bourse · levée de fonds</span>
           <b>{d.name} · {d.what}</b>
-          <span className="muted small">Souscription à {px(d.roundPrice)} Ꜷ jusqu'à {real(d.roundEnds)} · dès {W(IPO.minWealth)} de patrimoine</span>
+          <span className="muted small">Souscription à {px(d.roundPrice)} W jusqu'à {real(d.roundEnds)} · dès {W(IPO.minWealth)} disponibles</span>
           <span className="accent small">Voir la levée →</span>
         </button>
       ))}
@@ -166,14 +166,14 @@ function List({ aur, now, bets, onPick, onDetail, onSubscribe, onRead }) {
         {aur.rounds.map(d => (
           <article key={d.tk} className="panel round">
             <div className="round-h"><TkIcon tk={d.tk} size={30} /><span><b>{d.name}</b><small className="muted">{d.what} · {SECTORS[d.sector]?.name}</small></span>
-              <span className="r mono"><b>{px(d.roundPrice)} Ꜷ</b><small>clôture {d.roundEnds ? real(d.roundEnds) : "—"}</small></span></div>
+              <span className="r mono"><b>{px(d.roundPrice)} W</b><small>clôture {d.roundEnds ? real(d.roundEnds) : "—"}</small></span></div>
             <RoundClock d={d} now={now} stats={aur.roundStats?.[d.tk]} />
             <p className="small">{d.story}</p>
             <div className="empty-acts">
               <button type="button" className="btn primary" onClick={() => onSubscribe(d.tk)}>Souscrire</button>
               {news(d.tk) && <button type="button" className="btn" onClick={() => onRead(news(d.tk))}>Lire l'annonce</button>}
             </div>
-            <p className="muted small">Réservé aux joueurs qui ont {W(IPO.minWealth)} de patrimoine, {IPO.maxShare * 100} % du patrimoine au plus. Le premier cours peut être bien au-dessus… ou en dessous.</p>
+            <p className="muted small">Réservé aux joueurs qui ont {W(IPO.minWealth)} disponibles (sans les logements), {IPO.maxShare * 100} % au plus. Le premier cours peut être bien au-dessus… ou en dessous.</p>
           </article>
         ))}
       </>}

@@ -92,7 +92,7 @@ export function Ranking({ api, me, wealth, onVisit }) {
             {rows.map((p, i) => (
               <button type="button" key={p.id} className={"brow" + (p.id === me.id ? " me" : "")} onClick={() => onVisit(p)} aria-label={`Voir le QG de ${p.pseudo}`}>
                 <span className="rk mono">{i + 1}</span>
-                <span><b>{p.pseudo}{p.guild && <i className="gtag">{p.guild}</i>}</b><small>{sub(p.title, `${p.bets} pari${p.bets > 1 ? "s" : ""} clôturé${p.bets > 1 ? "s" : ""}`)}</small></span>
+                <span><b>{p.pseudo}{p.guild && <> <i className="gtag">{p.guild}</i></>}</b><small>{sub(p.title, `${p.bets} pari${p.bets > 1 ? "s" : ""} clôturé${p.bets > 1 ? "s" : ""}`)}</small></span>
                 <span className={"r mono " + cls(p.gain)}>{sW(p.gain)}</span>
               </button>
             ))}
@@ -112,7 +112,7 @@ export function Friends({ api, say, onVisit, onBack }) {
   const row = (f, acts) => (
     <div key={f.id} className="brow frow">
       <button type="button" className="fname" onClick={() => onVisit(f)} aria-label={`Voir le QG de ${f.pseudo}`}>
-        <b>{f.pseudo}{f.guild && <i className="gtag">{f.guild}</i>}</b>
+        <b>{f.pseudo}{f.guild && <> <i className="gtag">{f.guild}</i></>}</b>
         {f.state === "ami" && <small className="mono">jour <span className={cls(f.today)}>{sW(f.today)}</span> · total <span className={cls(f.total)}>{sW(f.total)}</span></small>}
       </button>
       <span className="f-acts">{acts}</span>
@@ -167,7 +167,7 @@ export function Guilds({ api, me, say, onVisit, onBack, accent }) {
           {list.map((g, i) => (
             <button type="button" key={g.id} className={"brow" + (g.mine ? " me" : "")} onClick={() => { setSel(g); window.scrollTo({ top: 0 }) }}>
               <span className="rk mono">{i + 1}</span>
-              <span><b>{g.name}<i className="gtag">{g.tag}</i></b><small>{sub(`${g.members}/30 membres`, g.motto)}</small></span>
+              <span><b>{g.name} <i className="gtag">{g.tag}</i></b><small>{sub(`${g.members}/${g.cap ?? 30} membres`, g.motto)}</small></span>
               <span className={"r mono " + cls(g.gain)}>{sW(g.gain)}</span>
             </button>
           ))}
@@ -196,7 +196,7 @@ function GuildView({ api, me, g, mine, canJoin, run, onVisit }) {
         ))}
       </div>
       {mine ? <button type="button" className="btn" onClick={() => run(() => api.guildLeave(), "Tu as quitté la guilde.")}>Quitter la guilde</button>
-        : canJoin && g.members < 30 ? <button type="button" className="btn primary" onClick={() => run(() => api.guildJoin(g.id), `Bienvenue chez ${g.name}.`)}>Rejoindre</button>
+        : canJoin && g.members < (g.cap ?? 30) ? <button type="button" className="btn primary" onClick={() => run(() => api.guildJoin(g.id), `Bienvenue chez ${g.name}.`)}>Rejoindre</button>
         : canJoin ? <p className="muted">Guilde complète.</p> : <p className="muted">Quitte ta guilde pour rejoindre celle-ci.</p>}
     </div>
   );

@@ -58,7 +58,7 @@ export function Account({ account, me, title, patrimoine, openStake, objects, ca
           <div className="row"><span>Patrimoine</span><b>{W(patrimoine)}</b></div>
           <div className="row"><span>Solde</span><b>{W(me.cash)}</b></div>
           <div className="row"><span>Mises en cours</span><b>{W(openStake)}</b></div>
-          <div className="row"><span>Objets du QG (revente 60 %)</span><b>{W(objects)}</b></div>
+          <div className="row"><span>Objets et logements du QG (60 %)</span><b>{W(objects)}</b></div>
           <div className="row"><span>Faillites</span><b>{me.bankruptcies}</b></div>
         </div>
       </div>

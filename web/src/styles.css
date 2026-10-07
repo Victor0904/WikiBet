@@ -527,7 +527,7 @@ button:active:not(:disabled) { transform: scale(.96) }
 .perks p { margin: 4px 0 0 }
 .city { display: flex; flex-direction: column; gap: 10px }
 .city p { margin: 0 }
-.city-scene { height: 380px; background: radial-gradient(ellipse at 50% 30%, #23304a 0%, var(--panel) 75%) }
+.city-scene { height: 420px }
 
 /* ===== Portefeuille, levées de fonds, journal ===== */
 .risk-tag { font: 600 10px var(--f-mono); font-style: normal; color: var(--down); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-left: 6px; vertical-align: 2px }
@@ -590,3 +590,4 @@ button:active:not(:disabled) { transform: scale(.96) }
 .folio-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; font-size: 12.5px }
 .folio-facts span { display: flex; flex-direction: column } .folio-facts small { font: 10.5px var(--f-body); color: var(--faint) }
 .folio-card .spark { width: 100%; height: 40px; display: block }
+.obs { margin: 0; color: var(--muted); border-left: 2px solid var(--accent); padding-left: 6px }

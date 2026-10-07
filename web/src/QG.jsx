@@ -36,7 +36,8 @@ export default function QG({ api, catalog, inv, me, owner, self, patrimoine, ope
   const owned = id => (inv[id]?.qty ?? 0) > 0;
   const level = Math.max(0, ...catalog.filter(i => i.kind === "home" && owned(i.id)).map(i => i.level));
   const decor = catalog.filter(i => i.kind === "decor" && owned(i.id)).map(i => i.id);
-  const objects = catalog.filter(i => i.kind !== "bonus" && owned(i.id)).reduce((a, i) => a + Math.floor(i.price * .6), 0);
+  const resale = catalog.filter(i => (i.kind === "decor" || i.kind === "cosmetic") && owned(i.id)).reduce((a, i) => a + Math.floor(i.price * .6), 0);
+  const homes = catalog.filter(i => i.kind === "home" && owned(i.id)).reduce((a, i) => a + Math.floor(i.price * .6), 0);
   const next = catalog.find(i => i.kind === "home" && i.level === level + 1);
   const setDone = SET_STREAM.filter(owned).length;
   const boost = me?.salary_boost_until && Date.parse(me.salary_boost_until) > Date.now() ? Date.parse(me.salary_boost_until) : null;
@@ -51,7 +52,7 @@ export default function QG({ api, catalog, inv, me, owner, self, patrimoine, ope
         </div>
         {patrimoine != null && <div className="r mono"><b className="big-num">{W(patrimoine)}</b><small>patrimoine</small></div>}
       </div>
-      {self && <p className="muted small">Solde {W(me.cash)} · en jeu {W(openStake)} · objets {W(objects)} (valeur de revente, 60 %)</p>}
+      {self && <p className="muted small">Solde {W(me.cash)} · en jeu {W(openStake)} · objets revendables {W(resale)} · logements {W(homes)} (ne se revendent pas, comptés à 60 % au classement)</p>}
 
       <Scene level={level} items={decor} accent={accent} pnl={self ? pnl : null} trophies={wall} />
 

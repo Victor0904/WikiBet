@@ -28,10 +28,10 @@ test("ville : dons au Trésor, construction par le fondateur, mairie d'abord", a
   await db.query("select city_build('salle')");
   await assert.rejects(db.query("select city_build('salle')"), /mairie/, "niveau 2 seulement avec une mairie de niveau 2");
   const { rows: [{ v }] } = await db.query("select city_view($1) as v", [g.id]);
-  assert.equal(v.treasury, 50000); assert.equal(v.cap, 35); assert.equal(v.donors[0].pseudo, "bob");
+  assert.equal(v.treasury, 300000 - 10000 - 15000); assert.equal(v.cap, 35); assert.equal(v.donors[0].pseudo, "bob");
 });
 
-test("ville : salle des marchés (frais), banque (liquidation), observatoire (cotes)", async () => {
+test("ville : salle des marchés (frais), banque (liquidation) ; l'observatoire ne touche plus aux cotes", async () => {
   const { db } = await city();
   await db.query("update guilds set treasury = 1e7");
   await as(db, A);
@@ -46,19 +46,24 @@ test("ville : salle des marchés (frais), banque (liquidation), observatoire (co
   assert.equal(l.payout, 150); assert.equal(l.insured, true, "banque : 15 % de la mise rendus");
 });
 
-test("ville : entretien chaque nuit, la ville s'endort sans Trésor ; dividende du fonds aux membres actifs", async () => {
-  const { db, g } = await city();
-  await db.query("update guilds set treasury = 100000");
-  await as(db, A); await db.query("select city_build('mairie')");
-  await db.query("select city_give(3000000, 'fonds')");                 // fonds : 3 000 unités d'AUR-12 à 1 000
+test("ville : entretien selon les membres actifs, la ville s'endort sans Trésor ; dividende pris sur les gains du fonds", async () => {
+  const { db } = await city();
+  await db.query("update guilds set treasury = 10000");
+  await as(db, A); await db.query("select city_build('mairie')");               // Trésor vide après la mairie
+  await db.query("select city_give(3000000, 'fonds')");                         // 3 000 unités d'AUR-12 à 1 000
   await db.query("update guild_members set joined_at = now() - interval '5 days'");
   await db.query("insert into bets (user_id, session, day, kind, stake, status, created_at) values ($1, 0, 0, 'trade', 10, 'lost', day_start() - interval '2 hours')", [B]);
   await db.query("update guilds set last_day = paris_day() - 1");
   const before = await cash(db, B);
   await db.query("select city_daily()");
   assert.equal((await db.query("select asleep from city_buildings")).rows[0].asleep, true, "Trésor vide : la mairie s'endort");
-  assert.equal(await cash(db, B), before + 500, "fonds à 3 M : 500 W pour bob, actif hier");
-  assert.equal((await db.query("select city_level($1, 'mairie') as l", [A])).rows[0].l, 0, "endormie : plus d'effet");
+  assert.equal(await cash(db, B), before, "fonds sans gain : pas de dividende (pas d'argent créé)");
+  await idx(db, 1100);                                                           // l'AUR-12 gagne 10 %
+  await db.query("update guilds set last_day = paris_day() - 1");
   await db.query("select city_daily()");
-  assert.equal(await cash(db, B), before + 500, "une seule fois par jour");
+  assert.equal(Math.round(await cash(db, B)), Math.round(before + 150000), "moitié du gain (300 000 W) au seul membre actif");
+  const { rows: [g] } = await db.query("select fund_units, fund_hwm from guilds");
+  assert.equal(Math.round(g.fund_units * 1100), 3150000, "le dividende sort du fonds");
+  await db.query("select city_daily()");
+  assert.equal(Math.round(await cash(db, B)), Math.round(before + 150000), "une seule fois par jour");
 });

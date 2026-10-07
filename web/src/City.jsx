@@ -4,7 +4,6 @@ import { createCity } from "./qg/city.js";
 import { W, nf0 } from "./format.js";
 import { gameClock } from "../supabase/functions/_shared/aurelys.js";
 
-const TIERS = [[250000, 100], [1000000, 250], [3000000, 500], [10000000, 1000]];
 
 function Scene({ v, accent, now, onVisit }) {
   const ref = useRef(null), sc = useRef(null), [err, setErr] = useState(null), pick = useRef(onVisit);
@@ -23,22 +22,22 @@ export default function City({ api, guildId, me, mine, say, onVisit, accent }) {
   if (!v) return <p className="muted small">Chargement de la ville…</p>;
   const boss = v.owner === me.id, lv = id => v.buildings.find(b => b.id === id), mairie = lv("mairie")?.level ?? 0;
   const run = async (fn, ok) => { try { await fn(); say(ok, "up"); setAmt(""); load() } catch (e) { say(e.message, "down") } };
-  const amount = Math.floor(Number(amt)), tier = [...TIERS].reverse().find(([s]) => v.fund >= s), next = TIERS.find(([s]) => v.fund < s);
+  const amount = Math.floor(Number(amt)), above = Math.max(0, v.fund - v.hwm);
   return (
     <div className="city">
       <Scene v={v} accent={accent} now={now} onVisit={onVisit} />
       <p className="muted small">Un immeuble par membre : son allure suit son logement. Touche-le pour visiter son QG. La nuit d'Aurelys, les fenêtres s'allument.</p>
       <div className="tiles">
-        <div className="tile"><small>Trésor</small><b className="mono">{W(v.treasury)}</b><small>entretien {W(v.upkeep)} / jour</small></div>
-        <div className="tile"><small>Fonds (placé sur l'AUR-12)</small><b className="mono">{W(v.fund)}</b><small>{tier ? `${tier[1]} W / jour par membre actif` : "pas encore de dividende"}</small></div>
+        <div className="tile"><small>Trésor</small><b className="mono">{W(v.treasury)}</b><small>entretien {W(v.upkeep)} / jour ({v.active} membre{v.active > 1 ? "s" : ""} actif{v.active > 1 ? "s" : ""})</small></div>
+        <div className="tile"><small>Fonds (placé sur l'AUR-12)</small><b className="mono">{W(v.fund)}</b><small>{above > 0 ? `+${W(above)} au-dessus de son plus haut` : "pas de gain à partager pour l'instant"}</small></div>
       </div>
-      {next && <p className="muted small">Prochain palier du fonds : {W(next[0])}, soit {W(next[1])} par jour pour chaque membre actif (un pari la veille, présent depuis 3 jours).</p>}
+      <p className="muted small">Chaque nuit, la moitié de ce que le fonds a gagné au-dessus de son plus haut est partagée entre les membres actifs (un pari la veille, présents depuis 3 jours). Pas de gain, pas de dividende.</p>
       {mine && <div className="add-row">
         <input inputMode="numeric" placeholder="Montant (100 W au moins)" value={amt} onChange={e => setAmt(e.target.value.replace(/\D/g, ""))} aria-label="Montant du don" />
         <button type="button" className="btn primary" disabled={!(amount >= 100)} onClick={() => run(() => api.cityGive(amount, "tresor"), `${W(amount)} donnés au Trésor`)}>Trésor</button>
         <button type="button" className="btn" disabled={!(amount >= 100)} onClick={() => run(() => api.cityGive(amount, "fonds"), `${W(amount)} placés dans le fonds`)}>Fonds</button>
       </div>}
-      {mine && <p className="fine">Les dons ne reviennent pas : le Trésor paie la construction et l'entretien, le fonds suit la Bourse d'Aurelys et verse un dividende chaque nuit. Sans Trésor pour l'entretien, la ville s'endort (plus d'avantages) sans rien perdre.</p>}
+      {mine && <p className="fine">Les dons ne reviennent pas : le Trésor paie la construction et l'entretien, le fonds suit la Bourse d'Aurelys et partage ses gains chaque nuit. Sans Trésor pour l'entretien, la ville s'endort (plus d'avantages) sans rien perdre.</p>}
       <h3 className="sec">Bâtiments publics</h3>
       <div className="shop">
         {cat.map(c => {

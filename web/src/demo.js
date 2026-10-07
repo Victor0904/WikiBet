@@ -67,6 +67,8 @@ export async function demoApi() {
     aurSubscribe: (tk, amount) => act("select * from aur_subscribe($1, $2)", [tk, amount]),
     myHoldings: () => all("select * from my_holdings()"),
     aurRounds: () => all("select * from aur_round_stats()"),
+    myWealth: async () => (await all("select my_wealth() as w"))[0].w,
+    myCity: async () => (await all("select my_city() as c"))[0].c,
     aurNews: () => all("select * from aur_news where t <= now() order by id desc limit 150"),
     aurOrder: async body => {
       if (body.action === "open") return normBet(await act("select * from aur_open($1, $2, $3, $4, $5, $6)", [UID, body.tk, body.dir, body.lev, body.stake, slip(S, body.tk, body.stake * body.lev)]));

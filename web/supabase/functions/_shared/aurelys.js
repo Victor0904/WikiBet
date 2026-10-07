@@ -17,8 +17,8 @@ const Y = 0.34, PERM = 0.3, TAU = 5;              // impact : constante, part pe
 const FLOW = 0.55, GAP = 0.5;                                      // taille des ordres des bots, en part de la liquidité
 const VIX_BASE = 1.7e-7;                          // variance par tick de l'indice en marché calme (calibrée)
 
-const LIQ = { haute: 60000, moyenne: 20000, faible: 6000 }; // Ꜷ échangés par minute de jeu, en journée
-// Profondeur du carnet face à l'ordre d'un joueur (Ꜷ) : un ordre de cette taille fait bouger le cours d'environ 0,43 σ jour.
+const LIQ = { haute: 60000, moyenne: 20000, faible: 6000 }; // W échangés par minute de jeu, en journée
+// Profondeur du carnet face à l'ordre d'un joueur (W) : un ordre de cette taille fait bouger le cours d'environ 0,43 σ jour.
 // Volontairement faible, pour que « plus on achète, plus ça monte » se voie : 25 000 W sur Solarmine ≈ 1 % de hausse.
 const DEPTH = { haute: 600000, moyenne: 200000, faible: 60000 };
 
@@ -156,10 +156,10 @@ function spawn(S, R, out) {
   S.extra[tk] = d; out.listing.push(pub(d));
   const end = realTxt(realOf(d.roundEnd));
   publish(S, out, { tk: null, sector, cat: "ipo", sent: .3, mag: 0, hl: 240,
-    title: `${name} veut entrer en bourse : souscription ouverte à ${fmtPx(price)} Ꜷ l'action`,
+    title: `${name} veut entrer en bourse : souscription ouverte à ${fmtPx(price)} W l'action`,
     text: [`${d.story}`,
-      `La levée de fonds est ouverte jusqu'au ${end} (heure de Paris). Chaque action est proposée à ${fmtPx(price)} Ꜷ ; ${(d.shares / 1e6).toFixed(0)} millions d'actions composeront le capital.`,
-      `Seuls les investisseurs déjà installés (au moins ${IPO.minWealth.toLocaleString("fr-FR")} W de patrimoine) peuvent souscrire, et pas plus de ${IPO.maxShare * 100} % de leur patrimoine.`,
+      `La levée de fonds est ouverte jusqu'au ${end} (heure de Paris). Chaque action est proposée à ${fmtPx(price)} W ; ${(d.shares / 1e6).toFixed(0)} millions d'actions composeront le capital.`,
+      `Seuls les investisseurs déjà installés (au moins ${IPO.minWealth.toLocaleString("fr-FR")} W disponibles, logements non compris) peuvent souscrire, et pas plus de ${IPO.maxShare * 100} % de cette somme.`,
       `« Ces jeunes sociétés peuvent multiplier leur valeur, ou disparaître en quelques semaines », prévient ${pick(R, ANALYSTS)}. Le premier cours sera fixé par le marché le jour de l'introduction.`].join("\n\n") });
 }
 // Ce qui est publié (base de données, écran) : tout sauf la qualité cachée.
@@ -174,8 +174,8 @@ function ipo(S, R, out, d) {
   const ch = open / d.roundPrice - 1;
   out.listing.push(pub(d));
   publish(S, out, { tk: d.tk, cat: "ipo", sent: Math.max(-1, Math.min(1, ch * 2)), mag: 0, hl: 360,
-    title: `Introduction en bourse : ${d.name} débute à ${fmtPx(open)} Ꜷ, ${ch >= 0 ? "+" : "−"}${Math.abs(Math.round(ch * 100))} % sur le prix de la levée`,
-    text: [`Premier jour de cotation pour ${d.name}. Les souscripteurs avaient payé ${fmtPx(d.roundPrice)} Ꜷ l'action ; le marché l'a d'abord fixée à ${fmtPx(open)} Ꜷ.`,
+    title: `Introduction en bourse : ${d.name} débute à ${fmtPx(open)} W, ${ch >= 0 ? "+" : "−"}${Math.abs(Math.round(ch * 100))} % sur le prix de la levée`,
+    text: [`Premier jour de cotation pour ${d.name}. Les souscripteurs avaient payé ${fmtPx(d.roundPrice)} W l'action ; le marché l'a d'abord fixée à ${fmtPx(open)} W.`,
       d.story,
       ch >= .3 ? `« L'appétit des investisseurs est réel, mais il faudra des résultats pour tenir ce prix », juge ${pick(R, ANALYSTS)}.`
         : ch <= -.2 ? `« Un départ difficile : le marché doute du modèle », note ${pick(R, ANALYSTS)}.`
@@ -189,7 +189,7 @@ function delist(S, out, d) {
   out.listing.push(pub(d));
   publish(S, out, { tk: d.tk, cat: "faillite", sent: -1, mag: 0, hl: 240,
     title: `${d.name} fait faillite : l'action est radiée de la cote`,
-    text: [`Le cours de ${d.name} est tombé à ${fmtPx(last)} Ꜷ, moins de ${Math.round(IPO.delist * 100)} % de son prix d'introduction (${fmtPx(d.ipoPrice)} Ꜷ). La société est placée en liquidation.`,
+    text: [`Le cours de ${d.name} est tombé à ${fmtPx(last)} W, moins de ${Math.round(IPO.delist * 100)} % de son prix d'introduction (${fmtPx(d.ipoPrice)} W). La société est placée en liquidation.`,
       `Les actionnaires perdent leur mise ; les positions encore ouvertes sur le titre sont soldées au dernier cours.`,
       `Le projet était de proposer : ${d.what.toLowerCase()}. Il n'aura pas trouvé son marché à temps.`].join("\n\n") });
 }
@@ -216,7 +216,7 @@ function article(S, n) {
   if (d) {
     const st = STORIES[d.tk] ?? d, [year, city] = (st.since ?? "").split(" · ");
     out.push(`${d.name} (${st.what?.toLowerCase() ?? "jeune pousse"}${year ? `, fondée en ${year} à ${city}` : ""}). ${(st.story ?? d.desc).split(/(?<=\.) /)[0]}`);
-    const x = S.st[d.tk]; if (x) out.push(`Le titre cotait ${fmtPx(Math.exp(x.lp + x.tmp))} Ꜷ au moment de l'annonce.`);
+    const x = S.st[d.tk]; if (x) out.push(`Le titre cotait ${fmtPx(Math.exp(x.lp + x.tmp))} W au moment de l'annonce.`);
   } else if (n.sector) {
     out.push(`Sont concernées : ${listed(S).filter(s => s.sector === n.sector).map(s => s.name).join(", ")}.`);
   }
@@ -343,20 +343,20 @@ const priceOf = x => Math.exp(x.lp + x.tmp);
 const sentOf = (S, key, t) => { const a = S.sent[key]; if (!a) return 0; let v = 0; for (const [s, t0, hl] of a) v += s * Math.exp(-(t - t0) * Math.LN2 / hl); return v };
 const addSent = (S, key, s, t, hl) => (S.sent[key] ??= []).push([s, t, hl]);
 
-// Impact relatif d'un ordre de `q` Ꜷ (loi de la racine carrée) : volatilité du moment (GARCH, régime, événement proche)
+// Impact relatif d'un ordre de `q` W (loi de la racine carrée) : volatilité du moment (GARCH, régime, événement proche)
 // et liquidité de l'heure.
 const impactOf = (s, q, act, gh, reg, pre) => Math.sign(q) * Y * (s.si / Math.sqrt(DAY)) * gh * REGIMES[reg].vol ** .7 * pre * Math.sqrt(Math.abs(q) / (s.L * act));
 const impact = (S, s, q, act) => impactOf(s, q, act, S.st[s.tk].gh, S.reg, soonEvent(s, S.t) ? 1.5 : 1);
 // Ordres des joueurs : même loi, mais face à la profondeur du carnet (DEPTH) et à la volatilité journalière.
 const playerImpactOf = (s, q, gh, reg) => Math.sign(q) * Y * s.sig * gh * REGIMES[reg].vol ** .7 * Math.sqrt(Math.abs(q) / s.depth);
 const playerImpact = (S, s, q) => playerImpactOf(s, q, S.st[s.tk].gh, S.reg);
-// Écart de prix subi par un joueur pour un ordre de `notional` Ꜷ : ce qu'il paie en plus à l'achat, en moins à la vente.
+// Écart de prix subi par un joueur pour un ordre de `notional` W : ce qu'il paie en plus à l'achat, en moins à la vente.
 // Prix moyen d'exécution : la moitié du mouvement qu'il provoque.
 export const slip = (S, tk, notional) => playerImpact(S, defOf(S, tk), notional) * 0.5;
 // Estimation pour l'écran, qui ne connaît pas la volatilité du moment (gardée par le serveur).
 export const slipEstimate = (tk, notional, sec, reg = "calme") => playerImpactOf(BY[tk], notional, 1, reg) * 0.5;
 
-// Avance la simulation jusqu'à `untilSec` (seconde réelle). `orders` : ordres des joueurs [{ tk, q }] (q en Ꜷ, + achat), joués au premier tick.
+// Avance la simulation jusqu'à `untilSec` (seconde réelle). `orders` : ordres des joueurs [{ tk, q }] (q en W, + achat), joués au premier tick.
 // `signals` : chiffres réels du moment { tk: { z, txt } } (z = écart à la normale, +0,1 = 10 % au-dessus), voir LINKS.
 // Renvoie les cours de chaque minute de jeu (t en secondes réelles) et les actualités publiées.
 export function advance(S, untilSec, orders = [], signals = null) {
@@ -390,6 +390,8 @@ function publish(S, out, n) {
 }
 
 function companyNews(S, R, out, s, cat, signed) {
+  // Pas deux nouvelles de la même entreprise à moins d'une heure d'Aurelys : le temps de lire et de jouer dessus.
+  S.lastCo ??= {}; if (S.t - (S.lastCo[s.tk] ?? -1e9) < 60) return; S.lastCo[s.tk] = S.t;
   const x = S.st[s.tk], hint = x.res && Math.abs(x.res.act - x.res.cons) > 1.5 && R() < .6 ? Math.sign(x.res.act - x.res.cons) : 0;
   if (cat === "analyste" && R() < .5 && revision(S, R, out, s)) return;
   const c = CATS[cat], sign = signed ?? c.sign ?? (hint || (R() < .5 ? -1 : 1));
@@ -445,7 +447,9 @@ function hourly(S, R, out) {
     const sg = S.sig?.[tk], x = S.st[tk]; if (!sg || typeof sg.z !== "number") continue;
     const d = sg.z - (x.z ?? 0); if (Math.abs(d) < .03) continue;
     x.z = sg.z;
-    publish(S, out, { tk, cat: "reel", title: `${BY[tk].name} : ${sg.txt}`, text: LINKS[tk].src + ".", mag: LINKS[tk].beta * d, sent: Math.max(-1, Math.min(1, d * 6)), hl: 360 });
+    // Couleur de la nouvelle : le niveau (au-dessus ou sous la normale), comme sur la fiche ; l'effet sur la valeur suit le changement.
+    publish(S, out, { tk, cat: "reel", title: `${BY[tk].name} : ${sg.txt}`, text: `${LINKS[tk].src}. ${d > 0 ? "Mieux" : "Moins bien"} qu'au relevé précédent.`,
+      mag: LINKS[tk].beta * d, sent: Math.max(-1, Math.min(1, (Math.abs(sg.z) > .02 ? sg.z : d) * 6)), hl: 360 });
   }
   // Macro : marches aléatoires lentes, rappelées vers leur moyenne.
   S.g += .02 * (1.5 - S.g) + gauss(R) * .04; S.pi += .02 * (2.4 - S.pi) + gauss(R) * .03;
@@ -536,7 +540,7 @@ function sovereign(S, out) {
   S.reg = "reprise"; S.regAge = 0;
   publish(S, out, { cat: "baleine", title: "Le fonds souverain d'Aurelys intervient pour soutenir le marché", text: "Le gouverneur Holm salue une décision « responsable ».", sent: .7, mag: .02, hl: 360 });
 }
-// Flux des baleines sur une action pendant ce tick (Ꜷ, + achat).
+// Flux des baleines sur une action pendant ce tick (W, + achat).
 function whaleFlow(S, R, out, s, Lt) {
   const W = S.whales; let q = 0;
   const k = W.kraken;
@@ -627,7 +631,9 @@ function tick(S, R, out, pending) {
   for (const sec of Object.keys(SECTORS)) {
     const key = "sec:" + sec;
     if (S.next[key] <= t) {
-      if (S.next[key]) { const up = R() < .5, mag = (up ? 1 : -1) * (.005 + R() * .02); publish(S, out, { sector: sec, cat: "secteur", title: fill(pick(R, SECTOR_NEWS[up ? "up" : "down"]), { S: SECTORS[sec].name }), mag, sent: mag * 15, hl: 360 }) }
+      // Mémoire par secteur : une tendance dure (3 fois sur 4, la nouvelle suivante va dans le même sens).
+      S.secSign ??= {};
+      if (S.next[key]) { const up = S.secSign[sec] != null && R() < .75 ? S.secSign[sec] > 0 : R() < .5; S.secSign[sec] = up ? 1 : -1; const mag = (up ? 1 : -1) * (.005 + R() * .02); publish(S, out, { sector: sec, cat: "secteur", title: fill(pick(R, SECTOR_NEWS[up ? "up" : "down"]), { S: SECTORS[sec].name }), mag, sent: mag * 15, hl: 360 }) }
       S.next[key] = t + Math.ceil(-Math.log(1 - R()) * 1440 / reg.news);
     }
   }

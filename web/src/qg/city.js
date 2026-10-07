@@ -71,23 +71,43 @@ export function createCity(parent, onPick) {
   scene.add(hemi, sun);
   const fine = matchMedia("(pointer: fine)").matches;
   const controls = fine ? Object.assign(new OrbitControls(camera, renderer.domElement), { enablePan: false, minZoom: .7, maxZoom: 2.5, minPolarAngle: .6, maxPolarAngle: 1.15, enableDamping: true }) : null;
-  let city = null, R = 10, lit = [], picks = [], key = "";
+  let city = null, R = 10, lit = [], picks = [], key = "", movers = [], bulbs = [];
 
   function frame() {
-    const w = parent.clientWidth, h = parent.clientHeight, view = R * 1.55, asp = w / h;
+    const w = parent.clientWidth, h = parent.clientHeight, view = R * 1.75, asp = w / h;
     renderer.setSize(w, h, false);
     Object.assign(camera, { left: -view * asp / 2, right: view * asp / 2, top: view / 2, bottom: -view / 2 }); camera.updateProjectionMatrix();
   }
   function build({ members, buildings, accent }) {
     if (city) { scene.remove(city); city.traverse(o => { o.geometry?.dispose(); o.material?.emissiveMap?.dispose(); o.material?.dispose?.() }) }
-    city = new THREE.Group(); lit = []; picks = [];
+    city = new THREE.Group(); lit = []; picks = []; movers = []; bulbs = [];
     const n = members.length, ring = Math.max(1, Math.ceil(Math.sqrt(n + 9))), size = ring * 2.4 + 2; R = size / 2 + 1;
     city.add(box(size + 2, .3, size + 2, mat(0x3d4a35), 0, -.3), box(size + 2.4, .2, size + 2.4, mat(0x2a2a2a), 0, -.45));
     // Rues en croix et place centrale.
-    city.add(box(size + 2, .02, 1, mat(0x3a3d44)), box(1, .02, size + 2, mat(0x3a3d44)), box(5.2, .03, 5.2, mat(0xb8ad98)));
+    city.add(box(size + 2, .02, 1, mat(0x3a3d44)), box(1, .02, size + 2, mat(0x3a3d44)), box(8.4, .03, 8.4, mat(0xb8ad98)));
+    // Lampadaires le long des rues (allumés la nuit), quelques-uns éclairent vraiment.
+    const half = size / 2 + .6;
+    for (let k = -half; k <= half; k += 2.4) for (const [x, z] of [[k, .7], [.7, k]]) {
+      if (Math.abs(k) < 4.6) continue;
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(.09, 8, 6), new THREE.MeshStandardMaterial({ color: 0xfff2c4, emissive: 0xffc860, emissiveIntensity: 0 }));
+      bulb.position.set(x, 1.25, z); bulbs.push(bulb);
+      city.add(cyl(.03, .04, 1.2, mat(0x2a2d34), x, 0, z, 6), bulb);
+    }
+    // Habitants et voitures : ils parcourent les rues en boucle.
+    const peopleColors = [0xf04b5c, 0x3987e5, 0xf5b83d, 0x1fcb8b, 0xa78bfa, 0xe9e2d4];
+    for (let i = 0; i < Math.min(24, 6 + members.length * 2); i++) {
+      const p = group(cyl(.07, .09, .32, mat(peopleColors[i % 6]), 0, 0, 0, 6), new THREE.Mesh(new THREE.SphereGeometry(.07, 8, 6), mat(0xe8c4a0)));
+      p.children[1].position.y = .4;
+      movers.push({ o: p, axis: i % 2, lane: (i % 4 < 2 ? 1 : -1) * .42, speed: .25 + (i % 5) * .06, off: i * 1.7, span: size + 1 }); city.add(p);
+    }
+    for (let i = 0; i < Math.min(8, 2 + members.length); i++) {
+      const car = group(box(.55, .2, .28, mat(peopleColors[(i + 2) % 6], { metalness: .3 })), box(.3, .15, .26, mat(0x223344), -.03, .2, 0));
+      movers.push({ o: car, axis: i % 2, lane: (i % 2 ? .18 : -.18), speed: 1.1 + (i % 3) * .3, off: i * 3.1, span: size + 1, car: true }); city.add(car);
+    }
     const slots = []; // places en spirale autour de la place, en évitant les rues
     for (let i = -ring; i <= ring; i++) for (let j = -ring; j <= ring; j++) {
-      const x = i * 2.4, z = j * 2.4; if (Math.abs(x) < 3.2 && Math.abs(z) < 3.2) continue; if (Math.abs(x) < 1.2 || Math.abs(z) < 1.2) continue;
+      const x = i * 2.4, z = j * 2.4; if (Math.abs(x) < 4.4 && Math.abs(z) < 4.4) continue; if (Math.abs(x) < 1.2 || Math.abs(z) < 1.2) continue;
+      if (Math.max(Math.abs(x), Math.abs(z)) > ring * 2.4 - .2) continue; // rien au bord du plateau
       slots.push([x, z]);
     }
     slots.sort((a, b) => Math.hypot(...a) - Math.hypot(...b));
@@ -95,11 +115,15 @@ export function createCity(parent, onPick) {
       const [x, z] = slots[i] ?? [0, 0], b = home(m.home ?? 0, accent, lit);
       b.position.set(x, 0, z); b.userData.member = m; picks.push(b); city.add(b);
     });
-    slots.slice(members.length, members.length + 12).forEach(([x, z], i) => { if (i % 2 === 0) city.add(group(tree(x - .4, z), tree(x + .4, z + .3))) });
+    // Terrains libres : parcs, arbres et bancs, pour que la ville ne paraisse pas vide.
+    slots.slice(members.length).forEach(([x, z], i) => {
+      if (i % 3 === 2) city.add(box(1.6, .02, 1.6, mat(0x4f7a3a), x, 0, z), box(.6, .12, .15, mat(0x7a5537), x, .15, z + .4), tree(x - .5, z - .4), tree(x + .5, z - .3));
+      else city.add(group(tree(x - .45, z), tree(x + .45, z + .35), tree(x, z - .5)));
+    });
     // Place : les bâtiments construits autour de la fontaine.
-    const spots = { mairie: [0, -1.5], salle: [-1.6, .2], banque: [1.6, .2], presse: [-1.4, 1.8], observatoire: [1.4, 1.8] };
+    const spots = { mairie: [0, -2.4], salle: [-2.5, .3], banque: [2.5, .3], presse: [-2.3, 2.8], observatoire: [2.3, 2.8] };
     city.add(cyl(.6, .7, .25, mat(0x9aa8b8)), cyl(.08, .08, .6, mat(0x9aa8b8)));
-    for (const b of buildings) { const g = publicBuilding(b.id, b.level, b.asleep, lit, accent); g.scale.setScalar(.6); g.position.set(...[spots[b.id][0], 0, spots[b.id][1]]); city.add(g) }
+    for (const b of buildings) { const g = publicBuilding(b.id, b.level, b.asleep, lit, accent); g.scale.setScalar(.95); g.position.set(...[spots[b.id][0], 0, spots[b.id][1]]); city.add(g) }
     scene.add(city);
     camera.position.set(R * 2, R * 1.9, R * 2); camera.lookAt(0, 0, 0);
     if (controls) { controls.target.set(0, 0, 0); controls.update() }
@@ -110,7 +134,10 @@ export function createCity(parent, onPick) {
     const d = Math.max(0, Math.sin((h - 6) / 12 * Math.PI)); // 0 la nuit, 1 à midi
     sun.intensity = .45 + 1.3 * d; hemi.intensity = .6 + .5 * d; // la nuit reste lisible
     sun.position.set(Math.cos((h - 6) / 12 * Math.PI) * 20, 4 + 16 * d, 10);
-    lit.forEach(m => { m.emissiveIntensity = d < .25 ? 1.1 * (1 - d * 4) : 0 });
+    const night = d < .25 ? 1 - d * 4 : 0;
+    lit.forEach(m => { m.emissiveIntensity = 1.1 * night });
+    bulbs.forEach(b => { b.material.emissiveIntensity = 2 * night });
+    renderer.setClearColor(new THREE.Color(0x0d1426).lerp(new THREE.Color(0x8fb8de), d), 1); // ciel : nuit bleu nuit, jour bleu clair
   }
   const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
   const tap = e => {
@@ -122,7 +149,16 @@ export function createCity(parent, onPick) {
   };
   renderer.domElement.addEventListener("click", tap);
   let raf = 0;
-  const loop = () => { raf = requestAnimationFrame(loop); controls?.update(); renderer.render(scene, camera) };
+  const t0 = performance.now();
+  const loop = () => {
+    raf = requestAnimationFrame(loop);
+    const t = (performance.now() - t0) / 1000;
+    for (const m of movers) { // aller-retour le long d'une rue
+      const u = ((t * m.speed + m.off) % (2 * m.span)), pos = (u < m.span ? u : 2 * m.span - u) - m.span / 2, dir = u < m.span ? 1 : -1;
+      if (m.axis) { m.o.position.set(m.lane, 0, pos); m.o.rotation.y = dir > 0 ? -Math.PI / 2 : Math.PI / 2 } else { m.o.position.set(pos, 0, m.lane); m.o.rotation.y = dir > 0 ? 0 : Math.PI }
+    }
+    controls?.update(); renderer.render(scene, camera);
+  };
   raf = requestAnimationFrame(loop);
   const ro = new ResizeObserver(frame); ro.observe(parent);
   return {
