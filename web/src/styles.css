@@ -295,11 +295,12 @@ button.brow:hover { background: var(--panel2) }
 .top-seg button { position: relative; z-index: 1; background: none !important; box-shadow: none !important; transition: color .25s }
 
 /* Contenu : fondu glissé au changement d'onglet */
-.view-anim { animation: view-in .32s var(--ease-out) both }
+/* backwards, pas both : un transform gardé après l'animation ferait de la vue le repère des modales (fixed), affichées alors en bas de page. */
+.view-anim { animation: view-in .32s var(--ease-out) backwards }
 
 /* Feuilles : montée en ressort, fond qui se fond */
 .scrim { animation: fade-in .25s ease-out both; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px) }
-.sheet { animation: sheet-in .5s var(--spring) both }
+.sheet { animation: sheet-in .5s var(--spring) backwards }
 @media (min-width: 1024px) { .sheet { animation-name: pop-in } }
 
 /* Appui : léger enfoncement */
@@ -423,7 +424,7 @@ button:active:not(:disabled) { transform: scale(.96) }
 }
 
 /* Sous-onglet : le contenu sous le contrôle segmenté se fond, la lentille glisse sans être recréée */
-.top-seg ~ section, .top-seg ~ .empty-state, .top-seg ~ .history, .top-seg ~ .pos-list, .top-seg ~ .duels { animation: view-in .3s var(--ease-out) both }
+.top-seg ~ section, .top-seg ~ .empty-state, .top-seg ~ .history, .top-seg ~ .pos-list, .top-seg ~ .duels { animation: view-in .3s var(--ease-out) backwards }
 
 /* Icône crypto : la règle générale .who > span (colonne) ne doit pas la déformer */
 .who > .coin-icon { display: grid; place-items: center; flex-direction: initial }

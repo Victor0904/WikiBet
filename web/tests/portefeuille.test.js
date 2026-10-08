@@ -37,7 +37,9 @@ test("levée de fonds : réservée aux joueurs à 50 000 W de patrimoine, 20 % a
 
 test("moteur : des jeunes pousses sont annoncées, introduites en bourse, et radiées si elles s'effondrent", () => {
   const S = initState(1800000000, 4), all = [];
-  for (let m = S.t, end = S.t + 25 * DAY; m < end; m += 60) all.push(...advance(S, realOf(m + 60)).listing);
+  let bad = 0;
+  for (let m = S.t, end = S.t + 25 * DAY; m < end; m += 60) { const o = advance(S, realOf(m + 60)); all.push(...o.listing); bad += o.ticks.filter(x => !Number.isFinite(x.p)).length }
+  assert.equal(bad, 0, "aucun cours invalide (un seul NaN fige tout le marché)");
   const by = st => all.filter(d => d.status === st);
   assert.ok(by("round").length >= 3 && by("listed").length >= 3, "plusieurs levées et introductions");
   assert.ok(all.every(d => !("q" in d)), "la qualité cachée ne sort jamais");

@@ -122,3 +122,13 @@ test("trophées : meilleur trade, krach, mains de diamant, million", async () =>
   assert.ok(t.best.got && t.krach.got && t.diamant.got && t.million.got);
   assert.match(t.best.detail, /^\+1.?499 W · NXR$/, "cadre du meilleur trade : gain net (frais d'ouverture compris)");
 });
+
+test("grands logements : villa, manoir, château, île privée, chacun après le précédent", async () => {
+  const db = await freshDb();
+  await login(db, A, "alice");
+  await db.query("update profiles set cash = 20000000 where id = $1", [A]);
+  await assert.rejects(buy(db, "villa"), /logement précédent/);
+  for (const id of ["studio", "openspace", "loft", "penthouse", "villa", "manoir", "chateau", "ile"]) await buy(db, id);
+  assert.equal(await cash(db, A), 20000000 - 16487000);
+  assert.equal((await db.query("select home_level($1) l", [A])).rows[0].l, 8);
+});

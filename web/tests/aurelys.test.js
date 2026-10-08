@@ -156,3 +156,13 @@ test("aurelys : un état calculé à l'ancienne échelle (5 s par minute) garde 
   assert.equal(S.spm, SPM);
   assert.ok(Math.abs(EPOCH_S + S.nextIpo * SPM - realIpo) <= SPM, "la prochaine levée garde son heure réelle");
 });
+
+test("aurelys : le Courrier ne garde que les articles des 2 dernières heures, et toujours le dernier", async () => {
+  const db = await freshDb();
+  await db.query("insert into aur_news (id, t, cat, title) values (1, now() - interval '3 hours', 'x', 'vieux'), (2, now() - interval '1 hour', 'x', 'récent')");
+  await db.query("select aur_settle()");
+  assert.deepEqual((await db.query("select title from aur_news")).rows.map(r => r.title), ["récent"]);
+  await db.query("update aur_news set t = now() - interval '5 hours'");
+  await db.query("select aur_settle()");
+  assert.equal((await db.query("select count(*)::int n from aur_news")).rows[0].n, 1, "le dernier reste, pour la numérotation");
+});

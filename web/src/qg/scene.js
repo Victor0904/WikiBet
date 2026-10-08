@@ -16,8 +16,12 @@ const HOMES = [
   { size: 10.5, floor: 0x6e6258, wall: 0x2f3346, win: 0.55 }, // open space
   { size: 12.5, floor: 0x4a3528, wall: 0x7a3b2e, win: 0.5 },  // loft (briques)
   { size: 15, floor: 0xd4d0c8, wall: 0x1c2030, win: 0.9 },    // penthouse
+  { size: 16, floor: 0xe0c9a6, wall: 0xe9e1d3, win: 0.9 },    // villa : pierre claire, murs blancs
+  { size: 17, floor: 0x5a3a24, wall: 0x2f4a3a, win: 0.6 },    // manoir : parquet sombre, boiseries vertes
+  { size: 18, floor: 0x8a8478, wall: 0x6e6a62, win: 0.5 },    // château : pierre de taille
+  { size: 18, floor: 0xe8d9b0, wall: 0x2a6f80, win: 0.95 },   // île privée : sable et lagon
 ];
-const WALL = [3.2, 3.2, 3.4, 3.8, 4.8]; // hauteur des murs par logement : le penthouse est en double hauteur
+const WALL = [3.2, 3.2, 3.4, 3.8, 4.8, 4.8, 5.2, 6, 4.8]; // hauteur des murs par logement : le penthouse est en double hauteur
 
 const mat = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: .7, metalness: 0, ...o });
 const glow = color => new THREE.MeshBasicMaterial({ color });
@@ -252,6 +256,33 @@ function structure(level, S, H, accent) {
       const chand = new THREE.PointLight(0xfff0d0, 1.6, 8); chand.position.set(c + S * .45, H - 1, c + S * .5);
       out.push(cyl(.5, .3, .25, mat(0xe8c547, { metalness: .9, roughness: .2, emissive: 0x3a2a00 }), c + S * .45, H - 1, c + S * .5), chand, plantPot(c + .6, c + .6), plantPot(c + S - .6, c + S - .6));
     }
+  }
+  // Au-dessus du penthouse : chaque logement garde tout ce qui précède et ajoute sa signature.
+  const water = new THREE.MeshStandardMaterial({ color: 0x2fc4d9, emissive: 0x0b5a7a, roughness: .1, metalness: .2 });
+  const palm = (x, z, h = 2.4) => out.push(group(cyl(.07, .11, h, wood), ...[0, 1, 2, 3, 4].map(i => { const f = box(1.1, .04, .28, mat(0x2f8d4a), Math.cos(i * 1.26) * .45, h - .05, -Math.sin(i * 1.26) * .45); f.rotation.y = i * 1.26; f.rotation.z = -.25; return f })).translateX(x).translateZ(z));
+  const fireplace = (z, k = 1) => { const l = new THREE.PointLight(0xff8a3a, 1.4, 6); l.position.set(c + .8, .6, z);
+    out.push(box(.6, 1.6 * k, 2 * k, mat(0x9a948a), c + .3, 0, z), box(.32, .7 * k, 1.1 * k, mat(0x1a1210, { emissive: 0xff5a1a, emissiveIntensity: .9 }), c + .5, .15, z), box(.8, .1, 2.3 * k, mat(0x5a3a24), c + .4, 1.6 * k, z), l) };
+  // Places libres : bord droit vers l'avant, mur de gauche entre le canapé et le mur d'écrans, milieu du premier plan.
+  if (level === 5) { // villa : palmiers et transats au bord de la piscine
+    palm(c + S - .8, c + 12.2, 2.6); palm(c + 9.2, c + S - .7, 2.9); palm(c + 12.4, c + S - .7, 2.2);
+    out.push(...[0, 1].map(i => box(.6, .25, 1.6, white, c + 4.8 + i * .9, 0, c + S - 4.3)));
+  }
+  if (level === 6) { // manoir : cheminée entre deux bibliothèques, tapis persan et fauteuils
+    const z = c + S * .55; fireplace(z);
+    out.push(km("bookcaseClosedWide", { x: c + .35, z: z - 2.1, size: 1.6, ry: Math.PI / 2 }), km("bookcaseClosedWide", { x: c + .35, z: z + 2.1, size: 1.6, ry: Math.PI / 2 }),
+      box(3, .02, 2.2, mat(0x7a2a2a), c + 2.6, 0, z), km("loungeChair", { x: c + 2.8, z: z - 1, size: 1, ry: -Math.PI / 2 }), km("loungeChair", { x: c + 2.8, z: z + 1, size: 1, ry: -Math.PI / 2 }));
+  }
+  if (level === 7) { // château : joints de pierre, bannières au-dessus des fenêtres, grande cheminée, trône
+    for (let y = .5; y < H; y += .5) out.push(box(S, .03, .01, mat(0x4a4640), 0, y, c + .005), box(.01, .03, S, mat(0x4a4640), c + .005, y, 0));
+    [.15, .35, .55, .75].forEach(f => out.push(box(.9, 2.2, .03, mat(accent), c + S * f, H - 2.6, c + .04)));
+    fireplace(c + S * .55, 1.4);
+    const gold = mat(0xe8c547, { metalness: .8, roughness: .3 });
+    out.push(box(1.6, .3, 1.6, mat(0x7a2a2a), c + 9, 0, c + 1.6), box(1, .6, .9, gold, c + 9, .3, c + 1.5), box(1, 1.6, .15, gold, c + 9, .3, c + 1.05));
+  }
+  if (level === 8) { // île privée : lagon bordé de sable, palmiers
+    const sand = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, .04, 40), mat(0xf2e3b8)), lagoon = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, .06, 40), water);
+    sand.position.set(c + 10.5, .02, c + S - 3); lagoon.position.set(c + 10.5, .05, c + S - 3); out.push(sand, lagoon);
+    palm(c + S - .8, c + 11.6, 2.4); palm(c + S - .8, c + 13.2, 2.9); palm(c + 7.6, c + S - .5, 2.6); palm(c + 13.4, c + S - .5, 2.2); palm(c + 1, c + 8.6, 2.5);
   }
   return out;
 }

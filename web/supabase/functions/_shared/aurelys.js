@@ -19,6 +19,8 @@ const VIX_BASE = 1.7e-7;                          // variance par tick de l'indi
 
 // Volatilité de toute la cote, relevée de moitié (choix de Victor : un marché plus vivant). Les fiches affichent la valeur relevée.
 const VOLX = 2.5; // 1,5 puis 2,5 : Victor veut un marché qui bouge franchement chaque jour d'Aurelys
+// Volatilité propre à l'entreprise : la volatilité totale moins la part du marché et du secteur.
+const siOf = (sig, beta) => Math.sqrt(Math.max((0.3 * sig) ** 2, sig * sig - (0.006 * beta) ** 2 - 0.005 ** 2));
 const LIQ = { haute: 60000, moyenne: 20000, faible: 6000 }; // W échangés par minute de jeu, en journée
 // Profondeur du carnet face à l'ordre d'un joueur (W) : un ordre de cette taille fait bouger le cours d'environ 0,43 σ jour.
 // Volontairement faible, pour que « plus on achète, plus ça monte » se voie : 25 000 W sur Solarmine ≈ 1 % de hausse.
@@ -52,9 +54,7 @@ export const STOCKS = [
   ["OND", "Ondéo Live", "loisirs", 24.5, 50, .03, 1.2, "moyenne", .08, 35, 0, "#7C5CFF", "Plateforme de streaming : vit de l'audience des lives."],
 ].map(([tk, name, sector, p0, shares, sig0, beta, liq, mu, per, div, color, desc], i) => {
   const sig = sig0 * VOLX;
-  const sm = 0.006 * beta, ss = 0.005; // part du marché et du secteur dans la volatilité
-  return { i, tk, name, sector, p0, shares: shares * 1e6, sig, beta, liq, L: LIQ[liq], depth: DEPTH[liq], mu, per, div, color, desc,
-    si: Math.sqrt(Math.max((0.3 * sig) ** 2, sig * sig - sm * sm - ss * ss)) };
+  return { i, tk, name, sector, p0, shares: shares * 1e6, sig, beta, liq, L: LIQ[liq], depth: DEPTH[liq], mu, per, div, color, desc, si: siOf(sig, beta) };
 });
 export const BY = Object.fromEntries(STOCKS.map(s => [s.tk, s]));
 // Entreprises branchées sur des chiffres réels, relevés par le serveur (fonction aurelys) : un écart à la normale fait
@@ -156,6 +156,7 @@ function spawn(S, R, out) {
     story: `${f1} et ${f2} ont fondé ${name} à ${city}. Leur pari : ${what.toLowerCase()}. La société n'a encore jamais gagné d'argent ; elle lève des fonds pour grandir.`,
     q: Math.max(-2, Math.min(2, gauss(R))), status: "round", roundPrice: price, roundEnd: S.t + IPO.roundDays * DAY, born: S.t,
   };
+  d.si = siOf(d.sig, d.beta);
   S.extra[tk] = d; out.listing.push(pub(d));
   const end = realTxt(realOf(d.roundEnd));
   publish(S, out, { tk: null, sector, cat: "ipo", sent: .3, mag: 0, hl: 240,
@@ -370,6 +371,9 @@ export function advance(S, untilSec, orders = [], signals = null) {
   if (signals) S.sig = signals;
   S.extra ??= {}; out.listing = [];
   if ((S.spm ?? 5) !== SPM) rescale(S);
+  // Réparation : les jeunes pousses créées avant le 8 octobre n'avaient pas de `si`, d'où des cours NaN (marché figé).
+  for (const d of Object.values(S.extra)) d.si ??= siOf(d.sig, d.beta);
+  for (const x of Object.values(S.st)) if (!Number.isFinite(x.gh)) x.gh = 1.3;
   if (target - S.t > 300) S.t = target - 1; // longue coupure : le marché reprend là où il s'était arrêté
   const pending = {};
   for (const o of orders) pending[o.tk] = (pending[o.tk] ?? 0) + Number(o.q);

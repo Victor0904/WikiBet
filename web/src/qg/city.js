@@ -31,7 +31,10 @@ function facade(color, floors, cols) {
   return new THREE.MeshStandardMaterial({ color, roughness: .7, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0 });
 }
 
-// Immeuble d'un membre selon son logement : cabane, maison, petit immeuble, loft de briques, tour de verre.
+// Immeuble d'un membre selon son logement : cabane, maison, petit immeuble, loft de briques, tour de verre,
+// puis villa, manoir, château et île privée (formes dessinées ici : pas de modèle Kenney équivalent).
+const water = new THREE.MeshStandardMaterial({ color: 0x2fc4d9, emissive: 0x0b5a7a, roughness: .1 });
+const palm = (x, z) => group(cyl(.03, .04, .7, mat(0x8a6a4b)), ...[0, 1, 2, 3].map(i => box(.36, .02, .1, mat(0x2f8d4a), Math.cos(i * 1.57) * .15, .68, Math.sin(i * 1.57) * .15).rotateY(-i * 1.57))).translateX(x).translateZ(z);
 function home(level, accent, lit) {
   const roof = mat(0x7a3b2e), A = new THREE.Color(accent);
   const shapes = [
@@ -40,6 +43,11 @@ function home(level, accent, lit) {
     () => { const f = facade(0xbac1cf, 4, 3); lit.push(f); return group(box(1.3, 2.4, 1.3, f), box(1.35, .1, 1.35, mat(A), 0, 2.4)) },
     () => { const f = facade(0x8a4a3a, 4, 4); lit.push(f); return group(box(1.6, 2.6, 1.4, f), box(.3, .8, .3, mat(0x3a2a24), .5, 2.6, .3)) },
     () => { const f = facade(0x5a7a9a, 10, 3, true); f.metalness = .4; f.roughness = .25; lit.push(f); return group(box(1.3, 5.2, 1.3, f), box(.9, .4, .9, mat(A), 0, 5.2), cyl(.03, .03, 1, mat(0xdddddd), 0, 5.6)) },
+    () => { const f = facade(0xf2ebe0, 1, 4); lit.push(f); return group(box(1.8, .8, 1.2, f, 0, 0, -.25), box(1.9, .08, 1.3, mat(A), 0, .8, -.25), box(.9, .04, .5, water, .35, 0, .7), palm(-.75, .7)) },
+    () => { const f = facade(0xd9cbb2, 2, 5); lit.push(f); return group(box(1.7, 1.4, 1.2, f), cyl(0, 1.15, .8, roof, 0, 1.4, 0, 4), box(.2, .6, .2, roof, -.55, 1.6, .2), box(.2, .6, .2, roof, .55, 1.6, -.2)) },
+    () => { const f = facade(0x9a948a, 3, 3), st = mat(0x8a8478); lit.push(f); return group(box(1.2, 1.6, 1.2, f),
+      ...[[-.7, -.7], [.7, -.7], [-.7, .7], [.7, .7]].flatMap(([x, z]) => [cyl(.28, .28, 2.2, st, x, 0, z), cyl(0, .34, .55, mat(A), x, 2.2, z)]), box(.02, .3, .22, mat(A), .7, 2.9, .82)) },
+    () => { const f = facade(0xf2ebe0, 1, 3); lit.push(f); return group(cyl(1.1, 1.1, .05, water), cyl(.75, .85, .12, mat(0xf2e3b8)), box(.7, .5, .6, f, .1, .12, -.1), box(.8, .06, .7, mat(A), .1, .62, -.1), palm(-.45, .35), palm(.5, .45)) },
   ];
   return (shapes[level] ?? shapes[0])();
 }
@@ -161,13 +169,15 @@ export function createCity(parent, onPick) {
     members.forEach((m, i) => {
       const mine = [], [x, z] = slots[i] ?? [0, 0], [dir, names, size] = HOMES_3D[m.home ?? 0] ?? HOMES_3D[0];
       // Modèle Kenney ; la forme simple reste affichée en attendant (ou si le modèle ne charge pas).
-      const b = place(city, dir(names[hashId(m.id) % names.length]), { x, z, ry: (hashId(m.id) % 4) * Math.PI / 2, size, own: true, fallback: home(m.home ?? 0, color, mine),
+      const drawn = !HOMES_3D[m.home ?? 0]; // villa et au-delà : forme dessinée, pas de modèle à charger
+      const b = drawn ? home(m.home, color, mine) : place(city, dir(names[hashId(m.id) % names.length]), { x, z, ry: (hashId(m.id) % 4) * Math.PI / 2, size, own: true, fallback: home(m.home ?? 0, color, mine),
         onLoad: model => {
           const mats = []; model.traverse(o => { if (o.isMesh && o.material.map) { o.material.emissive = new THREE.Color(0xffc070); o.material.emissiveMap = o.material.map; o.material.userData.k = .3; mats.push(o.material) } });
           (m.online ? online : lit).push(...mats); if (!m.online) mats.forEach(f => { f.userData.dark = true });
           if (m.gain) addBeacon(b, new THREE.Box3().setFromObject(model).max.y);
           if (lastHour != null) daylight(lastHour);
         } });
+      if (drawn) { b.position.set(x, 0, z); b.rotation.y = (hashId(m.id) % 4) * Math.PI / 2; city.add(b); if (m.gain) addBeacon(b, new THREE.Box3().setFromObject(b).max.y) }
       // Fenêtres : allumées la nuit seulement si le membre est connecté (une ville vide se voit).
       (m.online ? online : lit).push(...mine); if (!m.online) mine.forEach(f => { f.userData.dark = true });
       b.userData.member = m; picks.push(b);

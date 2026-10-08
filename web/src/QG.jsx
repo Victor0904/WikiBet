@@ -83,7 +83,7 @@ export default function QG({ api, catalog, inv, me, owner, self, patrimoine, ope
 
       {self && <div className="panel perks">
         <b>Avantages de ton logement</b>
-        <p className="muted small">Historique de tes paris sur {PERKS[level].hist} jour{PERKS[level].hist > 1 ? "s" : ""} · {PERKS[level].alerts} alerte{PERKS[level].alerts > 1 ? "s" : ""} de prix sur Aurelys.{next ? ` Avec le ${next.name.toLowerCase()} : ${PERKS[level + 1].hist} jours et ${PERKS[level + 1].alerts} alertes.` : ""}</p>
+        <p className="muted small">Historique de tes paris sur {PERKS[level].hist} jour{PERKS[level].hist > 1 ? "s" : ""} · {PERKS[level].alerts} alerte{PERKS[level].alerts > 1 ? "s" : ""} de prix sur Aurelys.{next ? ` ${next.name} : ${PERKS[level + 1].hist} jours et ${PERKS[level + 1].alerts} alertes.` : ""}</p>
       </div>}
 
       {self && next && (
@@ -92,7 +92,7 @@ export default function QG({ api, catalog, inv, me, owner, self, patrimoine, ope
             <span className="bar"><i style={{ width: `${Math.min(100, me.cash / next.price * 100)}%` }} /></span>
             <small className="muted mono">{W(Math.min(me.cash, next.price))} / {W(next.price)}</small></div>
           <Confirm label={`Emménager · ${W(next.price)}`} confirm="Confirmer le déménagement ?" disabled={me.cash < next.price}
-            onClick={() => act(() => api.buyItem(next.id), () => `Bienvenue dans ton ${next.name.toLowerCase()} !`)} />
+            onClick={() => act(() => api.buyItem(next.id), () => `Emménagement réussi : ${next.name} !`)} />
         </div>
       )}
 
@@ -106,7 +106,7 @@ export default function QG({ api, catalog, inv, me, owner, self, patrimoine, ope
             const resale = Math.floor(it.price * .6), equipped = inv[it.id]?.equipped;
             let action;
             if (it.kind === "home") action = has ? <span className="muted small">{it.level === level ? "Ton logement" : "Déjà habité"}</span>
-              : it.level === level + 1 ? <Confirm label={`Emménager · ${W(it.price)}`} confirm="Confirmer ?" disabled={me.cash < it.price} onClick={() => act(() => api.buyItem(it.id), () => `Bienvenue dans ton ${it.name.toLowerCase()} !`)} />
+              : it.level === level + 1 ? <Confirm label={`Emménager · ${W(it.price)}`} confirm="Confirmer ?" disabled={me.cash < it.price} onClick={() => act(() => api.buyItem(it.id), () => `Emménagement réussi : ${it.name} !`)} />
               : <span className="muted small">Après {HOME_NAMES[it.level - 1]}</span>;
             else if (locked) action = <span className="muted small">À partir du logement {HOME_NAMES[it.level]}</span>;
             else if (it.kind === "bonus") action = <div className="item-acts">

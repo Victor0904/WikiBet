@@ -8,9 +8,10 @@ export const cls = v => v > 1e-9 ? "up" : v < -1e-9 ? "down" : "flat";
 export const clock = ms => new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
 // QG : noms des logements (palier 0 = chambre offerte) et couleurs des thèmes.
-export const HOME_NAMES = ["Chambre", "Studio", "Open space", "Loft", "Penthouse"];
+export const HOME_NAMES = ["Chambre", "Studio", "Open space", "Loft", "Penthouse", "Villa", "Manoir", "Château", "Île privée"];
 // Avantages durables du logement : jours d'historique des paris, alertes de prix sur Aurelys.
-export const PERKS = [{ hist: 1, alerts: 1 }, { hist: 3, alerts: 2 }, { hist: 7, alerts: 3 }, { hist: 30, alerts: 5 }, { hist: 90, alerts: 10 }];
+export const PERKS = [{ hist: 1, alerts: 1 }, { hist: 3, alerts: 2 }, { hist: 7, alerts: 3 }, { hist: 30, alerts: 5 }, { hist: 90, alerts: 10 },
+  { hist: 180, alerts: 15 }, { hist: 365, alerts: 20 }, { hist: 730, alerts: 30 }, { hist: 1095, alerts: 50 }];
 export const THEMES = { theme_cyan: "#3CC8E6", theme_violet: "#A78BFA", theme_rose: "#F472B6", theme_or: "#E8C547" };
 export const DEFAULT_ACCENT = "#F5B83D";
 export const CAP0_TXT = "10 000 W"; // capital de départ, pour les textes
