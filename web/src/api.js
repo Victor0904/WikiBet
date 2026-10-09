@@ -13,6 +13,8 @@ export async function connect() {
 
   const sb = createClient(url, key); // session gardée dans le navigateur (localStorage) : on reste connecté
   let { data: { session } } = await sb.auth.getSession();
+  // Session gardée d'un compte supprimé côté serveur : on l'oublie et on repart sur une partie neuve.
+  if (session && (await sb.auth.getUser()).error?.status === 403) { await sb.auth.signOut({ scope: "local" }); session = null }
   if (!session) {
     const r = await sb.auth.signInAnonymously();
     if (r.error) throw new Error(`Connexion impossible : active « Anonymous sign-ins » dans Supabase (Authentication → Sign In / Providers). ${r.error.message}`);
