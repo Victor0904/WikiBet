@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
 import { liqPrice, BK_LIMIT, CAP0, EPOCH, CYCLE_MS } from "./engine.js";
 import { connect } from "./api.js";
-import { nf0, nf2, W, sW, clock, cls, HOME_NAMES, THEMES, DEFAULT_ACCENT, PERKS } from "./format.js";
+import { nf0, nf2, W, sW, clock, cls, HOME_NAMES, THEMES, DEFAULT_ACCENT, PERKS, AUTO_LV, TRIGGER_LV } from "./format.js";
 import { useAurelys } from "./aurelys.js";
 import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
 import { BY as AUR, slipEstimate, FEE, gameClock } from "../supabase/functions/_shared/aurelys.js";
@@ -52,7 +52,7 @@ function Game({ api }) {
   const say = useCallback((text, tone) => { setToast({ text, tone, at: Date.now() }) }, []);
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 2600); return () => clearTimeout(id) }, [toast]);
 
-  const [holds, setHolds] = useState([]), [invest, setInvest] = useState(null); // portefeuille d'actions (sans levier)
+  const [holds, setHolds] = useState([]), [invest, setInvest] = useState(null), [triggers, setTriggers] = useState([]); // portefeuille d'actions (sans levier)
   const [catalog, setCatalog] = useState([]), [inv, setInv] = useState({}), [rain, setRain] = useState(0), [visit, setVisit] = useState(null);
   useEffect(() => { if (!catalog.length) api.shopItems().then(setCatalog).catch(() => {}) }, [api, board, catalog.length]); // réessaie à chaque rafraîchissement tant qu'il est vide
   const known = useRef(null); // statut de chaque pari au chargement précédent, pour fêter les gains
@@ -61,10 +61,10 @@ function Game({ api }) {
   const histFrom = k - Math.round(perks.hist * 1440 / 11); // séances de 11 min
   const refresh = useCallback(async () => {
     try {
-      const [m, b, l, i, h] = await Promise.all([api.me(), api.myBets(histFrom), api.leaderboard().catch(() => []), api.inventoryOf(api.uid).catch(() => []), api.myHoldings().catch(() => [])]); // classement, QG, portefeuille : facultatifs, le jeu tourne sans
+      const [m, b, l, i, h, tg] = await Promise.all([api.me(), api.myBets(histFrom), api.leaderboard().catch(() => []), api.inventoryOf(api.uid).catch(() => []), api.myHoldings().catch(() => []), api.myTriggers().catch(() => [])]); // classement, QG, portefeuille : facultatifs, le jeu tourne sans
       const prev = known.current, won = prev ? b.filter(x => x.status === "won" && prev.get(x.id) === "open") : [];
       known.current = new Map(b.map(x => [x.id, x.status]));
-      setMe(m); setBets(b); setBoard(l); setInv(Object.fromEntries(i.map(r => [r.item_id, r]))); setHolds(h.map(x => ({ ...x, qty: +x.qty, cost: +x.cost, price: +x.price })));
+      setMe(m); setBets(b); setBoard(l); setInv(Object.fromEntries(i.map(r => [r.item_id, r]))); setHolds(h.map(x => ({ ...x, qty: +x.qty, cost: +x.cost, price: +x.price }))); setTriggers(tg);
       if (won.length) { setToast({ text: `Gagné : ${sW(won.reduce((a, x) => a + x.payout - x.stake, 0))}`, tone: "up", at: Date.now() }); setRain(Date.now()) }
     } catch (e) { say(e.message, "down") }
   }, [api, histFrom, say]);
@@ -113,6 +113,8 @@ function Game({ api }) {
 
   const go = t => { setTab(t); if (t !== "more") setMore(null); window.scrollTo({ top: 0 }) };
   const feeOpen = r => r.kind === "aurelys" ? r.stake * r.lev * FEE : 0; // frais d'ouverture, en plus de la mise
+  const onAuto = homeLevel >= AUTO_LV ? (id, sl, tp) => run(() => api.aurSetAuto(id, sl, tp), () => sl == null && tp == null ? "Stop et objectif retirés." : "Stop et objectif enregistrés.") : null;
+  const cancelTrigger = id => run(() => api.aurTriggerCancel(id), () => "Ordre annulé.");
   const closeTrade = b => run(() => b.kind === "aurelys" ? api.aurOrder({ action: "close", id: b.id }) : api.closeTrade(b.id),
     r => `Clôturée : ${sW(r.payout - r.stake - feeOpen(r))}${feeOpen(r) ? ` (frais ${W(r.fees)})` : ""}`);
   const howtoDone = () => { try { localStorage.setItem("wb-howto", "1") } catch { } setFirstVisit(false); setMore(null); setTab("market") };
@@ -130,7 +132,8 @@ function Game({ api }) {
 
       <div className="layout">
         <aside className="rail">
-          <Positions now={now} aur={aur} bets={open} onClose={closeTrade} />
+          <Triggers list={triggers} onCancel={cancelTrigger} />
+          <Positions now={now} aur={aur} bets={open} onClose={closeTrade} onAuto={onAuto} />
         </aside>
 
         <main className="main">
@@ -144,7 +147,8 @@ function Game({ api }) {
             <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` · ${open.length}` : ""}`], ["folio", "Portefeuille"], ["history", "Historique"]]} />
             {posView === "folio" ? <Portfolio holds={holds} aur={aur} px={holdPx} onSell={h => setInvest({ tk: h.tk, mode: "sell", qty: h.qty })} onBuy={tk => setInvest({ tk, mode: "buy" })} onMarket={() => go("market")} />
             : posView === "open" ? <>
-              {open.length ? <Positions vertical now={now} aur={aur} bets={open} onClose={closeTrade} />
+              <Triggers list={triggers} onCancel={cancelTrigger} />
+              {open.length ? <Positions vertical now={now} aur={aur} bets={open} onClose={closeTrade} onAuto={onAuto} />
                 : <div className="empty-state"><b>Aucun pari en cours</b><p className="muted">Prends position sur une action d'Aurelys.</p>
                     <div className="empty-acts"><button type="button" className="btn primary" onClick={() => go("market")}>Marché</button></div></div>}
             </> : <History bets={bets.filter(b => b.status !== "open")} />}
@@ -177,9 +181,10 @@ function Game({ api }) {
         onInvest={tk => { setAurDetail(null); setInvest({ tk, mode: "buy" }) }} />}
       {invest && <InvestSheet {...invest} api={api} aur={aur} me={me} hold={holds.find(h => h.tk === invest.tk)} onClose={() => setInvest(null)}
         onDone={async (args, ok) => { const r = await run(() => args.mode === "round" ? api.aurSubscribe(args.tk, args.amount) : api.aurOrder(args.mode === "buy" ? { action: "buy", tk: args.tk, amount: args.amount } : { action: "sell", tk: args.tk, qty: args.qty }), () => ok); if (r) setInvest(null) }} />}
-      {ticket && <Ticket api={api} aur={aur} now={now} me={me} ticket={ticket} pref={pref} setPref={setPref} onClose={() => setTicket(null)}
+      {ticket && <Ticket api={api} aur={aur} now={now} me={me} ticket={ticket} level={homeLevel} openCount={positions.length + triggers.filter(g => g.status === "wait").length} pref={pref} setPref={setPref} onClose={() => setTicket(null)}
         onSubmit={async args => {
-          const r = await run(() => api.aurOrder({ action: "open", ...args }), b => `Position ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} ouverte · ${W(b.stake)} à ${aurPx(b.entry)} (frais ${W(b.fees)})`);
+          const r = args.px ? await run(() => api.aurTriggerAdd(args), g => `Ordre en attente : ouverture quand le cours ${g.above ? "monte" : "descend"} à ${aurPx(g.px)}.`)
+            : await run(() => api.aurOrder({ action: "open", ...args }), b => `Position ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} ouverte · ${W(b.stake)} à ${aurPx(b.entry)} (frais ${W(b.fees)})`);
           if (r) setTicket(null);
         }} />}
       {toast && <div className={"toast " + (toast.tone || "")} role="status">{toast.text}</div>}
@@ -233,10 +238,29 @@ function Onboarding({ api, onDone }) {
 }
 
 /* Mes positions en direct : toujours visibles, en tête sur mobile et dans la colonne de gauche sur grand écran. */
-function Positions({ now, aur, bets, onClose, vertical }) {
+// Ordres à déclenchement (penthouse) : en attente, ou exécutés / refusés depuis moins d'un jour.
+function Triggers({ list, onCancel }) {
+  if (!list.length) return null;
+  return (
+    <section className="panel triggers">
+      <h2>Ordres à déclenchement</h2>
+      {list.slice(0, 8).map(g => (
+        <div key={g.id} className="row">
+          <span><b>{AUR[g.tk]?.name ?? g.tk}</b> {g.dir === "up" ? "▲" : "▼"} ×{g.lev} · {W(g.stake)} quand le cours {g.above ? "monte à" : "descend à"} {aurPx(g.px)}
+            {g.status === "done" && <small className="up"> · exécuté</small>}
+            {g.status === "failed" && <small className="down"> · refusé : {g.msg}</small>}
+            {g.status === "cancelled" && <small className="muted"> · annulé</small>}</span>
+          {g.status === "wait" && <button type="button" className="link" onClick={() => onCancel(g.id)}>Annuler</button>}
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function Positions({ now, aur, bets, onClose, onAuto, vertical }) {
   if (!bets.length && !vertical) return <div className="panel empty-pos"><h2>Mes positions</h2><p className="muted">Aucune position ouverte. Choisis une action d'Aurelys et prends position à la hausse ou à la baisse.</p></div>;
   const list = [...bets].filter(b => b.kind === "aurelys").sort((a, b) => b.id - a.id);
-  const cards = list.map(b => <AurelysCard key={b.id} b={b} aur={aur} now={now} onClose={onClose} Facts={Facts} />);
+  const cards = list.map(b => <AurelysCard key={b.id} b={b} aur={aur} now={now} onClose={onClose} onAuto={onAuto} Facts={Facts} />);
   if (vertical) return <div className="pos-list vertical">{cards}</div>;
   return (
     <section className="panel">
@@ -367,8 +391,9 @@ function Rain({ kind, at }) {
   );
 }
 
-function Ticket({ api, aur, now, me, ticket, pref, setPref, onClose, onSubmit }) {
-  const [stake, setStake] = useState(pref.stake), [busy, setBusy] = useState(false), [dir, setDir] = useState(ticket.dir);
+function Ticket({ api, aur, now, me, ticket, level, openCount, pref, setPref, onClose, onSubmit }) {
+  const [stake, setStake] = useState(pref.stake), [busy, setBusy] = useState(false), [dir, setDir] = useState(ticket.dir), [trig, setTrig] = useState("");
+  const trigPx = trig.trim() === "" ? null : +trig.replace(",", "."), maxPos = PERKS[level].pos, full = openCount >= maxPos;
   const set = p => setPref(x => ({ ...x, ...p }));
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
   // Aurelys : ×20 avec un logement, ×25 dans une guilde qui a une salle des marchés (vérifié par le serveur).
@@ -378,14 +403,14 @@ function Ticket({ api, aur, now, me, ticket, pref, setPref, onClose, onSubmit })
   const fee = stake * pref.lev * FEE;
   const aq = aur.quotes[ticket.tk], overCap = stake * pref.lev > aurCap(ticket.tk);
   const open = !!aq && !aq.halt && !overCap;
-  const ok = stake > 0 && stake + fee <= me.cash && open;
+  const ok = stake > 0 && stake + fee <= me.cash && !full && (trigPx == null ? open : trigPx > 0 && !overCap);
   // Max : tout le solde, frais d'ouverture compris, et sans dépasser le plafond d'une action d'Aurelys.
   const maxStake = Math.min(Math.floor(me.cash / (1 + pref.lev * FEE)), Math.floor(aurCap(ticket.tk) / pref.lev));
   let body, title, cta;
   {
     const p = aq?.p ?? 0, sl = slipEstimate(ticket.tk, stake * pref.lev, now / 1000, aur.x?.reg), entry = p * (1 + (dir === "up" ? sl : -sl)), b = { entry, lev: pref.lev, dir, stake };
     title = AUR[ticket.tk].name;
-    cta = `${dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×${pref.lev} · ${W(stake)}`;
+    cta = `${trigPx ? "Placer l'ordre · " : ""}${dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×${pref.lev} · ${W(stake)}`;
     body = <>
       <div className="seg" role="group" aria-label="Sens">
         <button type="button" aria-pressed={dir === "up"} className="buy" onClick={() => setDir("up")}>▲ Hausse</button>
@@ -403,6 +428,11 @@ function Ticket({ api, aur, now, me, ticket, pref, setPref, onClose, onSubmit })
         <div className="row"><span>Liquidation à</span><b>{aurPx(liqPrice(b))}</b></div>
         <div className="row"><span>Plafond sur cette action</span><b>{W(aurCap(ticket.tk))} engagés</b></div>
       </div>
+      {level >= TRIGGER_LV ? <>
+        <label htmlFor="trig">Ouvrir seulement quand le cours atteint (facultatif)</label>
+        <input id="trig" className="mono" inputMode="decimal" placeholder="tout de suite" value={trig} onChange={e => setTrig(e.target.value)} />
+        {trigPx > 0 && <p className="muted small">L'ordre attend que le cours {trigPx > p ? "monte" : "descende"} à {aurPx(trigPx)}, puis part au cours du marché (prix qui peut différer un peu). Ton solde n'est débité qu'à ce moment-là.</p>}
+      </> : <p className="muted small">Ordres à déclenchement (ouvrir quand le cours atteint un seuil) : avec le penthouse (QG).</p>}
       <p className="muted small">Ton ordre fait bouger le cours : plus il est gros, et plus l'action est peu liquide, plus tu paies cher (même chose à la clôture). Le prix exact est calculé par le serveur. La position reste ouverte jusqu'à ce que tu la clôtures, ou jusqu'à la liquidation.</p>
     </>;
   }
@@ -410,7 +440,7 @@ function Ticket({ api, aur, now, me, ticket, pref, setPref, onClose, onSubmit })
     <div className="scrim" onClick={e => e.target === e.currentTarget && onClose()}>
       <form className="sheet" role="dialog" aria-modal="true" aria-label={title} onSubmit={async e => {
         e.preventDefault(); if (!ok) return; setBusy(true); set({ stake });
-        await onSubmit({ tk: ticket.tk, dir, lev: pref.lev, stake });
+        await onSubmit({ tk: ticket.tk, dir, lev: pref.lev, stake, ...(trigPx ? { px: trigPx } : {}) });
         setBusy(false);
       }}>
         <div className="sheet-h"><h2>{title}</h2><button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button></div>
@@ -418,6 +448,7 @@ function Ticket({ api, aur, now, me, ticket, pref, setPref, onClose, onSubmit })
         <label htmlFor="stake">Mise</label>
         <div className="stake"><input id="stake" className="mono" type="number" inputMode="numeric" min="1" step="1" value={stake} onChange={e => setStake(Math.max(0, Math.floor(+e.target.value || 0)))} /><span>W</span></div>
         <StakeChips value={stake} set={setStake} cash={me.cash} max={maxStake} />
+        {full && <p className="error small">Au plus {maxPos} positions ouvertes ou en attente avec ton logement : un logement plus grand en permet davantage (QG).</p>}
         {overCap && <p className="error small">Au plus {W(aurCap(ticket.tk))} engagés (mise × levier) sur cette action.</p>}
         {aq?.halt && <p className="error small">Cotation suspendue, reprise dans quelques secondes.</p>}
         {stake + fee > me.cash && <p className="error small">Solde insuffisant : il te manque {W(stake + fee - me.cash)}{fee ? " (frais compris)" : ""}.</p>}

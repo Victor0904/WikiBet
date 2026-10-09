@@ -483,8 +483,22 @@ export const aurLive = (b, q, ticks) => {
   return { px: p, value, net: value - b.stake - b.fees, closeFee, lq, hit, halt: q?.halt };
 };
 
-export function AurelysCard({ b, aur, now, onClose, Facts }) {
-  const q = aur.quotes[b.aur], ticks = aur.ticks[b.aur], x = aurLive(b, q, ticks), t0 = Date.parse(b.created_at), [busy, setBusy] = useState(false);
+// Stop et objectif d'une position (loft) : un cours vide retire l'ordre. Vérifiés par le serveur (aur_set_auto).
+function AutoForm({ b, onAuto, onDone }) {
+  const [sl, setSl] = useState(b.sl ?? ""), [tp, setTp] = useState(b.tp ?? ""), [busy, setBusy] = useState(false);
+  const num = v => String(v).trim() === "" ? null : +String(v).replace(",", ".");
+  return (
+    <form className="auto-form" onSubmit={async e => { e.preventDefault(); setBusy(true); const r = await onAuto(b.id, num(sl), num(tp)); setBusy(false); if (r) onDone() }}>
+      <label>Stop<input className="mono" inputMode="decimal" placeholder="aucun" value={sl} onChange={e => setSl(e.target.value)} /></label>
+      <label>Objectif<input className="mono" inputMode="decimal" placeholder="aucun" value={tp} onChange={e => setTp(e.target.value)} /></label>
+      <button type="submit" className="btn" disabled={busy}>OK</button>
+      <p className="muted small">Dès que le cours touche un seuil, la position est clôturée au cours du marché (prix qui peut différer un peu du seuil).</p>
+    </form>
+  );
+}
+
+export function AurelysCard({ b, aur, now, onClose, onAuto, Facts }) {
+  const q = aur.quotes[b.aur], ticks = aur.ticks[b.aur], x = aurLive(b, q, ticks), t0 = Date.parse(b.created_at), [busy, setBusy] = useState(false), [auto, setAuto] = useState(false);
   // Cours minute par minute tant qu'on les a (dernière heure réelle), sinon bougies d'une heure d'Aurelys.
   const cs = (aur.candles[b.aur] ?? []).filter(k => k[0] * 1000 > t0 - 300000), recent = (ticks ?? []).filter(k => k[0] * 1000 > t0);
   const pts = [[t0, b.entry], ...((ticks?.[0]?.[0] ?? Infinity) * 1000 <= t0 ? recent.map(k => [k[0] * 1000, k[1]]) : cs.map(k => [k[0] * 1000 + 299000, k[4]])), [now, x.px]];
@@ -505,8 +519,13 @@ export function AurelysCard({ b, aur, now, onClose, Facts }) {
         ["Liquidation", `${px(x.lq)} (${pct(d)})`, Math.abs(d) < .03 ? "down warn" : ""],
         ["Frais", `${W(b.fees)} payés + ${W(x.closeFee)}`],
         ["Ouverte depuis", `${gdur(now - t0)} d'Aurelys`],
+        b.sl != null && ["Stop", px(b.sl), "down"],
+        b.tp != null && ["Objectif", px(b.tp), "up"],
         x.halt && ["Clôture", "à la reprise de la cotation"],
       ]} />
+      {onAuto ? (auto ? <AutoForm b={b} onAuto={onAuto} onDone={() => setAuto(false)} />
+        : <button type="button" className="link" onClick={() => setAuto(true)}>{b.sl != null || b.tp != null ? "Modifier le stop et l'objectif" : "Ajouter un stop ou un objectif"}</button>)
+        : <p className="muted small">Stop et objectif automatiques : avec le loft (QG).</p>}
       {x.hit
         ? <p className="muted small">Seuil de liquidation touché, règlement en cours…</p>
         : <button type="button" className="btn primary" disabled={busy || x.halt} onClick={async () => { setBusy(true); await onClose(b); setBusy(false) }}>Clôturer · {W(x.value)}</button>}

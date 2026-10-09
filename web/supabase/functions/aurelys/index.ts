@@ -83,7 +83,13 @@ async function tick(lead: number) {
     // Annonces, introductions et radiations de jeunes pousses : seulement si ce pas a bien été enregistré.
     if (!error && out.listing.length) must(await admin.rpc("aur_listing", { p_defs: out.listing }));
   }
-  return { t: S.t, liquidated: must(await admin.rpc("aur_settle")) };
+  const liquidated = must(await admin.rpc("aur_settle"));
+  // Ordres automatiques (stop, objectif, déclenchement) dont le seuil a été touché : au cours du marché, avec l'impact.
+  for (const d of must(await admin.rpc("aur_due")) as { what: string; id: number; tk: string; notional: number }[]) {
+    const { error } = await admin.rpc("aur_auto_exec", { p_what: d.what, p_id: d.id, p_slip: slip(S, d.tk, d.notional) });
+    if (error) console.error("ordre auto", d, error.message);
+  }
+  return { t: S.t, liquidated };
 }
 
 Deno.serve(async req => {

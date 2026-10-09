@@ -1,7 +1,7 @@
 // Onglet QG : la pièce en 3D et la boutique. Chargé à la demande (Three.js ne pèse que sur cet onglet).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createScene } from "./qg/scene.js";
-import { W, nf0, clock, HOME_NAMES, PERKS } from "./format.js";
+import { W, nf0, clock, HOME_NAMES, PERKS, AUTO_LV, TRIGGER_LV } from "./format.js";
 
 const SET_STREAM = ["ecran2", "ecran3", "micro", "camera", "chaise", "neon"];
 const TABS = [["decor", "Déco"], ["home", "Logement"], ["cosmetic", "Style"], ["bonus", "Bonus"]];
@@ -83,7 +83,8 @@ export default function QG({ api, catalog, inv, me, owner, self, patrimoine, ope
 
       {self && <div className="panel perks">
         <b>Avantages de ton logement</b>
-        <p className="muted small">Historique de tes paris sur {PERKS[level].hist} jour{PERKS[level].hist > 1 ? "s" : ""} · {PERKS[level].alerts} alerte{PERKS[level].alerts > 1 ? "s" : ""} de prix sur Aurelys.{next ? ` ${next.name} : ${PERKS[level + 1].hist} jours et ${PERKS[level + 1].alerts} alertes.` : ""}</p>
+        <p className="muted small">{PERKS[level].pos} positions ouvertes en même temps · historique de tes paris sur {PERKS[level].hist} jour{PERKS[level].hist > 1 ? "s" : ""} · {PERKS[level].alerts} alerte{PERKS[level].alerts > 1 ? "s" : ""} de prix sur Aurelys{level >= AUTO_LV ? " · stop et objectif automatiques" : ""}{level >= TRIGGER_LV ? " · ordres à déclenchement" : ""}.</p>
+        {next && <p className="muted small">{next.name} : {PERKS[level + 1].pos} positions, {PERKS[level + 1].hist} jours d'historique, {PERKS[level + 1].alerts} alertes{level + 1 === AUTO_LV ? ", stop et objectif automatiques sur tes positions" : ""}{level + 1 === TRIGGER_LV ? ", ordres à déclenchement (ouvrir quand le cours atteint un seuil)" : ""}.</p>}
       </div>}
 
       {self && next && (

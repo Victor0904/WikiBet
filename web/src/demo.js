@@ -43,7 +43,9 @@ export async function demoApi() {
         from = S.t;
       }
       await db.query("select settle()"); // salaires (pg_cron en ligne)
-      if ((await all("select aur_settle() as n"))[0].n) listeners.forEach(f => f());
+      const n = (await all("select aur_settle() as n"))[0].n, due = await all("select * from aur_due()");
+      for (const d of due) await db.query("select aur_auto_exec($1, $2, $3)", [d.what, d.id, slip(S, d.tk, d.notional)]).catch(e => console.error(e));
+      if (n || due.length) listeners.forEach(f => f());
     } catch (e) { console.error(e) } finally { busy = false }
   };
   await step(); setInterval(step, 2000);
@@ -77,6 +79,10 @@ export async function demoApi() {
       const [b] = await all("select aur, stake, lev from bets where id = $1", [body.id]);
       return normBet(await act("select * from aur_close($1, $2, $3)", [UID, body.id, slip(S, b.aur, b.stake * b.lev)]));
     },
+    aurSetAuto: (id, sl, tp) => act("select * from aur_set_auto($1, $2, $3)", [id, sl, tp]),
+    aurTriggerAdd: ({ tk, dir, lev, stake, px }) => act("select * from aur_trigger_add($1, $2, $3, $4, $5)", [tk, dir, lev, stake, px]),
+    aurTriggerCancel: id => act("select aur_trigger_cancel($1)", [id]),
+    myTriggers: () => all("select * from aur_triggers where user_id = $1 and (status = 'wait' or done_at > now() - interval '1 day') order by id desc", [UID]),
     restart: () => act("select * from restart()"),
     myBets: async min => (await all("select * from bets where user_id = $1 and (status = 'open' or session >= $2) order by id desc", [UID, min])).map(normBet),
     leaderboard: async () => (await all("select * from leaderboard()")).map(normBoard),
