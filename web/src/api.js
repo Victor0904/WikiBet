@@ -81,7 +81,7 @@ export async function connect() {
       setLoginEmail: email => rpc("set_login_email", { p_email: email }),
       // Crée le compte ou change le mot de passe (côté serveur), puis se reconnecte : le navigateur propose d'enregistrer le mot de passe.
       register: async (pseudo, password) => { await invoke("aurelys", { action: "register", password }); return signIn(pseudo, password) },
-      signOut: () => auth(sb.auth.signOut(), true),
+      signOut: async () => { await sb.removeAllChannels(); return auth(sb.auth.signOut(), true) }, // temps réel fermé avant de quitter la session
     },
     now: () => Date.now() + offset,
     me: async () => (await rows(sb.from("profiles").select("*").eq("id", uid).maybeSingle())) ?? null,
