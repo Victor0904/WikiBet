@@ -13,13 +13,13 @@ function useAct() {
   return [act, busy, out];
 }
 
-// Se connecter à un compte existant (pseudo et mot de passe).
+// Se connecter à un compte existant (pseudo ou e-mail, et mot de passe).
 export function LoginPanel({ account, warn }) {
   const [pseudo, setPseudo] = useState(""), [pw, setPw] = useState(""), [act, busy, out] = useAct();
   return (
     <form className="auth" onSubmit={e => { e.preventDefault(); act(() => account.signIn(pseudo, pw)) }}>
       {warn && <p className="muted small">Ta partie actuelle n'a pas de mot de passe : elle sera remplacée par celle du compte.</p>}
-      <input name="username" autoComplete="username" placeholder="Pseudo" value={pseudo} onChange={e => setPseudo(e.target.value)} required />
+      <input name="username" autoComplete="username" placeholder="Pseudo ou e-mail" value={pseudo} onChange={e => setPseudo(e.target.value)} required />
       <input name="password" type="password" autoComplete="current-password" placeholder="Mot de passe" value={pw} onChange={e => setPw(e.target.value)} required />
       <button className="btn primary" type="submit" disabled={busy}>Se connecter</button>
       {out}
@@ -40,6 +40,20 @@ function PasswordForm({ account, pseudo, label }) {
   );
 }
 
+// E-mail de connexion facultatif : un autre identifiant, jamais vérifié ni utilisé pour écrire (pas d'envoi d'e-mails).
+function EmailForm({ account }) {
+  const [email, setEmail] = useState(""), [act, busy, out] = useAct();
+  useEffect(() => { account.loginEmail().then(e => setEmail(e ?? "")).catch(() => { }) }, [account]);
+  return (
+    <form className="auth" onSubmit={e => { e.preventDefault(); act(async () => setEmail(await account.setLoginEmail(email) ?? ""), email.trim() ? "E-mail enregistré : tu peux t'en servir pour te connecter." : "E-mail retiré.") }}>
+      <label className="muted small" htmlFor="login-email">E-mail pour se connecter (facultatif, on ne t'écrira jamais)</label>
+      <input id="login-email" type="email" autoComplete="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)} />
+      <button className="btn" type="submit" disabled={busy}>Enregistrer l'e-mail</button>
+      {out}
+    </form>
+  );
+}
+
 // Encadré « Compte » de Mon compte : choisir un mot de passe, se connecter, se déconnecter.
 export function AccountLink({ account, pseudo }) {
   const [u, setU] = useState(undefined), [login, setLogin] = useState(false), [change, setChange] = useState(false), [act, busy, out] = useAct();
@@ -50,6 +64,7 @@ export function AccountLink({ account, pseudo }) {
       <b>Compte</b>
       {u.email ? <>
         <p className="muted">Connecté en tant que {pseudo}. Ta partie est sauvegardée.</p>
+        <EmailForm account={account} />
         {change ? <PasswordForm account={account} pseudo={pseudo} label="Changer le mot de passe" />
           : <button type="button" className="link" onClick={() => setChange(true)}>Changer de mot de passe</button>}
         <button type="button" className="btn" disabled={busy} onClick={() => act(() => account.signOut())}>Se déconnecter</button>

@@ -50,7 +50,9 @@ export async function connect() {
     mode: "supabase", uid,
     account: {
       user: async () => (await sb.auth.getUser()).data.user,
-      signIn,
+      signIn, // pseudo ou e-mail
+      loginEmail: () => rpc("my_login_email"),
+      setLoginEmail: email => rpc("set_login_email", { p_email: email }),
       // Crée le compte ou change le mot de passe (côté serveur), puis se reconnecte : le navigateur propose d'enregistrer le mot de passe.
       register: async (pseudo, password) => { await invoke("aurelys", { action: "register", password }); return signIn(pseudo, password) },
       signOut: () => auth(sb.auth.signOut(), true),
