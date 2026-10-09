@@ -1,0 +1,11 @@
+#!/bin/sh
+# Avant chaque push (donc avant chaque déploiement Vercel) : tous les tests doivent passer.
+# Activé une fois par clone : git config core.hooksPath .githooks
+cd "$(git rev-parse --show-toplevel)/web" || exit 1
+echo "pre-push : npm test…"
+if ! npm test --silent > /tmp/aurelys-pre-push.log 2>&1; then
+  grep -E "^not ok|^# (pass|fail)" /tmp/aurelys-pre-push.log
+  echo "pre-push : tests en échec, push bloqué (détail : /tmp/aurelys-pre-push.log)."
+  exit 1
+fi
+grep -E "^# (pass|fail)" /tmp/aurelys-pre-push.log

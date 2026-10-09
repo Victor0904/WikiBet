@@ -7,7 +7,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test tests/*.test.js",
-    "seed": "node scripts/seed.mjs"
+    "seed": "node scripts/seed.mjs",
+    "db:push": "npm test && npx supabase db push --yes",
+    "fn:deploy": "npm test && npx supabase functions deploy aurelys --use-api"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

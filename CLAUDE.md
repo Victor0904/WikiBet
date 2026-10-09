@@ -141,6 +141,11 @@ Attention au biais actuel : une partie des articles a été choisie dans le top 
 
 ## Règles de travail
 
+- **Aucun déploiement sans tests verts (règle de Victor, octobre 2026).**
+  - Push (donc déploiement Vercel) : le hook `.githooks/pre-push` lance `npm test` dans `web/` et bloque le push au moindre échec. À activer une fois par clone : `git config core.hooksPath .githooks`. Ne jamais le contourner (`--no-verify`). Le workflow `.github/workflows/tests.yml` relance les tests sur GitHub à chaque push (il ne bloque pas Vercel, le hook si).
+  - Migrations en production : toujours `npm run db:push` (tests, puis `supabase db push`), jamais `npx supabase db push` seul. Fonction `aurelys` : `npm run fn:deploy`.
+  - Ne pas enchaîner un déploiement derrière un `grep` de la sortie des tests : c'est le code de sortie de `npm test` qui décide.
+
 - Tout texte affiché en français, phrases courtes.
 - Ne pas présenter des données simulées comme réelles : la mention en bas de l'écran doit rester à jour.
 - Toute règle de jeu se code d'abord en SQL (la base fait foi), puis se reflète dans le front pour l'affichage en direct. Ajouter un test dans `web/tests/` à chaque règle.
