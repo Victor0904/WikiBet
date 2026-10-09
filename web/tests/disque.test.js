@@ -52,6 +52,8 @@ test("cours à la seconde perdus (redémarrage) : les actions gardent la valeur 
   assert.equal((await db.query("select holding_price('HLV') p")).rows[0].p, 20, "dernière bougie");
   assert.equal((await db.query("select patrimoine($1) p", [A])).rows[0].p, before, "patrimoine inchangé : pas de fausse faillite");
   await assert.rejects(open(db, A, "HLV", "up", 1, 100), /indisponible/);
+  await db.query("update aur_candles set t = now() - interval '5 seconds'"); // bougie qui vient de commencer : toujours refusé
+  await assert.rejects(open(db, A, "HLV", "up", 1, 100), /indisponible/, "le cours de repli n'est jamais frais");
   await db.query("select aur_settle()");
   const c = (await db.query("select o, h, l, c from aur_candles where tk = 'HLV'")).rows;
   assert.equal(c.length, 1); assert.equal(c[0].o, 20, "la bougie n'est pas effacée");

@@ -9,6 +9,8 @@ const ONLINE = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPA
 // Session Supabase gardée dans ce navigateur ? Sinon, c'est une première visite : l'accueil s'affiche tout de suite.
 const hasSession = () => { try { return Object.keys(localStorage).some(k => /^sb-.+-auth-token$/.test(k)) } catch { return true } };
 let apiP; const getApi = () => apiP ??= import("./api.js").then(m => m.connect());
+// Lien de parrainage (?ref=CODE) : le code est gardé dans ce navigateur jusqu'à l'inscription, l'adresse est nettoyée.
+try { const r = new URLSearchParams(location.search).get("ref"); if (r) { localStorage.setItem("wb-ref", r.slice(0, 40)); history.replaceState(null, "", location.pathname) } } catch { }
 const Wait = () => <main className="center"><p className="muted">Connexion au marché…</p></main>;
 
 export default function App() {
@@ -28,11 +30,13 @@ export default function App() {
 function Onboarding({ api, onDone }) {
   const online = api ? !!api.account : ONLINE;
   const [pseudo, setPseudo] = useState(""), [pw, setPw] = useState(""), [err, setErr] = useState(null), [login, setLogin] = useState(false);
+  const [ref, setRef] = useState(() => { try { return localStorage.getItem("wb-ref") ?? "" } catch { return "" } });
   // En ligne, le compte se crée tout de suite avec un mot de passe : on se reconnecte avec son pseudo, le navigateur s'en souvient.
   const submit = async e => {
     e.preventDefault();
     let a;
-    try { a = api ?? await getApi(); await a.createProfile(pseudo) } catch (x) { return setErr(x.message) }
+    try { a = api ?? await getApi(); await a.createProfile(pseudo, ref.trim()) } catch (x) { return setErr(x.message) }
+    try { localStorage.removeItem("wb-ref") } catch { }
     if (!a.account) return onDone();
     try { await a.account.register(pseudo.trim(), pw) } catch (x) { setErr(`Partie créée, mais mot de passe refusé : ${x.message} Tu pourras le choisir dans Mon compte.`); setTimeout(onDone, 4000) }
   };
@@ -47,6 +51,8 @@ function Onboarding({ api, onDone }) {
           <label htmlFor="pw">Mot de passe</label>
           <input id="pw" name="password" type="password" autoComplete="new-password" placeholder="8 caractères au moins" value={pw} onChange={e => setPw(e.target.value)} minLength={8} required />
         </>}
+        <label htmlFor="ref">Code de parrainage <span className="muted">(facultatif)</span></label>
+        <input id="ref" name="ref" autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="ex. VAYK-7Q2" value={ref} onChange={e => setRef(e.target.value)} maxLength={40} />
         {err && <p className="error">{err}</p>}
         <button className="btn primary" type="submit">Entrer sur le marché</button>
       </form>

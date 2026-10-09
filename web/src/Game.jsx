@@ -5,7 +5,7 @@ import { useAurelys } from "./aurelys.js";
 import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
 import { BY as AUR, slipEstimate, FEE, gameClock } from "../supabase/functions/_shared/aurelys.js";
 import { Dock, Segmented, SubHeader, Logo } from "./nav.jsx";
-import { MoreMenu, HowTo, Account, Legal, PushPanel } from "./pages.jsx";
+import { Profile, HowTo, Account, Legal, PushPanel } from "./pages.jsx";
 import { Ranking, Friends, Guilds, LoginPanel, BotTag } from "./social.jsx";
 import Portfolio from "./Portfolio.jsx";
 const QG = lazy(() => import("./QG.jsx")); // Three.js n'est chargé qu'à l'ouverture du QG
@@ -45,6 +45,7 @@ export default function Game({ api, onNoProfile }) {
   const say = useCallback((text, tone) => { setToast({ text, tone, at: Date.now() }) }, []);
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), toast.long ? 7000 : 2600); return () => clearTimeout(id) }, [toast]);
 
+  const [refs, setRefs] = useState(null); // parrainage : mon code, mes filleuls, mon parrain, mon rang de la veille
   const [holds, setHolds] = useState([]), [invest, setInvest] = useState(null), [triggers, setTriggers] = useState([]); // portefeuille d'actions (sans levier)
   const [catalog, setCatalog] = useState([]), [inv, setInv] = useState({}), [rain, setRain] = useState(0), [visit, setVisit] = useState(null);
   useEffect(() => { if (!catalog.length) api.shopItems().then(setCatalog).catch(() => {}) }, [api, board, catalog.length]); // réessaie à chaque rafraîchissement tant qu'il est vide
@@ -54,7 +55,7 @@ export default function Game({ api, onNoProfile }) {
   const histFrom = k - Math.round(perks.hist * 1440 / 11); // séances de 11 min
   const refresh = useCallback(async () => {
     try {
-      const [m, b, l, i, h, tg] = await Promise.all([api.me(), api.myBets(histFrom), api.leaderboard().catch(() => []), api.inventoryOf(api.uid).catch(() => []), api.myHoldings().catch(() => []), api.myTriggers().catch(() => [])]); // classement, QG, portefeuille : facultatifs, le jeu tourne sans
+      const [m, b, l, i, h, tg, rf] = await Promise.all([api.me(), api.myBets(histFrom), api.leaderboard().catch(() => []), api.inventoryOf(api.uid).catch(() => []), api.myHoldings().catch(() => []), api.myTriggers().catch(() => []), api.myReferrals?.().catch(() => null)]); // classement, QG, portefeuille : facultatifs, le jeu tourne sans
       const prev = known.current, ended = prev ? b.filter(x => x.status !== "open" && prev.get(x.id) === "open") : [];
       const won = ended.filter(x => x.status === "won" && !x.closed_by);
       known.current = new Map(b.map(x => [x.id, x.status]));
@@ -66,9 +67,10 @@ export default function Game({ api, onNoProfile }) {
         ...ended.filter(x => x.closed_by === "objectif").map(x => `Objectif atteint : ${name(x.aur)} ${side(x)} clôturée à ${aurPx(x.exit)}, ${sW(net(x))}`),
         ...(prevT ? tg.filter(g => prevT.get(g.id) === "wait" && g.status === "done").map(g => `Ordre exécuté : ${name(g.tk)} ${side(g)} ouverte`) : []),
         ...(prevT ? tg.filter(g => prevT.get(g.id) === "wait" && g.status === "failed").map(g => `Ordre refusé : ${name(g.tk)}. ${g.msg}`) : []),
+        ...refNotes(rf),
       ];
       if (notes.length) setToast({ text: notes.join(" · "), tone: ended.some(x => x.closed_by === "liq" || x.closed_by === "stop") ? "down" : "up", at: Date.now(), long: true });
-      setMe(m); setBets(b); setBoard(l); setInv(Object.fromEntries(i.map(r => [r.item_id, r]))); setHolds(h.map(x => ({ ...x, qty: +x.qty, cost: +x.cost, price: +x.price }))); setTriggers(tg);
+      setMe(m); setBets(b); setBoard(l); setInv(Object.fromEntries(i.map(r => [r.item_id, r]))); setHolds(h.map(x => ({ ...x, qty: +x.qty, cost: +x.cost, price: +x.price }))); setTriggers(tg); if (rf) setRefs(rf);
       if (won.length && !notes.length) { setToast({ text: `Gagné : ${sW(won.reduce((a, x) => a + x.payout - x.stake, 0))}`, tone: "up", at: Date.now() }); setRain(Date.now()) }
     } catch (e) { say(e.message, "down") }
   }, [api, histFrom, say]);
@@ -161,7 +163,7 @@ export default function Game({ api, onNoProfile }) {
               {open.length ? <Positions vertical now={now} aur={aur} bets={open} onClose={closeTrade} onAuto={onAuto} />
                 : <div className="empty-state"><b>Aucun pari en cours</b><p className="muted">Prends position sur une action d'Aurelys.</p>
                     <div className="empty-acts"><button type="button" className="btn primary" onClick={() => go("market")}>Marché</button></div></div>}
-            </> : <History bets={bets.filter(b => b.status !== "open")} />}
+            </> : <History bets={withReferrals(bets.filter(b => b.status !== "open"), refs)} />}
           </>}
 
           {tab === "qg" && <Suspense fallback={<p className="muted pad">Chargement du QG…</p>}>
@@ -179,7 +181,9 @@ export default function Game({ api, onNoProfile }) {
             : more === "account" ? <Account account={api.account} push={api.push} me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"}
                 canRestart={me.cash + openStake + holdsValue + catalog.filter(i => i.kind !== "home").reduce((a, i) => a + Math.floor(i.price * .6) * (inv[i.id]?.qty ?? 0), 0) < BK_LIMIT} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} onBack={() => setMore(null)} />
             : more === "legal" ? <Legal onBack={() => setMore(null)} />
-            : <MoreMenu go={setMore} me={me} title={myTitle} />)}
+            : more === "notifs" && api.push ? <><SubHeader title="Notifications" onBack={() => setMore(null)} /><PushPanel push={api.push} /></>
+            : <Profile api={api} me={me} title={myTitle} home={HOME_NAMES[homeLevel]} board={board} patrimoine={patrimoine} refs={refs} accent={accent}
+                say={say} go={setMore} onTrophies={() => go("qg")} hasPush={!!api.push} />)}
           </>}
           </div>
         </main>
@@ -257,11 +261,40 @@ const Facts = ({ items }) => (
   </dl>
 );
 
+// Parrainage : bandeaux quand un filleul s'inscrit ou est validé (comparé au dernier état vu dans ce navigateur).
+function refNotes(rf) {
+  if (!rf) return [];
+  const rows = [...rf.mine.map(r => ({ k: r.id, s: r.status, txt: r.status === "validé" ? `Parrainage : ${r.pseudo} validé, ${r.paid ? sW(r.paid) : "plus de récompense (4 filleuls déjà récompensés)"}` : `${r.pseudo} s'est inscrit avec ton code` })),
+    ...(rf.sponsor ? [{ k: "parrain", s: rf.sponsor.status, txt: rf.sponsor.status === "validé" ? `Parrainage validé : ${sW(rf.sponsor.paid)}` : null }] : [])];
+  let seen = null; try { seen = JSON.parse(localStorage.getItem("wb-refs")) } catch { }
+  try { localStorage.setItem("wb-refs", JSON.stringify(Object.fromEntries(rows.map(r => [r.k, r.s])))) } catch { }
+  if (!seen) return []; // première fois dans ce navigateur : rien de neuf à annoncer
+  return rows.filter(r => r.txt && seen[r.k] !== r.s).map(r => r.txt);
+}
+// Lignes de parrainage dans l'historique des gains, à leur date (elles ne comptent pas au classement des gains).
+function withReferrals(list, refs) {
+  if (!refs) return list;
+  const lines = [...refs.mine.filter(r => r.status === "validé").map(r => ({ id: "ref-" + r.id, kind: "parrainage", at: r.validated_at, text: `Parrainage : ${r.pseudo} validé`, gain: r.paid })),
+    ...(refs.sponsor?.status === "validé" ? [{ id: "ref-me", kind: "parrainage", at: refs.sponsor.validated_at, text: `Parrainage : bienvenue de ${refs.sponsor.pseudo}`, gain: refs.sponsor.paid }] : [])];
+  const out = [...list];
+  for (const l of lines.sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) {
+    const i = out.findIndex(b => b.kind !== "parrainage" && Date.parse(b.created_at) < Date.parse(l.at));
+    out.splice(i < 0 ? out.length : i, 0, l);
+  }
+  return out;
+}
+
 function History({ bets }) {
   if (!bets.length) return <p className="muted pad">Tes paris réglés apparaîtront ici.</p>;
   return (
     <div className="history">
       {bets.map(b => {
+        if (b.kind === "parrainage") return (
+          <div key={b.id} className="hrow">
+            <span><b>{b.text}</b><small>{clock(Date.parse(b.at))} · hors classement des gains</small></span>
+            <span className="r mono"><b className={cls(b.gain)}>{sW(b.gain)}</b><small>{b.gain ? "bonus" : "plafond atteint"}</small></span>
+          </div>
+        );
         const net = b.payout - b.stake;
         // Anciens marchés (crypto, Wikipédia, duels) : retirés du jeu, gardés dans l'historique.
         const label = b.kind === "trade" ? `${b.tk} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} · Wikipédia`

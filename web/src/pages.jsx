@@ -1,4 +1,4 @@
-// Pages du menu « Plus » : menu, Comment jouer, Mon compte, Sources des données.
+// Pages du menu « Plus » : profil, Comment jouer, Mon compte, Sources des données.
 import { W, CAP0_TXT } from "./format.js";
 import { SubHeader } from "./nav.jsx";
 import { AccountLink } from "./social.jsx";
@@ -27,23 +27,89 @@ export function PushPanel({ push, compact }) {
   );
 }
 
-export function MoreMenu({ go, me, title }) {
-  const rows = [
-    ["board", "Classement", "Meilleurs gains du jour, de tous les temps, patrimoine"],
-    ["friends", "Amis", "Ajoute tes amis et compare vos gains"],
-    ["guilds", "Guildes", "Rejoins une équipe de traders"],
-    ["howto", "Comment jouer", "Les règles en deux minutes"],
-    ["account", "Mon compte", `${me.pseudo}${title ? ` · ${title}` : ""}`],
-    ["legal", "Sources des données", "Ce qui est réel, ce qui est simulé"],
-  ];
+// Page Profil (onglet « Plus ») : qui je suis, inviter des amis, accès rapides. Ne relit rien de lourd : les
+// données du jeu déjà chargées d'abord, guilde / amis / trophées ensuite, une fois la page affichée.
+const initials = p => (p ?? "?").split(/[\s._-]+/).filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?";
+const ordinal = n => n === 1 ? "1er" : `${n}e`;
+export const Avatar = ({ pseudo, size = 56, accent }) => (
+  <span className="avatar" style={{ width: size, height: size, fontSize: size * .38, background: accent }} aria-hidden="true">{initials(pseudo)}</span>
+);
+
+export function Profile({ api, me, title, home, board, patrimoine, refs, accent, say, go, onTrophies, hasPush }) {
+  const [guild, setGuild] = useState(undefined), [friends, setFriends] = useState(null), [troph, setTroph] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    api.guildList?.("today").then(l => { if (!alive) return; const i = l.findIndex(g => g.mine); setGuild(i < 0 ? null : { ...l[i], rank: i + 1 }) }).catch(() => alive && setGuild(null));
+    api.myFriends?.().then(f => alive && setFriends(f.filter(x => x.state === "ami"))).catch(() => {});
+    api.trophies?.(me.id).then(t => alive && setTroph(t)).catch(() => {});
+    return () => { alive = false };
+  }, [api, me.id]);
+
+  const rank = board.findIndex(r => r.id === me.id) + 1 || null, delta = rank && refs?.rank_day ? refs.rank_day - rank : 0;
+  const mine = refs?.mine ?? [], rewarded = mine.filter(r => r.paid > 0).length;
+  const slots = [...mine.filter(r => r.status === "validé"), ...mine.filter(r => r.status !== "validé")].slice(0, 4);
+  const link = refs?.code ? `${location.origin}/?ref=${refs.code}` : null;
+  const share = async () => {
+    const text = `Rejoins-moi sur Aurelys, la bourse inventée où les joueurs font les cours. Mon code : ${refs.code}`;
+    if (navigator.share) { try { await navigator.share({ title: "Aurelys", text, url: link }); return } catch (e) { if (e?.name === "AbortError") return } }
+    try { await navigator.clipboard.writeText(link); say("Lien copié : colle-le à tes amis.") } catch { say(`Ton lien : ${link}`) }
+  };
+  const online = friends?.filter(f => f.online).length ?? 0, best = friends?.length ? friends.reduce((a, f) => f.today > a.today ? f : a) : null;
+
   return (
-    <section className="menu">
-      {rows.map(([k, t, sub]) => (
-        <button key={k} type="button" className="menu-row" onClick={() => go(k)}>
-          <span><b>{t}</b><small>{sub}</small></span><span className="chev" aria-hidden="true">›</span>
+    <div className="profile">
+      <header className="profile-head">
+        <Avatar pseudo={me.pseudo} accent={accent} />
+        <div className="who-txt">
+          <h1>{me.pseudo}{guild && <span className="gtag">{guild.tag}</span>}</h1>
+          <small>{[title, home].filter(Boolean).join(" · ")}</small>
+        </div>
+        <button type="button" className="gear" onClick={() => go("account")} aria-label="Mon compte">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.0 10.5L21.4 10.8L21.4 13.2L19.0 13.5L18.1 15.9L19.5 17.8L17.8 19.5L15.9 18.1L13.5 19.0L13.2 21.4L10.8 21.4L10.5 19.0L8.1 18.1L6.2 19.5L4.5 17.8L5.9 15.9L5.0 13.5L2.6 13.2L2.6 10.8L5.0 10.5L5.9 8.1L4.5 6.2L6.2 4.5L8.1 5.9L10.5 5.0L10.8 2.6L13.2 2.6L13.5 5.0L15.9 5.9L17.8 4.5L19.5 6.2L18.1 8.1Z" /><circle cx="12" cy="12" r="3" /></svg>
         </button>
-      ))}
-    </section>
+      </header>
+      <div className="profile-stats">
+        <div><small>Patrimoine</small><b className="mono">{W(patrimoine)}</b></div>
+        <div><small>Classement</small><b className="mono">{rank ? ordinal(rank) : "au-delà du 50e"}
+          {delta !== 0 && <span className={delta > 0 ? "up" : "down"}> {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}<span className="sr"> place{Math.abs(delta) > 1 ? "s" : ""} depuis hier</span></span>}</b></div>
+      </div>
+
+      {link && <section className="invite panel">
+        <div className="invite-h"><h2>Invite tes amis</h2><span className="mono">{rewarded}/4</span></div>
+        <p className="muted small">+10 000 W pour toi et +2 000 W pour ton ami quand il a clôturé 5 positions (100 W ou plus, sur 2 jours) et acheté son premier logement.</p>
+        <ul className="slots">
+          {[0, 1, 2, 3].map(i => { const r = slots[i]; return (
+            <li key={i} className={"slot" + (r ? (r.status === "validé" ? " done" : " wait") : "")}>
+              {r ? <><Avatar pseudo={r.pseudo} size={40} accent={r.status === "validé" ? accent : undefined} /><small>{r.status === "validé" ? r.pseudo : "en cours"}</small></>
+                 : <><span className="avatar empty" aria-hidden="true">+</span><small>libre</small></>}
+            </li>) })}
+        </ul>
+        <div className="invite-code"><span><small>Ton code</small><b className="mono">{refs.code}</b></span>
+          <button type="button" className="btn primary" onClick={share}>Partager</button></div>
+      </section>}
+
+      <div className="ptiles">
+        <button type="button" className="ptile panel" onClick={() => go("board")}>
+          <b>Classement</b><span>{board[0] ? `1er : ${board[0].pseudo}` : "—"}</span><small>{rank ? `Toi : ${ordinal(rank)}` : "Toi : au-delà du 50e"}</small>
+        </button>
+        <button type="button" className="ptile panel" onClick={() => go("guilds")}>
+          <b>Ma guilde</b>{guild === undefined ? <span>…</span> : guild ? <><span>{guild.name}</span><small>{ordinal(guild.rank)} du jour</small></> : <span>Rejoindre une guilde</span>}
+        </button>
+        <button type="button" className="ptile panel" onClick={() => go("friends")}>
+          <b>Amis</b>{!friends ? <span>…</span> : <><span>{friends.length ? `${online} en ligne` : "Ajouter des amis"}</span>
+            {best && best.today > 0 && <small>Meilleur gain du jour : {best.pseudo}</small>}</>}
+        </button>
+        <button type="button" className="ptile panel" onClick={onTrophies}>
+          <b>Trophées</b><span>{troph ? `${troph.filter(t => t.got).length}/${troph.length}` : "…"}</span><small>Voir mon QG</small>
+        </button>
+      </div>
+
+      <nav className="menu discreet" aria-label="Autres pages">
+        {[["howto", "Comment jouer"], ...(hasPush ? [["notifs", "Notifications"]] : []), ["account", "Mon compte"], ["legal", "Sources des données"]].map(([k, t]) => (
+          <button key={k} type="button" className="menu-row" onClick={() => go(k)}><span><b>{t}</b></span><span className="chev" aria-hidden="true">›</span></button>
+        ))}
+      </nav>
+    </div>
   );
 }
 

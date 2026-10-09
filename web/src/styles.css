@@ -624,3 +624,42 @@ button:active:not(:disabled) { transform: scale(.96) }
 @media (prefers-reduced-motion: reduce) { .pos.danger { animation: none; box-shadow: 0 0 0 2px var(--down) } }
 .gtag.bot { color: var(--faint); border-style: dashed }
 .news-search { width: 100%; margin: 12px 0 8px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; font-size: 16px; color: var(--ink) }
+
+/* ===== Page Profil (onglet Plus) ===== */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
+.profile { display: flex; flex-direction: column; gap: 14px }
+.profile-head { display: flex; align-items: center; gap: 12px }
+.avatar { flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--panel2); color: var(--accent-ink); font: 700 20px var(--f-cond); letter-spacing: .02em }
+.avatar:not([style*="background"]), .slot.wait .avatar { color: var(--ink) }
+.avatar.empty { width: 40px; height: 40px; background: none; border: 1.5px dashed var(--line); color: var(--muted); font: 400 20px var(--f-body) }
+.who-txt { min-width: 0; flex: 1 }
+.who-txt h1 { margin: 0; font: 700 22px/1.15 var(--f-cond); overflow-wrap: anywhere }
+.who-txt small { color: var(--muted); font-size: 13px }
+.gear { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; background: var(--panel); border: 1px solid var(--line) }
+.gear svg { width: 22px; height: 22px; fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round }
+.profile-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+.profile-stats > div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px }
+.profile-stats small { color: var(--muted); font-size: 12.5px }
+.profile-stats b { font-size: 18px; font-weight: 600 }
+.invite { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 9%, var(--panel)), var(--panel)) }
+.invite-h { display: flex; justify-content: space-between; align-items: baseline }
+.invite-h .mono { color: var(--accent); font-weight: 600 }
+.invite p { margin: 6px 0 12px }
+.slots { list-style: none; margin: 0 0 12px; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px }
+.slot { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0 }
+.slot small { font-size: 12px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.slot.done small { color: var(--ink) }
+.slot.wait .avatar { opacity: .75; border: 1.5px dashed var(--muted) }
+.invite-code { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--panel2); border-radius: 10px; padding: 8px 8px 8px 12px }
+.invite-code span { display: flex; flex-direction: column }
+.invite-code small { color: var(--muted); font-size: 12px }
+.invite-code b { font-size: 17px; letter-spacing: .06em }
+.ptiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+.ptile { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; color: inherit; min-height: 92px; min-width: 0 }
+.ptile:active { background: var(--panel2) }
+.ptile b { font: 700 15px var(--f-cond); letter-spacing: .01em }
+.ptile span { font-size: 14px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.ptile small { color: var(--muted); font-size: 12.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.menu.discreet .menu-row { min-height: 50px; padding: 12px 16px }
+.menu.discreet .menu-row b { font-weight: 500; font-size: 14.5px; color: var(--muted) }
+.menu.discreet .chev { color: var(--muted) }
