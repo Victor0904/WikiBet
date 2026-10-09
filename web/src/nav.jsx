@@ -9,7 +9,7 @@ const ICONS = {
 export const Icon = ({ name }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[name]}</svg>;
 
 export function Dock({ tab, setTab, badge }) {
-  const items = [["market", "Marché"], ["live", "Live"], ["positions", "Positions"], ["qg", "QG"], ["more", "Plus"]];
+  const items = [["market", "Marché"], ["positions", "Positions"], ["qg", "QG"], ["more", "Plus"]];
   const i = items.findIndex(([k]) => k === tab);
   return (
     <nav className="dock" aria-label="Sections">

@@ -32,18 +32,6 @@ const getJson = async (url: string) => { const r = await fetch(url, { signal: Ab
 
 // Chaque source est relevée séparément : une panne n'empêche pas les autres, et l'ancienne valeur reste.
 const SOURCES: Record<string, () => Promise<{ z: number; txt: string } | null>> = {
-  async PXF() {
-    const r = must(await admin.rpc("aur_real_inputs")) as any;
-    if (!r.steam_now || !r.steam_then) return null;
-    const z = clamp(r.steam_now / r.steam_then - 1, .5);
-    return { z, txt: `${fmt(r.steam_now)} joueurs connectés sur Steam, ${pct(z)} sur la veille` };
-  },
-  async OND() {
-    const r = must(await admin.rpc("aur_real_inputs")) as any;
-    if (!r.twitch_now || !r.twitch_then) return null;
-    const z = clamp(r.twitch_now / r.twitch_then - 1, .5);
-    return { z, txt: `${fmt(r.twitch_now)} spectateurs sur les grands lives Twitch, ${pct(z)} sur la veille` };
-  },
   async GTR() { // Beauce : la pluie aide les récoltes, la canicule les abîme.
     const d = (await getJson("https://api.open-meteo.com/v1/forecast?latitude=48.3&longitude=1.6&daily=precipitation_sum,temperature_2m_max&past_days=14&forecast_days=7&timezone=Europe%2FParis")).daily;
     const rain = d.precipitation_sum.slice(0, 14).reduce((a: number, b: number) => a + (b ?? 0), 0), heat = Math.max(...d.temperature_2m_max.slice(14));

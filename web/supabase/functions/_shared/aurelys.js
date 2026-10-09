@@ -60,8 +60,6 @@ export const BY = Object.fromEntries(STOCKS.map(s => [s.tk, s]));
 // Entreprises branchées sur des chiffres réels, relevés par le serveur (fonction aurelys) : un écart à la normale fait
 // bouger leur valeur fondamentale et leurs prochains résultats. Ce sont des données futures : on ne peut pas les connaître d'avance.
 export const LINKS = {
-  PXF: { src: "Joueurs connectés sur Steam (29 jeux suivis), comparés à la veille à la même heure", beta: .5 },
-  OND: { src: "Spectateurs des grands lives Twitch francophones, comparés à la veille à la même heure", beta: .5 },
   GTR: { src: "Pluie des 14 derniers jours et chaleur prévue en Beauce (Open-Meteo)", beta: .4 },
   HLV: { src: "Consommation électrique française (RTE éCO2mix), comparée à la veille", beta: .4 },
   LMR: { src: "Jours fériés à venir et météo du week-end à Paris (Open-Meteo)", beta: .3 },

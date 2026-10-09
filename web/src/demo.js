@@ -7,7 +7,7 @@ const migrations = Object.entries(import.meta.glob("../supabase/migrations/*.sql
 import { seedRows } from "./seed.js";
 import { createEngine } from "./engine.js";
 import data from "./pageviews.json"; // la démo remplit sa base locale (les tables du replay Wiki restent nécessaires à l'horloge des séances)
-import { normBet, normStream, normMarket, normBoard, normGuild } from "./api.js";
+import { normBet, normBoard, normGuild } from "./api.js";
 import { initState, advance, slip } from "../supabase/functions/_shared/aurelys.js";
 
 const UID = "00000000-0000-4000-8000-000000000001";
@@ -42,6 +42,7 @@ export async function demoApi() {
         if (out.listing.length) await db.query("select aur_listing($1)", [JSON.stringify(out.listing)]);
         from = S.t;
       }
+      await db.query("select settle()"); // salaires (pg_cron en ligne)
       if ((await all("select aur_settle() as n"))[0].n) listeners.forEach(f => f());
     } catch (e) { console.error(e) } finally { busy = false }
   };
@@ -55,10 +56,6 @@ export async function demoApi() {
     openTrade: ({ tk, dir, lev, stake }) => act("select * from open_trade($1, $2, $3, $4, 'close')", [tk, dir, lev, stake]),
     closeTrade: id => act("select * from close_trade($1)", [id]),
     betDuel: ({ duel, side, stake }) => act("select * from bet_duel($1, $2, $3)", [duel, side, stake]),
-    openStream: ({ login, dir, lev, stake, horizon }) => act("select * from open_stream($1, $2, $3, $4, $5)", [login, dir, lev, stake, horizon]),
-    streamBoard: async () => (await all("select * from stream_board(120)")).map(normStream),
-    openMarkets: async () => (await all("select * from open_markets()")).map(normMarket),
-    betQuestion: ({ market, side, stake }) => act("select * from bet_question($1, $2, $3)", [market, side, stake]),
     aurFeed: async since => (await all("select aur_feed($1) as f", [since ? new Date(since * 1000).toISOString() : null]))[0].f,
     aurHistory: async (tk, minutes) => (await all("select aur_history($1, $2) as h", [tk, minutes]))[0].h,
     aurTicks: async (tk, minutes) => (await all("select aur_ticks_of($1, $2) as k", [tk, minutes]))[0].k,
@@ -81,7 +78,6 @@ export async function demoApi() {
       return normBet(await act("select * from aur_close($1, $2, $3)", [UID, body.id, slip(S, b.aur, b.stake * b.lev)]));
     },
     restart: () => act("select * from restart()"),
-    settle: async () => (await all("select settle() as n"))[0].n,
     myBets: async min => (await all("select * from bets where user_id = $1 and (status = 'open' or session >= $2) order by id desc", [UID, min])).map(normBet),
     leaderboard: async () => (await all("select * from leaderboard()")).map(normBoard),
     gainsBoard: (period, scope) => all("select * from gains_board($1, $2)", [period, scope]),

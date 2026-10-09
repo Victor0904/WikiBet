@@ -13,6 +13,8 @@ Deux versions cohabitent :
 
 ## Décisions validées par Victor
 
+- **Live retiré (9 octobre 2026)** : Twitch et Steam ne sont plus relevés ni proposés (migration `20261020000000_sans_live.sql` : crons coupés, paris en cours remboursés, `make_markets()` ne crée plus rien). Le client n'appelle plus `settle()` ni `stream_board` / `open_markets` ; pg_cron s'en charge (salaires). Pixelfold et Ondéo ne sont plus branchées sur du réel. Les sections Live / Steam / Questions plus bas décrivent l'historique.
+
 - **Recentrage (octobre 2026, après une revue externe)** : on ne garde que les modes où le talent paie et où l'on ne peut pas tricher. **Aurelys** (le cœur) et le **Live** (Twitch / Steam). La crypto (hasard à court terme) et le replay Wikipédia avec ses duels (jours passés, donc trichables) sont retirés : migration `20261011000000_recentrage.sql` (positions crypto clôturées au dernier cours, paris Wiki remboursés, plus d'ouverture possible). Les tables restent pour l'historique ; l'horloge des séances de 11 min (`game_now`) sert encore au salaire.
 
 - Version en ligne sur **Supabase + Vercel**, React avec Vite (étape de build acceptée).

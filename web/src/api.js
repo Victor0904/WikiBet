@@ -4,10 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 
 // Les identifiants bigint et les cotes numeric arrivent parfois en texte : on normalise une fois ici.
 export const normBet = b => ({ ...b, id: Number(b.id), odds: b.odds == null ? null : Number(b.odds) });
-export const normMarket = m => ({ ...m, id: Number(m.id), closes_at: new Date(m.closes_at).toISOString(), p_yes: Number(m.p_yes), odds_yes: Number(m.odds_yes), odds_no: Number(m.odds_no) });
 export const normBoard = r => ({ ...r, cash: Number(r.cash), patrimoine: Number(r.patrimoine) });
 export const normGuild = g => ({ ...g, id: Number(g.id) });
-export const normStream = s => ({ ...s, ts: (s.ts || []).map(Number), vs: (s.vs || []).map(Number) });
 
 export async function connect() {
   const url = import.meta.env.VITE_SUPABASE_URL, key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -65,10 +63,6 @@ export async function connect() {
     openTrade: ({ tk, dir, lev, stake }) => rpc("open_trade", { p_tk: tk, p_dir: dir, p_lev: lev, p_stake: stake, p_horizon: "close" }), // ouverte jusqu'à la fin de séance
     closeTrade: id => rpc("close_trade", { p_id: id }),
     betDuel: ({ duel, side, stake }) => rpc("bet_duel", { p_duel: duel, p_side: side, p_stake: stake }),
-    openStream: ({ login, dir, lev, stake, horizon }) => rpc("open_stream", { p_login: login, p_dir: dir, p_lev: lev, p_stake: stake, p_horizon: horizon }),
-    streamBoard: async () => (await rpc("stream_board", { p_minutes: 120 })).map(normStream),
-    openMarkets: async () => (await rpc("open_markets")).map(normMarket),
-    betQuestion: ({ market, side, stake }) => rpc("bet_question", { p_market: market, p_side: side, p_stake: stake }),
     // Bourse d'Aurelys : cours jusqu'à maintenant (jamais au-delà), bougies, actualités publiées, ordres par le serveur.
     aurFeed: since => rpc("aur_feed", { p_since: since ? new Date(since * 1000).toISOString() : null }),
     aurHistory: (tk, minutes) => rpc("aur_history", { p_tk: tk, p_minutes: minutes }),
@@ -86,7 +80,6 @@ export async function connect() {
     aurNews: () => rows(sb.from("aur_news").select("*").order("id", { ascending: false }).limit(150)),
     aurOrder: body => invoke("aurelys", body),
     restart: () => rpc("restart"),
-    settle: () => rpc("settle"),
     myBets: async minSession => (await rows(sb.from("bets").select("*").eq("user_id", uid).or(`status.eq.open,session.gte.${minSession}`).order("id", { ascending: false }))).map(normBet),
     leaderboard: async () => (await rpc("leaderboard")).map(normBoard),
     gainsBoard: (period, scope) => rpc("gains_board", { p_period: period, p_scope: scope }),

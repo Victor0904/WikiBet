@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState, useCallback, lazy, Suspense } from "react";
-import { tradeValue, liqPrice, LEVS, BK_LIMIT, CAP0, EPOCH, CYCLE_MS } from "./engine.js";
+import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
+import { liqPrice, BK_LIMIT, CAP0, EPOCH, CYCLE_MS } from "./engine.js";
 import { connect } from "./api.js";
-import { PositionChart, Spark } from "./charts.jsx";
-import { nf0, nf2, W, sW, clock, pct, cls, HOME_NAMES, THEMES, DEFAULT_ACCENT, PERKS } from "./format.js";
+import { nf0, nf2, W, sW, clock, cls, HOME_NAMES, THEMES, DEFAULT_ACCENT, PERKS } from "./format.js";
 import { useAurelys } from "./aurelys.js";
 import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
 import { BY as AUR, slipEstimate, FEE, gameClock } from "../supabase/functions/_shared/aurelys.js";
@@ -16,42 +15,7 @@ const QG = lazy(() => import("./QG.jsx")); // Three.js n'est chargé qu'à l'ouv
 // Une séance se nomme par son heure de début réelle (« séance de 14:32 »), plus parlante que son numéro.
 const sessName = k => { const d = new Date(EPOCH + k * CYCLE_MS), t = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   return d.toDateString() === new Date().toDateString() ? `séance de ${t}` : `séance du ${d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} à ${t}` };
-const STREAM_H = { "15": "15 min", "60": "1 h", live: "fin du live" };
-const mmss = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0") };
 
-// État d'une position sur un streamer d'après les relevés reçus (le serveur fait foi pour le règlement).
-function liveStream(b, st, now) {
-  const t0 = Date.parse(b.created_at), end = b.end_at ? Date.parse(b.end_at) : null, upto = Math.min(now, end ?? now);
-  const pts = [[t0, b.entry]];
-  if (st) st.ts.forEach((t, i) => { if (t > t0 && t <= upto) pts.push([t, st.vs[i]]) });
-  for (const [, v] of pts.slice(1)) if (tradeValue(b, v) <= 0) return { value: 0, px: v, pts, liquidated: true, due: true };
-  const px = pts[pts.length - 1][1];
-  return { value: tradeValue(b, px), px, pts, liquidated: false, due: (end != null && now >= end) || (!!st && !st.live) };
-}
-// Instant du chiffre Twitch affiché : dernier relevé où le nombre a changé (Twitch le met à jour toutes les 1 à 3 min).
-function twitchAt(x) { let t = x.ts[0] ?? Date.parse(x.at); for (let i = 1; i < x.vs.length; i++) if (x.vs[i] !== x.vs[i - 1]) t = x.ts[i]; return t }
-const ago = ms => { const sec = Math.max(0, Math.round(ms / 1000)); return sec < 60 ? `il y a ${sec} s` : `il y a ${Math.floor(sec / 60)} min` };
-// Sources des questions en direct : chaînes Twitch et jeux Steam (sujets 'steam:<appid>'), même mécanique.
-const SRC = {
-  twitch: {
-    unit: "spectateurs", name: "Twitch", what: "le live",
-    info: "Chiffres Twitch réels, que Twitch met à jour toutes les 1 à 3 min",
-    intro: "Le live dépassera-t-il le seuil à l'heure dite ? Réponds Oui ou Non : la cote est figée au moment du pari. Paris fermés 5 min avant l'échéance.",
-    demo: "Les streamers Twitch ne sont disponibles qu'en ligne : la démo locale n'a pas accès à Twitch.",
-    end: "si le live est terminé, c'est Non",
-    fine: "Spectateurs Twitch réels (API Twitch), relevés chaque minute. Une question se règle sur le dernier chiffre Twitch avant l'heure annoncée ; si le live est terminé, c'est Non.",
-  },
-  steam: {
-    unit: "joueurs", name: "Steam", what: "le jeu",
-    info: "Joueurs connectés réels sur Steam, relevés chaque minute (Steam met parfois plusieurs minutes à actualiser un jeu)",
-    intro: "Le jeu aura-t-il plus de joueurs connectés que le seuil à l'heure dite ? Réponds Oui ou Non : la cote est figée au moment du pari. Paris fermés 5 min avant l'échéance.",
-    demo: "Les jeux Steam ne sont disponibles qu'en ligne : la démo locale n'a pas accès à Steam.",
-    end: "s'il n'y a plus de relevé, c'est le dernier chiffre connu qui compte",
-    fine: "Joueurs connectés réels (API publique de Steam), relevés chaque minute ; Steam actualise certains jeux moins souvent, l'heure du chiffre est indiquée. Une question se règle sur le dernier chiffre Steam avant l'heure annoncée.",
-  },
-};
-// Question « pic du jour » : échéance à 23:59:59 (les questions à l'heure tombent sur des quarts d'heure ronds).
-const isPeak = m => new Date(m.end_at ?? m.closes_at).getSeconds() === 59;
 const AUR_LEVS = [1, 5, 10, 15, 20, 25];
 // Montants cumulables : le premier appui remplace la mise affichée, les suivants s'ajoutent (10, 20, 30…).
 // 10 000 n'apparaît qu'au-delà de 10 000 W de solde.
@@ -65,14 +29,6 @@ function StakeChips({ value, set, cash, max }) {
     </div>
   );
 } // leviers d'Aurelys (×20 et ×25 se débloquent)
-const srcOf = login => login?.startsWith("steam:") ? SRC.steam : SRC.twitch;
-// Variation du nombre de spectateurs (ou de joueurs) sur les 15 dernières minutes.
-function chg15(x) {
-  if (!x.live || !x.vs.length) return 0;
-  const lim = Date.parse(x.at) - 15 * 60000; let ref = x.vs[0];
-  x.ts.forEach((t, i) => { if (t <= lim) ref = x.vs[i] });
-  return ref ? x.viewers / ref - 1 : 0;
-}
 
 export default function App() {
   const [api, setApi] = useState(null), [err, setErr] = useState(null);
@@ -89,7 +45,7 @@ function Game({ api }) {
 
   const [me, setMe] = useState(undefined), [bets, setBets] = useState([]), [board, setBoard] = useState([]);
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
-  const [aurDetail, setAurDetail] = useState(null), [liveSrc, setLiveSrc] = useState("twitch"), [posView, setPosView] = useState("open"), [more, setMore] = useState(null);
+  const [aurDetail, setAurDetail] = useState(null), [posView, setPosView] = useState("open"), [more, setMore] = useState(null);
   useEffect(() => { if (api.account?.landed) { setTab("more"); setMore("account") } }, [api]); // retour d'un lien e-mail
   // « Comment jouer » s'ouvre tout seul à la première visite.
   const [firstVisit, setFirstVisit] = useState(() => { try { return !localStorage.getItem("wb-howto") } catch { return false } });
@@ -117,14 +73,6 @@ function Game({ api }) {
   // Présence : la ville de ta guilde allume tes fenêtres quand tu es connecté.
   useEffect(() => { const ping = () => api.touch?.().catch(() => {}); ping(); const id = setInterval(ping, 60000); return () => clearInterval(id) }, [api]);
 
-  // Lives Twitch : relevés côté serveur chaque minute, rechargés ici toutes les 20 s.
-  const [streams, setStreams] = useState([]), [markets, setMarkets] = useState([]);
-  const loadStreams = useCallback(() => Promise.all([api.streamBoard(), api.openMarkets().catch(() => [])]).then(([b, m]) => { setStreams(b); setMarkets(m) }).catch(() => {}), [api]);
-  useEffect(() => { loadStreams(); const id = setInterval(loadStreams, 20000); return () => clearInterval(id) }, [loadStreams]);
-  const byLogin = useMemo(() => Object.fromEntries(streams.map(x => [x.login, x])), [streams]);
-  // Bâtiments de ma guilde (l'observatoire affiche tendance et prévision des lives).
-  const [city, setCity] = useState({});
-  useEffect(() => { const load = () => api.myCity().then(setCity).catch(() => {}); load(); const id = setInterval(load, 60000); return () => clearInterval(id) }, [api]);
   // Bourse d'Aurelys : cours à la seconde quand on la regarde ou qu'on y a une position, sinon toutes les 10 s.
   // Alertes de prix (Aurelys) : gardées dans ce navigateur, nombre selon le logement.
   const [alerts, setAlerts] = useState(() => { try { return JSON.parse(localStorage.getItem("wb-alerts")) ?? [] } catch { return [] } });
@@ -138,12 +86,6 @@ function Game({ api }) {
     setAlerts(l => l.filter(a => !hit.includes(a)));
   }, [beat]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Règlement des questions et positions du Live : à l'échéance, et toutes les 15 s.
-  const due = bets.filter(b => b.status === "open" && (b.kind === "stream" ? liveStream(b, byLogin[b.login], now).due : b.kind === "question" && now >= Date.parse(b.end_at))).length;
-  const settle = useCallback(() => api.settle().then(refresh).catch(() => {}), [api, refresh]);
-  useEffect(() => { if (due) settle() }, [due, settle]);
-  useEffect(() => { const id = setInterval(settle, 15000); return () => clearInterval(id) }, [settle]);
-
   const run = async (fn, ok) => { try { const r = await fn(); if (ok) say(ok(r), "up"); await refresh(); return r } catch (e) { say(e.message, "down") } };
   const open = bets.filter(b => b.status === "open");
   const equipped = cat => catalog.find(i => i.category === cat && inv[i.id]?.equipped);
@@ -151,15 +93,13 @@ function Game({ api }) {
   useEffect(() => { document.documentElement.style.setProperty("--accent", accent) }, [accent]);
   const openStake = open.reduce((a, b) => a + b.stake, 0);
   const objectsValue = catalog.filter(i => i.kind !== "bonus" && (inv[i.id]?.qty ?? 0) > 0).reduce((a, i) => a + Math.floor(i.price * .6), 0);
-  const positions = open.filter(b => b.kind === "stream" || b.kind === "aurelys");
-  const pnl = positions.length ? Math.round(positions.reduce((a, b) => a + (b.kind === "aurelys" ? aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).net
-    : liveStream(b, byLogin[b.login], now).value - b.stake), 0)) : null;
+  const positions = open.filter(b => b.kind === "aurelys");
+  const pnl = positions.length ? Math.round(positions.reduce((a, b) => a + aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).net, 0)) : null;
   // Le QG vit avec la partie : une position par écran, l'ambiance du jour, l'heure et l'humeur d'Aurelys, la une du Courrier.
   const midnight = new Date().setHours(0, 0, 0, 0);
   const dayNet = bets.filter(b => b.status !== "open" && Date.parse(b.closed_at) >= midnight).reduce((a, b) => a + b.payout - b.stake - (b.fee_open ?? 0), 0) + (pnl ?? 0);
   const qgLive = {
-    positions: positions.map(b => b.kind === "aurelys" ? { label: AUR[b.aur]?.name ?? b.aur, pnl: aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).net }
-      : { label: byLogin[b.login]?.display_name ?? b.login, pnl: liveStream(b, byLogin[b.login], now).value - b.stake }),
+    positions: positions.map(b => ({ label: AUR[b.aur]?.name ?? b.aur, pnl: aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).net })),
     mood: Math.abs(dayNet) < 1 ? 0 : Math.sign(dayNet), hour: gameClock(now / 1000).hour, reg: aur.x?.reg ?? "calme",
     une: aur.news.find(n => n.cat !== "secteur" && Math.abs(n.sent) >= .3)?.title ?? aur.news[0]?.title ?? "",
   };
@@ -191,29 +131,24 @@ function Game({ api }) {
 
       <div className="layout">
         <aside className="rail">
-          <Positions now={now} byLogin={byLogin} aur={aur} bets={open} onClose={closeTrade} />
+          <Positions now={now} aur={aur} bets={open} onClose={closeTrade} />
         </aside>
 
         <main className="main">
           <div key={showHowto ? "howto" : tab + (more ?? "")} className="view-anim">
           {showHowto ? <HowTo first={firstVisit} onBack={firstVisit ? howtoDone : () => setMore(null)} /> : <>
-          {(tab === "market" || tab === "live") && <MiniTicker now={now} byLogin={byLogin} aur={aur} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
+          {tab === "market" && <MiniTicker aur={aur} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
 
           {tab === "market" && <AurelysMarket aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onDetail={setAurDetail} onSubscribe={tk => setInvest({ tk, mode: "round" })} />}
-
-          {tab === "live" && <>
-            <Segmented label="Live" value={liveSrc} onChange={setLiveSrc} options={[["twitch", "Twitch"], ["steam", "Steam"]]} />
-            <Streams key={liveSrc} obs={city.observatoire ?? 0} src={liveSrc} streams={streams} markets={markets} mode={api.mode} bets={open} now={now} onPick={(market, side) => setTicket({ kind: "question", market, side })} />
-          </>}
 
           {tab === "positions" && <>
             <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` · ${open.length}` : ""}`], ["folio", "Portefeuille"], ["history", "Historique"]]} />
             {posView === "folio" ? <Portfolio holds={holds} aur={aur} px={holdPx} onSell={h => setInvest({ tk: h.tk, mode: "sell", qty: h.qty })} onBuy={tk => setInvest({ tk, mode: "buy" })} onMarket={() => go("market")} />
             : posView === "open" ? <>
-              {open.length ? <Positions vertical now={now} byLogin={byLogin} aur={aur} bets={open} onClose={closeTrade} />
-                : <div className="empty-state"><b>Aucun pari en cours</b><p className="muted">Prends position sur une action d'Aurelys ou réponds à une question en direct.</p>
-                    <div className="empty-acts"><button type="button" className="btn primary" onClick={() => go("market")}>Marché</button><button type="button" className="btn" onClick={() => go("live")}>Live</button></div></div>}
-            </> : <History byLogin={byLogin} bets={bets.filter(b => b.status !== "open")} />}
+              {open.length ? <Positions vertical now={now} aur={aur} bets={open} onClose={closeTrade} />
+                : <div className="empty-state"><b>Aucun pari en cours</b><p className="muted">Prends position sur une action d'Aurelys.</p>
+                    <div className="empty-acts"><button type="button" className="btn primary" onClick={() => go("market")}>Marché</button></div></div>}
+            </> : <History bets={bets.filter(b => b.status !== "open")} />}
           </>}
 
           {tab === "qg" && <Suspense fallback={<p className="muted pad">Chargement du QG…</p>}>
@@ -243,13 +178,9 @@ function Game({ api }) {
         onInvest={tk => { setAurDetail(null); setInvest({ tk, mode: "buy" }) }} />}
       {invest && <InvestSheet {...invest} api={api} aur={aur} me={me} hold={holds.find(h => h.tk === invest.tk)} onClose={() => setInvest(null)}
         onDone={async (args, ok) => { const r = await run(() => args.mode === "round" ? api.aurSubscribe(args.tk, args.amount) : api.aurOrder(args.mode === "buy" ? { action: "buy", tk: args.tk, amount: args.amount } : { action: "sell", tk: args.tk, qty: args.qty }), () => ok); if (r) setInvest(null) }} />}
-      {ticket && <Ticket api={api} aur={aur} now={now} byLogin={byLogin} me={me} ticket={ticket} pref={pref} setPref={setPref} onClose={() => setTicket(null)}
+      {ticket && <Ticket api={api} aur={aur} now={now} me={me} ticket={ticket} pref={pref} setPref={setPref} onClose={() => setTicket(null)}
         onSubmit={async args => {
-          const opened = b => `Position ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} ouverte · ${W(b.stake)}`;
-          const r = ticket.kind === "aurelys" ? await run(() => api.aurOrder({ action: "open", ...args }), b => `${opened(b)} à ${aurPx(b.entry)} (frais ${W(b.fees)})`)
-            : ticket.kind === "stream" ? await run(() => api.openStream(args), opened)
-            : await run(() => api.betQuestion(args), b => `Pari validé : ${b.side === "yes" ? "Oui" : "Non"} à ${nf2.format(b.odds)} · ${W(b.stake)}`);
-          if (ticket.kind === "stream" || ticket.kind === "question") loadStreams();
+          const r = await run(() => api.aurOrder({ action: "open", ...args }), b => `Position ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} ouverte · ${W(b.stake)} à ${aurPx(b.entry)} (frais ${W(b.fees)})`);
           if (r) setTicket(null);
         }} />}
       {toast && <div className={"toast " + (toast.tone || "")} role="status">{toast.text}</div>}
@@ -258,13 +189,11 @@ function Game({ api }) {
   );
 }
 
-// Bande compacte de mes paris en cours, en haut du Marché et du Live (sur mobile) : un appui ouvre l'onglet Positions.
-function MiniTicker({ now, byLogin, aur, bets, onOpen }) {
+// Bande compacte de mes paris en cours, en haut du Marché (sur mobile) : un appui ouvre l'onglet Positions.
+function MiniTicker({ aur, bets, onOpen }) {
   if (!bets.length) return null;
   const chip = b => {
     if (b.kind === "aurelys") { const net = aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).net; return [b.aur, sW(net), cls(net)] }
-    if (b.kind === "stream") { const net = liveStream(b, byLogin[b.login], now).value - b.stake; return [byLogin[b.login]?.display_name ?? b.login, sW(net), cls(net)] }
-    if (b.kind === "question") { const st = byLogin[b.login], cur = st?.viewers ?? b.entry, win = (b.side === "yes") === (cur > b.threshold); return [st?.display_name ?? b.login, b.side === "yes" ? "Oui" : "Non", win ? "up" : "down"] }
     return [b.kind, W(b.stake), "flat"];
   };
   return (
@@ -280,7 +209,7 @@ function Onboarding({ api, onDone }) {
     <div className="center">
       <form className="onboard" onSubmit={async e => { e.preventDefault(); try { await api.createProfile(pseudo); onDone() } catch (x) { setErr(x.message) } }}>
         <Logo big />
-        <p className="muted">Une bourse inventée, Aurelys, dont les cours naissent des ordres des joueurs et des bots, et des questions en direct sur Twitch et Steam. Tu démarres avec {W(CAP0)}.</p>
+        <p className="muted">Une bourse inventée, Aurelys, dont les cours naissent des ordres des joueurs et des bots. Tu démarres avec {W(CAP0)}.</p>
         <label htmlFor="pseudo">Ton pseudo</label>
         <input id="pseudo" value={pseudo} onChange={e => setPseudo(e.target.value)} minLength={2} maxLength={20} required autoFocus />
         {err && <p className="error">{err}</p>}
@@ -295,12 +224,10 @@ function Onboarding({ api, onDone }) {
 }
 
 /* Mes positions en direct : toujours visibles, en tête sur mobile et dans la colonne de gauche sur grand écran. */
-function Positions({ now, byLogin, aur, bets, onClose, vertical }) {
+function Positions({ now, aur, bets, onClose, vertical }) {
   if (!bets.length && !vertical) return <div className="panel empty-pos"><h2>Mes positions</h2><p className="muted">Aucune position ouverte. Choisis une action d'Aurelys et prends position à la hausse ou à la baisse.</p></div>;
-  const list = [...bets].sort((a, b) => b.id - a.id);
-  const cards = list.map(b => b.kind === "aurelys" ? <AurelysCard key={b.id} b={b} aur={aur} now={now} onClose={onClose} Facts={Facts} />
-    : b.kind === "stream" ? <StreamCard key={b.id} b={b} st={byLogin[b.login]} now={now} onClose={onClose} />
-    : <QuestionCard key={b.id} b={b} st={byLogin[b.login]} now={now} />);
+  const list = [...bets].filter(b => b.kind === "aurelys").sort((a, b) => b.id - a.id);
+  const cards = list.map(b => <AurelysCard key={b.id} b={b} aur={aur} now={now} onClose={onClose} Facts={Facts} />);
   if (vertical) return <div className="pos-list vertical">{cards}</div>;
   return (
     <section className="panel">
@@ -316,134 +243,8 @@ const Facts = ({ items }) => (
     {items.filter(Boolean).map(([k, v, c]) => <div key={k}><dt>{k}</dt><dd className={"mono " + (c || "")}>{v}</dd></div>)}
   </dl>
 );
-// Temps restant lisible : « 4:12 » sous l'heure, « 1 h 05 » au-delà.
-const left = ms => ms <= 0 ? "maintenant" : ms < 3600e3 ? mmss(ms) : `${Math.floor(ms / 3600e3)} h ${String(Math.floor(ms / 60e3) % 60).padStart(2, "0")}`;
-// Barre de temps : part écoulée entre l'ouverture et la clôture prévue.
-const TimeBar = ({ from, to, now }) => <span className="timebar" aria-hidden="true"><i style={{ width: `${Math.max(0, Math.min(100, (now - from) / Math.max(1, to - from) * 100))}%` }} /></span>;
-// Distance au seuil de liquidation, en % du cours actuel ; alerte sous 3 %.
-const liqFact = (b, px, fmt) => { const lq = liqPrice(b), d = lq / px - 1; return ["Liquidation", `${fmt(lq)} (${pct(d)})`, Math.abs(d) < .03 ? "down warn" : ""] };
 
-function StreamCard({ b, st, now, onClose }) {
-  const x = liveStream(b, st, now), net = x.value - b.stake, t0 = Date.parse(b.created_at);
-  const end = b.end_at ? Date.parse(b.end_at) : Math.max(now, t0 + 30 * 60000);
-  const [busy, setBusy] = useState(false);
-  return (
-    <article className={"pos " + (net >= 0 ? "gain" : "loss")}>
-      <div className="pos-h">
-        <b className="who">{st?.avatar && <img className="avatar sm" src={st.avatar} alt="" />}{st?.display_name ?? b.login}</b>
-        <span className={"side " + b.dir}>{b.dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×{b.lev}</span>
-      </div>
-      <div className="pos-pnl mono"><span className={cls(net)}>{sW(net)}</span><span className={cls(net)}>{pct(net / b.stake)}</span></div>
-      <PositionChart id={b.id} entry={b.entry} dir={b.dir} pts={x.pts} x0={t0} x1={end} />
-      <Facts items={[
-        ["Mise", `${W(b.stake)} · ×${b.lev}`],
-        ["Valeur", W(x.value), cls(net)],
-        ["Entrée", `${nf0.format(b.entry)} · ${clock(t0)}`],
-        ["Actuel", `${nf0.format(x.px)} (${pct(x.px / b.entry - 1)})`],
-        !x.liquidated && liqFact(b, x.px, v => nf0.format(Math.round(v))),
-        ["Clôture prévue", b.end_at ? `${clock(end)} · dans ${left(end - now)}` : "à la fin du live"],
-      ]} />
-      {b.end_at && <TimeBar from={t0} to={end} now={now} />}
-      {x.due
-        ? <p className="muted small">{x.liquidated ? "Liquidée, règlement en cours…" : st && !st.live ? "Live terminé, règlement en cours…" : "Échéance atteinte, règlement en cours…"}</p>
-        : <button type="button" className="btn primary" disabled={busy} onClick={async () => { setBusy(true); await onClose(b); setBusy(false) }}>Clôturer · {W(x.value)}</button>}
-    </article>
-  );
-}
-
-function QuestionCard({ b, st, now }) {
-  const t0 = Date.parse(b.created_at), end = Date.parse(b.end_at), upto = Math.min(now, end), pts = [[t0, b.entry]];
-  if (st) st.ts.forEach((t, i) => { if (t > t0 && t <= upto) pts.push([t, st.vs[i]]) });
-  const peak = isPeak(b), at = pts[pts.length - 1][0], cur = peak ? Math.max(...pts.map(p => p[1])) : pts[pts.length - 1][1]; // pic du jour : le plus haut atteint
-  const winning = (b.side === "yes") === (cur > b.threshold), S = srcOf(b.login);
-  return (
-    <article className={"pos " + (winning ? "gain" : "loss")}>
-      <div className="pos-h">
-        <b className="who">{st?.avatar && <img className="avatar sm" src={st.avatar} alt="" />}{st?.display_name ?? b.login}</b>
-        <span className={"side " + (b.side === "yes" ? "up" : "down")}>{b.side === "yes" ? "Oui" : "Non"} · {nf2.format(b.odds)}</span>
-      </div>
-      <p className="small">{peak ? <>Pic d'aujourd'hui au-dessus de <b className="mono">{nf0.format(b.threshold)}</b> {S.unit} (le pic d'hier) ?</> : <>Plus de <b className="mono">{nf0.format(b.threshold)}</b> {S.unit} à <b className="mono">{clock(end)}</b> ?</>}</p>
-      <div className="pos-q mono"><span className={winning ? "up" : "down"}>{winning ? "gagnant" : "perdant"} pour l'instant</span><span>{nf0.format(cur)} / {nf0.format(b.threshold)}</span></div>
-      <PositionChart id={b.id} entry={b.threshold} dir={b.side === "yes" ? "up" : "down"} pts={pts} x0={t0} x1={end} />
-      <Facts items={[
-        ["Mise", W(b.stake)],
-        ["Gain si gagné", W(b.stake * b.odds), "up"],
-        ["Au pari", `${nf0.format(b.entry)} · ${clock(t0)}`],
-        ["Écart au seuil", `${cur > b.threshold ? "+" : "−"}${nf0.format(Math.abs(cur - b.threshold))} (${pct(cur / b.threshold - 1)})`, winning ? "up" : "down"],
-        ["Échéance", now < end ? `${clock(end)} · dans ${left(end - now)}` : `${clock(end)} · passée`],
-        ["Chiffre affiché", `${S.name} de ${clock(at)}`],
-      ]} />
-      <TimeBar from={t0} to={end} now={now} />
-      {now >= end && <p className="muted small">Échéance passée, règlement au prochain chiffre {S.name}…</p>}
-    </article>
-  );
-}
-
-// Observatoire de guilde : tendance des 30 dernières minutes et prévision à l'échéance (même calcul que le serveur).
-function forecast(x, closesAt) {
-  const t0 = Date.parse(x.at) - 30 * 60000, pts = x.ts.map((t, i) => [t / 60000, Math.log(Math.max(1, x.vs[i]))]).filter(([t]) => t * 60000 >= t0);
-  if (pts.length < 3) return null;
-  const n = pts.length, mx = pts.reduce((a, p) => a + p[0], 0) / n, my = pts.reduce((a, p) => a + p[1], 0) / n;
-  const slope = Math.max(-.01, Math.min(.01, pts.reduce((a, [t, y]) => a + (t - mx) * (y - my), 0) / (pts.reduce((a, [t]) => a + (t - mx) ** 2, 0) || 1)));
-  const mins = Math.max(1, (Date.parse(closesAt) - Date.now()) / 60000), drift = Math.max(-.1, Math.min(.1, slope * Math.min(mins, 20) * .5));
-  return { per15: Math.exp(slope * 15) - 1, value: x.viewers * Math.exp(drift) };
-}
-
-function Streams({ obs = 0, src, streams: all, markets: allMarkets, mode, bets, now, onPick }) {
-  const [slot, setSlot] = useState(null), frozen = useRef({ key: null, logins: [] }), S = SRC[src], mineSrc = login => (srcOf(login) === S);
-  const streams = all.filter(x => mineSrc(x.login)), markets = allMarkets.filter(m => mineSrc(m.login));
-  if (!streams.length) return <p className="muted pad">{mode === "demo" ? S.demo : `Aucun relevé ${S.name} pour l'instant. La relève tourne chaque minute, reviens dans un instant.`}</p>;
-  const slots = [...new Set(markets.filter(m => m.kind !== "peak").map(m => m.closes_at))].sort();
-  if (markets.some(m => m.kind === "peak")) slots.push("peak");
-  const cur = slots.includes(slot) ? slot : slots[0];
-  const byL = Object.fromEntries(streams.map(x => [x.login, x])), lastTick = Math.max(...streams.map(x => Date.parse(x.at)));
-  const mine = login => bets.some(b => (b.kind === "question" || b.kind === "stream") && b.login === login);
-  const list = (cur === "peak" ? markets.filter(m => m.kind === "peak") : markets.filter(m => m.closes_at === cur && byL[m.login]?.live))
-    .map(m => ({ m, x: byL[m.login] ?? { login: m.login, display_name: m.login, viewers: 0, vs: [], ts: [], live: false } }));
-  // Ordre figé tant qu'on reste sur la même échéance, pour ne pas faire bouger les cartes sous le doigt.
-  if (frozen.current.key !== src + cur || !frozen.current.logins.length) frozen.current = { key: src + cur, logins: [...list].sort((a, b) => b.x.viewers - a.x.viewers).map(r => r.x.login) };
-  const rank = l => { const i = frozen.current.logins.indexOf(l); return i < 0 ? 1e9 : i };
-  list.sort((a, b) => rank(a.x.login) - rank(b.x.login));
-  return (
-    <section>
-      <div className="feed-info"><i className="pulse" aria-hidden="true" />{S.info} · dernier relevé {ago(now - lastTick)}</div>
-      <p className="muted small">{S.intro}</p>
-      {slots.length > 0 && <div className="chips" role="group" aria-label="Échéance">
-        {slots.map(t => <button key={t} type="button" aria-pressed={t === cur} onClick={() => setSlot(t)}>{t === "peak" ? "★ Pic du jour" : `à ${clock(Date.parse(t))}`}</button>)}
-      </div>}
-      {!list.length && <p className="muted pad">Les questions arrivent avec le prochain relevé {S.name}.</p>}
-      <div className="qlist">
-        {list.map(({ m, x }) => (
-          <article key={m.id} className={"qcard" + (mine(x.login) ? " mine" : "")}>
-            <div className="qhead">
-              <span className="who">
-                {x.avatar ? <img className="avatar" src={x.avatar} alt="" loading="lazy" /> : <span className="avatar" />}
-                <span><b>{x.display_name}</b><small title={x.title || ""}>{src === "steam" ? "joueurs connectés" : x.game || "en live"}</small></span>
-              </span>
-              <span className="r mono"><b>{nf0.format(x.viewers)}</b><small>chiffre de {clock(twitchAt(x))}</small></span>
-            </div>
-            {x.vs.length > 1 && <Spark path={x.vs} t={x.vs.length - 1} h={24} />}
-            {obs > 0 && m.kind !== "peak" && (() => { const f = forecast(x, m.closes_at); return f && <p className="obs small mono">Observatoire · tendance <span className={cls(f.per15)}>{pct(f.per15)}</span> / 15 min · prévision {nf0.format(Math.round(f.value))} à {clock(Date.parse(m.closes_at))}</p> })()}
-            {m.kind === "peak"
-              ? <p className="qtext">Pic d'aujourd'hui au-dessus de celui d'hier, <b className="mono">{nf0.format(m.threshold)}</b> {S.unit} ? <small className="muted">Paris jusqu'à {clock(Date.parse(m.bet_until))}, réglé à minuit.</small></p>
-              : <p className="qtext">Plus de <b className="mono">{nf0.format(m.threshold)}</b> {S.unit} à <b className="mono">{clock(Date.parse(m.closes_at))}</b> ?</p>}
-            <div className="qbtns">
-              <button type="button" className="buy" onClick={() => onPick(m, "yes")}><span>Oui</span><b className="mono">{nf2.format(m.odds_yes)}</b></button>
-              <button type="button" className="sell" onClick={() => onPick(m, "no")}><span>Non</span><b className="mono">{nf2.format(m.odds_no)}</b></button>
-            </div>
-          </article>
-        ))}
-      </div>
-      <p className="fine">{S.fine} Cote calculée sur l'écart au seuil, le temps restant et la volatilité du live sur la dernière heure, marge de 7 %.</p>
-    </section>
-  );
-}
-
-
-
-
-
-function History({ byLogin, bets }) {
+function History({ bets }) {
   if (!bets.length) return <p className="muted pad">Tes paris réglés apparaîtront ici.</p>;
   return (
     <div className="history">
@@ -451,7 +252,7 @@ function History({ byLogin, bets }) {
         const net = b.payout - b.stake;
         // Anciens marchés (crypto, Wikipédia, duels) : retirés du jeu, gardés dans l'historique.
         const label = b.kind === "trade" ? `${b.tk} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} · Wikipédia`
-          : b.kind === "stream" ? `${byLogin[b.login]?.display_name ?? b.login} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} · Twitch`
+          : b.kind === "stream" ? `${b.login} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} · Twitch`
           : b.kind === "crypto" ? `${b.sym} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} · crypto`
           : b.kind === "invest" ? `${AUR[b.aur]?.name ?? b.aur} · actions vendues${b.payout === 0 ? " (faillite)" : ""}`
           : "Duel Wikipédia";
@@ -463,7 +264,7 @@ function History({ byLogin, bets }) {
         );
         if (b.kind === "question") return (
           <div key={b.id} className="hrow">
-            <span><b>{byLogin[b.login]?.display_name ?? b.login} · plus de {nf0.format(b.threshold)} à {clock(Date.parse(b.end_at))} : {b.side === "yes" ? "Oui" : "Non"}</b><small>chiffre final {b.exit != null ? nf0.format(b.exit) : "—"} · cote {nf2.format(b.odds)}</small></span>
+            <span><b>{b.login} · plus de {nf0.format(b.threshold)} à {clock(Date.parse(b.end_at))} : {b.side === "yes" ? "Oui" : "Non"}</b><small>chiffre final {b.exit != null ? nf0.format(b.exit) : "—"} · cote {nf2.format(b.odds)}</small></span>
             <span className="r mono"><b className={cls(net)}>{sW(net)}</b><small>mise {W(b.stake)}</small></span>
           </div>
         );
@@ -557,25 +358,22 @@ function Rain({ kind, at }) {
   );
 }
 
-function Ticket({ api, aur, now, byLogin, me, ticket, pref, setPref, onClose, onSubmit }) {
-  const [stake, setStake] = useState(pref.stake), [busy, setBusy] = useState(false), [dir, setDir] = useState(ticket.dir), [side, setSide] = useState(ticket.side);
-  const isStream = ticket.kind === "stream";
-  const st = isStream ? byLogin[ticket.login] : null;
+function Ticket({ api, aur, now, me, ticket, pref, setPref, onClose, onSubmit }) {
+  const [stake, setStake] = useState(pref.stake), [busy, setBusy] = useState(false), [dir, setDir] = useState(ticket.dir);
   const set = p => setPref(x => ({ ...x, ...p }));
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
-  const isQ = ticket.kind === "question", isAur = ticket.kind === "aurelys";
   // Aurelys : ×20 avec un logement, ×25 dans une guilde qui a une salle des marchés (vérifié par le serveur).
   const [maxLev, setMaxLev] = useState(15);
-  useEffect(() => { if (ticket.kind === "aurelys") api.aurMaxLev().then(n => setMaxLev(+n)).catch(() => {}) }, [api, ticket.kind]);
-  useEffect(() => { if (isAur && pref.lev > maxLev) setPref(x => ({ ...x, lev: maxLev })) }, [isAur, maxLev, pref.lev, setPref]);
-  const fee = isAur ? stake * pref.lev * FEE : 0;
-  const aq = isAur ? aur.quotes[ticket.tk] : null, overCap = isAur && stake * pref.lev > aurCap(ticket.tk);
-  const open = isAur ? !!aq && !aq.halt && !overCap : isQ ? Date.parse(ticket.market.bet_until) > now : !!st?.live;
+  useEffect(() => { api.aurMaxLev().then(n => setMaxLev(+n)).catch(() => {}) }, [api]);
+  useEffect(() => { if (pref.lev > maxLev) setPref(x => ({ ...x, lev: maxLev })) }, [maxLev, pref.lev, setPref]);
+  const fee = stake * pref.lev * FEE;
+  const aq = aur.quotes[ticket.tk], overCap = stake * pref.lev > aurCap(ticket.tk);
+  const open = !!aq && !aq.halt && !overCap;
   const ok = stake > 0 && stake + fee <= me.cash && open;
   // Max : tout le solde, frais d'ouverture compris, et sans dépasser le plafond d'une action d'Aurelys.
-  const maxStake = isAur ? Math.min(Math.floor(me.cash / (1 + pref.lev * FEE)), isAur ? Math.floor(aurCap(ticket.tk) / pref.lev) : Infinity) : Math.floor(me.cash);
+  const maxStake = Math.min(Math.floor(me.cash / (1 + pref.lev * FEE)), Math.floor(aurCap(ticket.tk) / pref.lev));
   let body, title, cta;
-  if (isAur) {
+  {
     const p = aq?.p ?? 0, sl = slipEstimate(ticket.tk, stake * pref.lev, now / 1000, aur.x?.reg), entry = p * (1 + (dir === "up" ? sl : -sl)), b = { entry, lev: pref.lev, dir, stake };
     title = AUR[ticket.tk].name;
     cta = `${dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×${pref.lev} · ${W(stake)}`;
@@ -598,53 +396,12 @@ function Ticket({ api, aur, now, byLogin, me, ticket, pref, setPref, onClose, on
       </div>
       <p className="muted small">Ton ordre fait bouger le cours : plus il est gros, et plus l'action est peu liquide, plus tu paies cher (même chose à la clôture). Le prix exact est calculé par le serveur. La position reste ouverte jusqu'à ce que tu la clôtures, ou jusqu'à la liquidation.</p>
     </>;
-  } else if (isQ) {
-    const m = ticket.market, x = byLogin[m.login], o = side === "yes" ? m.odds_yes : m.odds_no, end = Date.parse(m.closes_at);
-    const S = srcOf(m.login);
-    title = m.kind === "peak" ? `${x?.display_name ?? m.login} : pic d'aujourd'hui au-dessus de ${nf0.format(m.threshold)} ${S.unit} ?` : `${x?.display_name ?? m.login} : plus de ${nf0.format(m.threshold)} ${S.unit} à ${clock(end)} ?`;
-    cta = `${side === "yes" ? "Oui" : "Non"} à ${nf2.format(o)} · ${W(stake)}`;
-    body = <>
-      <div className="seg" role="group" aria-label="Réponse">
-        <button type="button" aria-pressed={side === "yes"} className="buy" onClick={() => setSide("yes")}>Oui · {nf2.format(m.odds_yes)}</button>
-        <button type="button" aria-pressed={side === "no"} className="sell" onClick={() => setSide("no")}>Non · {nf2.format(m.odds_no)}</button>
-      </div>
-      <div className="rows mono">
-        <div className="row"><span>{S.unit[0].toUpperCase() + S.unit.slice(1)} (chiffre de {x ? clock(twitchAt(x)) : "—"})</span><b>{x ? nf0.format(x.viewers) : "—"}</b></div>
-        <div className="row"><span>Seuil</span><b>{nf0.format(m.threshold)}</b></div>
-        <div className="row"><span>Gain si {side === "yes" ? "Oui" : "Non"}</span><b>{W(stake * o)}</b></div>
-        <div className="row"><span>Paris fermés à</span><b>{clock(Date.parse(m.bet_until))}</b></div>
-      </div>
-      <p className="muted small">Réglé sur le dernier chiffre {S.name} avant {clock(end)} ; {S.end}. La cote bouge avec l'audience et le temps : celle retenue s'affiche après validation.</p>
-    </>;
-  } else if (isStream) {
-    const px = st?.viewers ?? 0, b = { entry: px, lev: pref.lev, dir, stake };
-    title = st?.display_name ?? ticket.login;
-    cta = `${dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×${pref.lev} · ${W(stake)}`;
-    body = <>
-      {st?.title && <p className="muted small clip" title={st.title}>{st.game ? `${st.game} · ` : ""}{st.title}</p>}
-      <div className="seg" role="group" aria-label="Sens">
-        <button type="button" aria-pressed={dir === "up"} className="buy" onClick={() => setDir("up")}>▲ Hausse</button>
-        <button type="button" aria-pressed={dir === "down"} className="sell" onClick={() => setDir("down")}>▼ Baisse</button>
-      </div>
-      <label>Levier</label>
-      <div className="seg" role="group" aria-label="Levier">{LEVS.map(v => <button key={v} type="button" aria-pressed={pref.lev === v} onClick={() => set({ lev: v })}>×{v}</button>)}</div>
-      <label>Échéance</label>
-      <div className="seg" role="group" aria-label="Échéance">{Object.entries(STREAM_H).map(([k, l]) => <button key={k} type="button" aria-pressed={pref.shorizon === k} onClick={() => set({ shorizon: k })}>{l}</button>)}</div>
-      <div className="rows mono">
-        <div className="row"><span>Spectateurs (dernier relevé)</span><b>{nf0.format(px)}</b></div>
-        <div className="row"><span>1 % de variation</span><b>±{W(stake * pref.lev / 100)}</b></div>
-        <div className="row"><span>Liquidation à</span><b>{nf0.format(Math.round(liqPrice(b)))} spectateurs</b></div>
-        <div className="row"><span>Fermeture automatique</span><b>{pref.shorizon === "live" ? "fin du live" : clock(now + +pref.shorizon * 60000)}</b></div>
-      </div>
-    </>;
   }
   return (
     <div className="scrim" onClick={e => e.target === e.currentTarget && onClose()}>
       <form className="sheet" role="dialog" aria-modal="true" aria-label={title} onSubmit={async e => {
         e.preventDefault(); if (!ok) return; setBusy(true); set({ stake });
-        await onSubmit(isAur ? { tk: ticket.tk, dir, lev: pref.lev, stake }
-          : isStream ? { login: ticket.login, dir, lev: pref.lev, stake, horizon: pref.shorizon }
-          : { market: ticket.market.id, side, stake });
+        await onSubmit({ tk: ticket.tk, dir, lev: pref.lev, stake });
         setBusy(false);
       }}>
         <div className="sheet-h"><h2>{title}</h2><button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button></div>
@@ -653,10 +410,9 @@ function Ticket({ api, aur, now, byLogin, me, ticket, pref, setPref, onClose, on
         <div className="stake"><input id="stake" className="mono" type="number" inputMode="numeric" min="1" step="1" value={stake} onChange={e => setStake(Math.max(0, Math.floor(+e.target.value || 0)))} /><span>W</span></div>
         <StakeChips value={stake} set={setStake} cash={me.cash} max={maxStake} />
         {overCap && <p className="error small">Au plus {W(aurCap(ticket.tk))} engagés (mise × levier) sur cette action.</p>}
-        {isAur && aq?.halt && <p className="error small">Cotation suspendue, reprise dans quelques secondes.</p>}
-        {!open && !isAur && <p className="error small">{isQ ? "Les paris sur cette question sont fermés." : "Ce streamer n'est plus en live."}</p>}
+        {aq?.halt && <p className="error small">Cotation suspendue, reprise dans quelques secondes.</p>}
         {stake + fee > me.cash && <p className="error small">Solde insuffisant : il te manque {W(stake + fee - me.cash)}{fee ? " (frais compris)" : ""}.</p>}
-        <button type="submit" className={"btn big " + (isQ ? (side === "yes" ? "buy" : "sell") : dir === "up" ? "buy" : "sell")} disabled={!ok || busy}>{cta}</button>
+        <button type="submit" className={"btn big " + (dir === "up" ? "buy" : "sell")} disabled={!ok || busy}>{cta}</button>
       </form>
     </div>
   );
