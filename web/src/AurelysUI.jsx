@@ -56,19 +56,20 @@ const REG_TXT = {
 const MAJOR = new Set(["resultats", "essai", "scandale", "produit", "taux", "crise", "baleine", "suspension", "reel", "macro"]);
 const isMajor = n => MAJOR.has(n.cat) || Math.abs(n.sent) >= .7;
 
-const VIEWS = [["board", "Tableau de bord"], ["list", "Actions"], ["news", "Journal"], ["heat", "Carte"]];
-export function AurelysMarket({ aur, now, bets, onPick, onDetail, onSubscribe }) {
-  const [view, setView] = useState("board"), [read, setRead] = useState(null);
+// La liste des actions a son propre onglet (stocks) ; le Marché garde tableau de bord, journal et carte.
+const VIEWS = [["board", "Tableau de bord"], ["news", "Journal"], ["heat", "Carte"]];
+export function AurelysMarket({ aur, now, bets, onPick, onDetail, onSubscribe, stocks, onList }) {
+  const [v, setView] = useState("board"), [read, setRead] = useState(null), view = stocks ? "list" : v;
   const live = aur.live;
   return (
     <section>
       <div className="feed-info"><i className={"pulse" + (live ? "" : " off")} aria-hidden="true" />{live ? "Bourse fictive, simulée en continu par des bots et les joueurs" : "Connexion au marché…"} · un jour d'Aurelys = 1 h réelle</div>
       <AurBar aur={aur} now={now} />
       <Flash aur={aur} now={now} onDetail={onDetail} />
-      <div className="chips" role="group" aria-label="Vue">
+      {!stocks && <div className="chips" role="group" aria-label="Vue">
         {VIEWS.map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}
-      </div>
-      {view === "board" ? <Board aur={aur} now={now} onDetail={onDetail} onNews={() => setView("news")} onRead={setRead} onList={() => setView("list")} />
+      </div>}
+      {view === "board" ? <Board aur={aur} now={now} onDetail={onDetail} onNews={() => setView("news")} onRead={setRead} onList={onList} />
         : view === "list" ? <List aur={aur} now={now} bets={bets} onPick={onPick} onDetail={onDetail} onSubscribe={onSubscribe} onRead={setRead} />
         : view === "news" ? <News aur={aur} now={now} onDetail={onDetail} onRead={setRead} />
         : <Heat aur={aur} now={now} onDetail={onDetail} />}

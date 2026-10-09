@@ -76,7 +76,7 @@ function Game({ api }) {
   // Alertes de prix (Aurelys) : gardées dans ce navigateur, nombre selon le logement.
   const [alerts, setAlerts] = useState(() => { try { return JSON.parse(localStorage.getItem("wb-alerts")) ?? [] } catch { return [] } });
   useEffect(() => { try { localStorage.setItem("wb-alerts", JSON.stringify(alerts)) } catch { } }, [alerts]);
-  const aur = useAurelys(api, tab === "market" || !!aurDetail || alerts.length > 0 || bets.some(b => b.status === "open" && b.kind === "aurelys"));
+  const aur = useAurelys(api, tab === "market" || tab === "actions" || !!aurDetail || alerts.length > 0 || bets.some(b => b.status === "open" && b.kind === "aurelys"));
   const beat = Math.floor(now / 2500);
   useEffect(() => {
     const hit = alerts.filter(a => { const p = aur.quotes[a.tk]?.p; return p != null && (a.above ? p >= a.price : p <= a.price) });
@@ -136,9 +136,9 @@ function Game({ api }) {
         <main className="main">
           <div key={showHowto ? "howto" : tab + (more ?? "")} className="view-anim">
           {showHowto ? <HowTo first={firstVisit} onBack={firstVisit ? howtoDone : () => setMore(null)} /> : <>
-          {tab === "market" && <MiniTicker aur={aur} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
+          {(tab === "market" || tab === "actions") && <MiniTicker aur={aur} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
 
-          {tab === "market" && <AurelysMarket aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onDetail={setAurDetail} onSubscribe={tk => setInvest({ tk, mode: "round" })} />}
+          {(tab === "market" || tab === "actions") && <AurelysMarket stocks={tab === "actions"} onList={() => go("actions")} aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onDetail={setAurDetail} onSubscribe={tk => setInvest({ tk, mode: "round" })} />}
 
           {tab === "positions" && <>
             <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` · ${open.length}` : ""}`], ["folio", "Portefeuille"], ["history", "Historique"]]} />
