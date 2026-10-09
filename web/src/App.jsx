@@ -6,7 +6,7 @@ import { useAurelys } from "./aurelys.js";
 import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
 import { BY as AUR, slipEstimate, FEE, gameClock } from "../supabase/functions/_shared/aurelys.js";
 import { Dock, Segmented, SubHeader, Logo } from "./nav.jsx";
-import { MoreMenu, HowTo, Account, Legal } from "./pages.jsx";
+import { MoreMenu, HowTo, Account, Legal, PushPanel } from "./pages.jsx";
 import { Ranking, Friends, Guilds, LoginPanel } from "./social.jsx";
 import Portfolio from "./Portfolio.jsx";
 const QG = lazy(() => import("./QG.jsx")); // Three.js n'est chargé qu'à l'ouverture du QG
@@ -50,22 +50,33 @@ function Game({ api }) {
   const [firstVisit, setFirstVisit] = useState(() => { try { return !localStorage.getItem("wb-howto") } catch { return false } });
   const [pref, setPref] = useState({ lev: 5, shorizon: "15", stake: 500 });
   const say = useCallback((text, tone) => { setToast({ text, tone, at: Date.now() }) }, []);
-  useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 2600); return () => clearTimeout(id) }, [toast]);
+  useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), toast.long ? 7000 : 2600); return () => clearTimeout(id) }, [toast]);
 
   const [holds, setHolds] = useState([]), [invest, setInvest] = useState(null), [triggers, setTriggers] = useState([]); // portefeuille d'actions (sans levier)
   const [catalog, setCatalog] = useState([]), [inv, setInv] = useState({}), [rain, setRain] = useState(0), [visit, setVisit] = useState(null);
   useEffect(() => { if (!catalog.length) api.shopItems().then(setCatalog).catch(() => {}) }, [api, board, catalog.length]); // réessaie à chaque rafraîchissement tant qu'il est vide
-  const known = useRef(null); // statut de chaque pari au chargement précédent, pour fêter les gains
+  const known = useRef(null), knownT = useRef(null); // statut de chaque pari au chargement précédent, pour fêter les gains
   // Logement : il fixe la profondeur de l'historique et le nombre d'alertes de prix (avantages durables).
   const homeLevel = Math.max(0, ...catalog.filter(i => i.kind === "home" && (inv[i.id]?.qty ?? 0) > 0).map(i => i.level)), perks = PERKS[homeLevel];
   const histFrom = k - Math.round(perks.hist * 1440 / 11); // séances de 11 min
   const refresh = useCallback(async () => {
     try {
       const [m, b, l, i, h, tg] = await Promise.all([api.me(), api.myBets(histFrom), api.leaderboard().catch(() => []), api.inventoryOf(api.uid).catch(() => []), api.myHoldings().catch(() => []), api.myTriggers().catch(() => [])]); // classement, QG, portefeuille : facultatifs, le jeu tourne sans
-      const prev = known.current, won = prev ? b.filter(x => x.status === "won" && prev.get(x.id) === "open") : [];
+      const prev = known.current, ended = prev ? b.filter(x => x.status !== "open" && prev.get(x.id) === "open") : [];
+      const won = ended.filter(x => x.status === "won" && !x.closed_by);
       known.current = new Map(b.map(x => [x.id, x.status]));
+      const prevT = knownT.current; knownT.current = new Map(tg.map(g => [g.id, g.status]));
+      const name = tk => AUR[tk]?.name ?? tk, side = x => `${x.dir === "up" ? "▲" : "▼"} ×${x.lev}`, net = x => x.payout - x.stake - (x.fee_open ?? 0);
+      const notes = [
+        ...ended.filter(x => x.closed_by === "liq").map(x => `Position liquidée : ${name(x.aur)} ${side(x)}, ${sW(net(x))}${x.insured ? " (assurée)" : ""}`),
+        ...ended.filter(x => x.closed_by === "stop").map(x => `Stop touché : ${name(x.aur)} ${side(x)} clôturée à ${aurPx(x.exit)}, ${sW(net(x))}`),
+        ...ended.filter(x => x.closed_by === "objectif").map(x => `Objectif atteint : ${name(x.aur)} ${side(x)} clôturée à ${aurPx(x.exit)}, ${sW(net(x))}`),
+        ...(prevT ? tg.filter(g => prevT.get(g.id) === "wait" && g.status === "done").map(g => `Ordre exécuté : ${name(g.tk)} ${side(g)} ouverte`) : []),
+        ...(prevT ? tg.filter(g => prevT.get(g.id) === "wait" && g.status === "failed").map(g => `Ordre refusé : ${name(g.tk)}. ${g.msg}`) : []),
+      ];
+      if (notes.length) setToast({ text: notes.join(" · "), tone: ended.some(x => x.closed_by === "liq" || x.closed_by === "stop") ? "down" : "up", at: Date.now(), long: true });
       setMe(m); setBets(b); setBoard(l); setInv(Object.fromEntries(i.map(r => [r.item_id, r]))); setHolds(h.map(x => ({ ...x, qty: +x.qty, cost: +x.cost, price: +x.price }))); setTriggers(tg);
-      if (won.length) { setToast({ text: `Gagné : ${sW(won.reduce((a, x) => a + x.payout - x.stake, 0))}`, tone: "up", at: Date.now() }); setRain(Date.now()) }
+      if (won.length && !notes.length) { setToast({ text: `Gagné : ${sW(won.reduce((a, x) => a + x.payout - x.stake, 0))}`, tone: "up", at: Date.now() }); setRain(Date.now()) }
     } catch (e) { say(e.message, "down") }
   }, [api, histFrom, say]);
   useEffect(() => { refresh(); return api.onChange(refresh) }, [api, refresh]);
@@ -147,6 +158,7 @@ function Game({ api }) {
             <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` · ${open.length}` : ""}`], ["folio", "Portefeuille"], ["history", "Historique"]]} />
             {posView === "folio" ? <Portfolio holds={holds} aur={aur} px={holdPx} onSell={h => setInvest({ tk: h.tk, mode: "sell", qty: h.qty })} onBuy={tk => setInvest({ tk, mode: "buy" })} onMarket={() => go("market")} />
             : posView === "open" ? <>
+              {api.push && positions.length > 0 && <PushPanel push={api.push} compact />}
               <Triggers list={triggers} onCancel={cancelTrigger} />
               {open.length ? <Positions vertical now={now} aur={aur} bets={open} onClose={closeTrade} onAuto={onAuto} />
                 : <div className="empty-state"><b>Aucun pari en cours</b><p className="muted">Prends position sur une action d'Aurelys.</p>
@@ -166,7 +178,7 @@ function Game({ api }) {
             more === "board" ? <><SubHeader title="Classement" onBack={() => setMore(null)} /><Ranking api={api} me={me} onVisit={visitQG} wealth={<Board board={board} me={me} onVisit={visitQG} />} /></>
             : more === "friends" ? <Friends api={api} say={say} onVisit={visitQG} onBack={() => setMore(null)} />
             : more === "guilds" ? <Guilds api={api} me={me} say={say} onVisit={visitQG} onBack={() => setMore(null)} accent={accent} />
-            : more === "account" ? <Account account={api.account} me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"}
+            : more === "account" ? <Account account={api.account} push={api.push} me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"}
                 canRestart={me.cash + openStake + catalog.filter(i => i.kind !== "home").reduce((a, i) => a + Math.floor(i.price * .6) * (inv[i.id]?.qty ?? 0), 0) < BK_LIMIT} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} onBack={() => setMore(null)} />
             : more === "legal" ? <Legal onBack={() => setMore(null)} />
             : <MoreMenu go={setMore} me={me} title={myTitle} />)}
@@ -187,7 +199,7 @@ function Game({ api }) {
             : await run(() => api.aurOrder({ action: "open", ...args }), b => `Position ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} ouverte · ${W(b.stake)} à ${aurPx(b.entry)} (frais ${W(b.fees)})`);
           if (r) setTicket(null);
         }} />}
-      {toast && <div className={"toast " + (toast.tone || "")} role="status">{toast.text}</div>}
+      {toast && <div className={"toast " + (toast.tone || "")} role="status" onClick={() => setToast(null)}>{toast.text}</div>}
       {effect && <Rain kind={effect} at={rain} />}
     </div>
   );

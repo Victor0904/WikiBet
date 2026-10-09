@@ -48,8 +48,30 @@ export async function connect() {
     return auth(sb.auth.signInWithPassword({ email, password }), true);
   };
 
+  // Notifications de liquidation (Web Push). Sur iPhone, seulement depuis le site ajouté à l'écran d'accueil.
+  const VAPID = "BAUKaJ7IlXOUt1biFxAMBI0Gda0eKPMtQdWJ2aoQmCuhleOuEBvcdZqf1_yEsHBo-BLEU_a7U0duu3HypFEHybE";
+  const canPush = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  const swReg = () => navigator.serviceWorker.register(`/sw.js?u=${encodeURIComponent(url)}&k=${encodeURIComponent(key)}`);
+  const push = {
+    status: async () => !canPush ? "unsupported" : Notification.permission === "denied" ? "denied"
+      : (await (await navigator.serviceWorker.getRegistration())?.pushManager.getSubscription()) ? "on" : "off",
+    enable: async () => {
+      if (await Notification.requestPermission() !== "granted") throw new Error("Notifications refusées : autorise-les dans les réglages du navigateur.");
+      const reg = await swReg(); await navigator.serviceWorker.ready;
+      const raw = Uint8Array.from(atob(VAPID.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+      const sub = await reg.pushManager.getSubscription() ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: raw });
+      await rpc("push_subscribe", { p_endpoint: sub.endpoint });
+    },
+    disable: async () => {
+      const sub = await (await navigator.serviceWorker.getRegistration())?.pushManager.getSubscription();
+      if (sub) { await rpc("push_unsubscribe", { p_endpoint: sub.endpoint }).catch(() => { }); await sub.unsubscribe() }
+    },
+  };
+  // Abonnement déjà accordé : on le rattache au compte du moment (après une connexion, l'identifiant change).
+  if (canPush && Notification.permission === "granted") push.status().then(s => s === "on" && push.enable()).catch(() => { });
+
   return {
-    mode: "supabase", uid,
+    mode: "supabase", uid, push,
     account: {
       user: async () => (await sb.auth.getUser()).data.user,
       signIn, // pseudo ou e-mail

@@ -1,0 +1,10 @@
+{
+  "name": "Aurelys",
+  "short_name": "Aurelys",
+  "description": "Une bourse inventée, dont les cours naissent des ordres des joueurs et des bots.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#08090D",
+  "theme_color": "#08090D",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

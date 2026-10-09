@@ -89,7 +89,31 @@ async function tick(lead: number) {
     const { error } = await admin.rpc("aur_auto_exec", { p_what: d.what, p_id: d.id, p_slip: slip(S, d.tk, d.notional) });
     if (error) console.error("ordre auto", d, error.message);
   }
+  await pushLiquidations().catch(e => console.error("push", e));
   return { t: S.t, liquidated };
+}
+
+/* ===== Notifications de liquidation (Web Push) =====
+   Sans contenu chiffré : seulement la signature VAPID (ES256, WebCrypto). Le service worker demande le détail (action push_info). */
+const VAPID_PUBLIC = "BAUKaJ7IlXOUt1biFxAMBI0Gda0eKPMtQdWJ2aoQmCuhleOuEBvcdZqf1_yEsHBo-BLEU_a7U0duu3HypFEHybE";
+const b64u = (b: ArrayBuffer | Uint8Array | string) => (typeof b === "string" ? btoa(unescape(encodeURIComponent(b))) : btoa(String.fromCharCode(...new Uint8Array(b as ArrayBuffer))))
+  .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+let vapidKey: CryptoKey | null = null;
+async function vapidJwt(aud: string) {
+  vapidKey ??= await crypto.subtle.importKey("jwk", JSON.parse(Deno.env.get("VAPID_PRIVATE")!), { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const head = b64u(JSON.stringify({ typ: "JWT", alg: "ES256" }));
+  const claims = b64u(JSON.stringify({ aud, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: "https://github.com/Victor0904/WikiBet" }));
+  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, vapidKey, new TextEncoder().encode(`${head}.${claims}`));
+  return `${head}.${claims}.${b64u(sig)}`;
+}
+async function pushLiquidations() {
+  if (!Deno.env.get("VAPID_PRIVATE")) return;
+  for (const { endpoint } of must(await admin.rpc("push_due")) as { endpoint: string }[]) {
+    const r = await fetch(endpoint, { method: "POST", signal: AbortSignal.timeout(5000), headers: {
+      TTL: "86400", Urgency: "high", Authorization: `vapid t=${await vapidJwt(new URL(endpoint).origin)}, k=${VAPID_PUBLIC}` } }).catch(e => { console.error("push", e); return null });
+    if (r && (r.status === 404 || r.status === 410)) await admin.from("push_subs").delete().eq("endpoint", endpoint); // abonnement expiré
+    else if (r && !r.ok) console.error("push", r.status, await r.text());
+  }
 }
 
 Deno.serve(async req => {
@@ -97,6 +121,11 @@ Deno.serve(async req => {
   try {
     const body = await req.json().catch(() => ({}));
     if (body.action === "tick") return json(await tick(Number(body.lead) || 20));
+    // Texte de la notification, demandé par le service worker avec son adresse d'abonnement (secrète).
+    if (body.action === "push_info") {
+      const rows = must(await admin.rpc("push_info", { p_endpoint: String(body.endpoint ?? "") })) as { aur: string; dir: string; lev: number; stake: number }[];
+      return json({ lines: rows.map(r => `${BY[r.aur]?.name ?? r.aur} ${r.dir === "up" ? "▲" : "▼"} ×${r.lev} · mise de ${new Intl.NumberFormat("fr-FR").format(Math.round(r.stake))} W perdue`) });
+    }
 
     // Ordres : le joueur doit être connecté (jeton de session, pas la clé publique).
     const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer /, "");

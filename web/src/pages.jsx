@@ -2,6 +2,30 @@
 import { W, CAP0_TXT } from "./format.js";
 import { SubHeader } from "./nav.jsx";
 import { AccountLink } from "./social.jsx";
+import { useEffect, useState } from "react";
+
+// Notifications de liquidation (Web Push). compact : simple invitation au-dessus des positions, cachée une fois réglé.
+export function PushPanel({ push, compact }) {
+  const [st, setSt] = useState(null), [busy, setBusy] = useState(false), [err, setErr] = useState(null);
+  useEffect(() => { push.status().then(setSt).catch(() => setSt("unsupported")) }, [push]);
+  const run = async fn => { setBusy(true); setErr(null); try { await fn(); setSt(await push.status()) } catch (e) { setErr(e.message) } finally { setBusy(false) } };
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  if (!st || (compact && st !== "off")) return null;
+  return (
+    <div className={"panel push-panel" + (compact ? " compact" : "")}>
+      {!compact && <b>Notifications</b>}
+      {st === "on" ? <>
+        <p className="muted small">Tu es prévenu sur cet appareil quand une position est liquidée, même site fermé.</p>
+        <button type="button" className="btn" disabled={busy} onClick={() => run(push.disable)}>Couper les notifications</button>
+      </> : st === "off" ? <>
+        <p className="muted small">Être prévenu sur cet appareil quand une position est liquidée, même site fermé.</p>
+        <button type="button" className="btn primary" disabled={busy} onClick={() => run(push.enable)}>Activer les notifications</button>
+      </> : st === "denied" ? <p className="muted small">Notifications bloquées : autorise-les pour ce site dans les réglages du navigateur.</p>
+        : <p className="muted small">{ios ? "Sur iPhone : ajoute Aurelys à l'écran d'accueil (Partager, puis « Sur l'écran d'accueil »), ouvre-le depuis là, puis active les notifications ici." : "Ce navigateur ne gère pas les notifications."}</p>}
+      {err && <p className="error small">{err}</p>}
+    </div>
+  );
+}
 
 export function MoreMenu({ go, me, title }) {
   const rows = [
@@ -47,7 +71,7 @@ export function HowTo({ onBack, first }) {
   );
 }
 
-export function Account({ account, me, title, patrimoine, openStake, objects, canRestart, onRestart, demo, onBack }) {
+export function Account({ account, push, me, title, patrimoine, openStake, objects, canRestart, onRestart, demo, onBack }) {
   return (
     <section className="account">
       <SubHeader title="Mon compte" onBack={onBack} />
@@ -62,6 +86,7 @@ export function Account({ account, me, title, patrimoine, openStake, objects, ca
         </div>
       </div>
       {account && <AccountLink account={account} pseudo={me.pseudo} />}
+      {push && <PushPanel push={push} />}
       <div className="panel bk">
         <p><b>Faillite</b>Sous 2 000 W (solde, mises en cours et valeur de revente de tes objets et bonus), tu peux repartir à {CAP0_TXT}. Tes paris en cours sont perdus, tes objets restent à toi, et le compteur de faillites augmente.</p>
         <button type="button" className="btn" disabled={!canRestart} onClick={onRestart}>Repartir</button>
