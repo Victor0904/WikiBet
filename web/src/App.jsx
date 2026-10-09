@@ -80,6 +80,8 @@ function Game({ api }) {
     } catch (e) { say(e.message, "down") }
   }, [api, histFrom, say]);
   useEffect(() => { refresh(); return api.onChange(refresh) }, [api, refresh]);
+  // Classement : toutes les 60 s (le temps réel ne suit plus que mon profil), pas quand l'onglet est caché.
+  useEffect(() => { const id = setInterval(() => { if (!document.hidden) api.leaderboard().then(setBoard).catch(() => {}) }, 60000); return () => clearInterval(id) }, [api]);
   // Présence : la ville de ta guilde allume tes fenêtres quand tu es connecté.
   useEffect(() => { const ping = () => api.touch?.().catch(() => {}); ping(); const id = setInterval(ping, 60000); return () => clearInterval(id) }, [api]);
 

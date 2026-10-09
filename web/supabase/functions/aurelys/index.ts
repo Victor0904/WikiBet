@@ -1,5 +1,5 @@
 // Bourse d'Aurelys côté serveur. Trois actions :
-// - tick (pg_cron, toutes les 10 s) : relève au besoin les chiffres réels (signaux), fait avancer la simulation jusqu'à
+// - tick (pg_cron, toutes les 20 s, 35 s d'avance) : relève au besoin les chiffres réels (signaux), fait avancer la simulation jusqu'à
 //   maintenant + `lead` secondes avec les ordres des joueurs reçus entre-temps, puis construit les bougies et vérifie les liquidations ;
 // - open / close (joueur connecté) : calcule l'impact de l'ordre (loi de la racine carrée) et l'enregistre en base.
 // L'état de la simulation (valeurs fondamentales, vrais résultats à venir) ne sort jamais du serveur.
@@ -18,8 +18,8 @@ const usable = (S: any) => S && S.t < gameMin(Date.now() / 1000) + 1e6;
 async function lastPrices() {
   const out: Record<string, number> = {};
   for (const s of STOCKS) {
-    const { data } = await admin.from("aur_ticks").select("p").eq("tk", s.tk).lte("t", new Date().toISOString()).order("t", { ascending: false }).limit(1).maybeSingle();
-    if (data) out[s.tk] = Number(data.p);
+    const { data } = await admin.rpc("aur_last", { p_tk: s.tk }); // dernier cours, ou dernière bougie si les cours ont été perdus
+    if (data?.p != null) out[s.tk] = Number(data.p);
   }
   return out;
 }

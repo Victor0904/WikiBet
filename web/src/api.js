@@ -138,7 +138,7 @@ export async function connect() {
     useBonus: id => rpc("use_bonus", { p_item: id }),
     onChange(cb) {
       const ch = sb.channel("wikibourse")
-        .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, cb)
+        .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `id=eq.${uid}` }, cb) // mon profil seulement (le classement se rafraîchit toutes les 60 s)
         .on("postgres_changes", { event: "*", schema: "public", table: "bets", filter: `user_id=eq.${uid}` }, cb)
         .on("postgres_changes", { event: "*", schema: "public", table: "inventory", filter: `user_id=eq.${uid}` }, cb)
         .subscribe();

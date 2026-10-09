@@ -747,7 +747,7 @@ function tick(S, R, out, pending) {
     // Indicateurs suivis par les bots : moyennes mobiles exponentielles, RSI, historique de 4 h.
     EMA_H.forEach((h, j) => { x.e[j] += (p - x.e[j]) * 2 / (h + 1) });
     const d = p - last; x.rg = (x.rg * 13 + Math.max(0, d)) / 14; x.rl = (x.rl * 13 + Math.max(0, -d)) / 14;
-    x.h.push(p); if (x.h.length > 240) x.h.shift();
+    x.h.push(+p.toPrecision(7)); if (x.h.length > 240) x.h.shift(); // 7 chiffres, comme les cours publiés : état 2 fois plus léger
     x.vol0 = v; x.ve += (v - x.ve) / 60;
     // Coupe-circuit : plus de 10 % en une heure de jeu → cotation suspendue 15 minutes.
     // (Une fois par mouvement : pas de nouvelle suspension tant que l'heure qui l'a déclenchée est dans la fenêtre.)
