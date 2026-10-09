@@ -1,0 +1,3 @@
+# Scripts shell : fins de ligne LF, sinon ils cassent sous Linux / macOS.
+.githooks/* text eol=lf
+*.sh text eol=lf
