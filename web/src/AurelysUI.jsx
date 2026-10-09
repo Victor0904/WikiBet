@@ -17,7 +17,8 @@ const gwhen = (atMs, nowMs) => { const a = gameClock(atMs / 1000), n = gameClock
   return `${d === 0 ? "aujourd'hui" : d === 1 ? "demain" : `jour ${a.day}`} ${a.hm}` };
 // Heure réelle, pour les articles et les levées de fonds : « 21:30 », « demain 01:30 », « ven. 9 oct. 14:00 ».
 const real = ms => { const d = new Date(ms), t = clock(ms), n = new Date(), days = Math.round((new Date(d).setHours(0, 0, 0, 0) - new Date(n).setHours(0, 0, 0, 0)) / 864e5);
-  return days === 0 ? t : days === 1 ? `demain ${t}` : days === -1 ? `hier ${t}` : `${d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })} ${t}` };
+  return days === 0 ? t : days === 1 ? `demain ${t}` : days === -1 ? `hier ${t}` : `${dayFmt.format(d)} ${t}` };
+const dayFmt = new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short" });
 const signed = v => `${v >= 0 ? "+" : "−"}${nf2.format(Math.abs(v)).replace(/,?0+$/, "")} %`;
 const agoTxt = ms => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `il y a ${s} s` : s < 3600 ? `il y a ${Math.floor(s / 60)} min` : `il y a ${Math.floor(s / 3600)} h` };
 // Derniers cours pour une mini-courbe : bougies d'une heure d'Aurelys, ou cours minute par minute tant qu'il y a peu de bougies.

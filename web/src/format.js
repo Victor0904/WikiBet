@@ -5,7 +5,9 @@ export const W = v => nf0.format(Math.round(v)) + " W"; // espace insécable : 
 export const sW = v => { const r = Math.round(v); return (r >= 0 ? "+" : "−") + W(Math.abs(r)) }; // jamais « −0 W »
 export const pct = v => { const r = Math.round(v * 10000) / 100; return (r > 0 ? "+" : r < 0 ? "−" : "") + nf2.format(Math.abs(r)) + " %" };
 export const cls = v => v > 1e-9 ? "up" : v < -1e-9 ? "down" : "flat";
-export const clock = ms => new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+// Formateurs créés une fois : toLocaleTimeString en recrée un à chaque appel (12 fois plus lent).
+const hhmm = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
+export const clock = ms => Number.isFinite(+ms) ? hhmm.format(ms) : "—";
 
 // QG : noms des logements (palier 0 = chambre offerte) et couleurs des thèmes.
 export const HOME_NAMES = ["Chambre", "Studio", "Open space", "Loft", "Penthouse", "Villa", "Manoir", "Château", "Île privée"];

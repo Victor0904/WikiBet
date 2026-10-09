@@ -32,7 +32,8 @@ function StakeChips({ value, set, cash, max }) {
 // Le jeu, chargé à part : l'accueil (App.jsx) s'affiche sans lui.
 export default function Game({ api, onNoProfile }) {
   const [now, setNow] = useState(api.now());
-  useEffect(() => { const id = setInterval(() => setNow(api.now()), 250); return () => clearInterval(id) }, [api]);
+  // Horloge de l'écran : une fois par seconde, calée sur le changement de seconde (même affichage, 4 fois moins de rendus).
+  useEffect(() => { let id; const tick = () => { const t = api.now(); setNow(t); id = setTimeout(tick, 1000 - t % 1000 + 5) }; tick(); return () => clearTimeout(id) }, [api]);
   const k = Math.floor((now - EPOCH) / CYCLE_MS); // numéro de séance de 11 min : sert au salaire et à la profondeur de l'historique
 
   const [me, setMe] = useState(undefined), [bets, setBets] = useState([]), [board, setBoard] = useState([]);
