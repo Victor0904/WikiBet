@@ -90,8 +90,13 @@ async function tick(lead: number) {
     if (error) console.error("ordre auto", d, error.message);
   }
   await pushLiquidations().catch(e => console.error("push", e));
-  const bots = await admin.rpc("bots_play"); // joueurs fictifs : chacun agit toutes les 2 à 12 min
-  if (bots.error) console.error("bots", bots.error.message);
+  // Joueurs fictifs : chacun agit toutes les 2 à 12 min, avec l'impact calculé comme pour un joueur. Un refus (cotation
+  // suspendue, plafond, nombre de positions) est ignoré : il réessaiera plus tard.
+  for (const p of must(await admin.rpc("bots_plan")) as { bot: string; what: string; bet: number; tk: string; dir: string; lev: number; stake: number }[]) {
+    const sl = slip(S, p.tk, p.stake * p.lev);
+    await (p.what === "close" ? admin.rpc("aur_close", { p_user: p.bot, p_id: p.bet, p_slip: sl })
+      : admin.rpc("aur_open", { p_user: p.bot, p_tk: p.tk, p_dir: p.dir, p_lev: p.lev, p_stake: p.stake, p_slip: sl }));
+  }
   return { t: S.t, liquidated };
 }
 

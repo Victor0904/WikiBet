@@ -93,7 +93,7 @@ test("bonus assurance : une position liquidée rend 50 % de la mise, une seule f
   assert.equal(await cash(db, A), before + 500);
 });
 
-test("salaire : 10 % des mises Aurelys tenues 1 min (500 W au plus), doublé par le bonus ; la faillite garde les objets", async () => {
+test("salaire : 10 % des mises Aurelys tenues 150 s (500 W au plus), doublé par le bonus ; la faillite garde les objets", async () => {
   const db = await freshDb();
   await setClock(db, 4, 100);
   await login(db, A, "alice");
@@ -101,8 +101,8 @@ test("salaire : 10 % des mises Aurelys tenues 1 min (500 W au plus), doublé par
   await db.query("select use_bonus('salaire_x2')");
   await db.query("insert into aur_ticks (tk, t, p) values ('HLV', now() - interval '2 seconds', 20)");
   const open = (st) => db.query("select aur_open($1, 'HLV', 'up', 1, $2, 0)", [A, st]);
-  await open(1000); await open(1500); // 2 500 W tenus 1 min : 250 W
-  await db.query("update bets set created_at = now() - interval '2 minutes'");
+  await open(1000); await open(1500); // 2 500 W tenus une heure d'Aurelys (150 s) : 250 W
+  await db.query("update bets set created_at = now() - interval '3 minutes'");
   await open(3000); // ouverte à l'instant : ne compte pas
   await setClock(db, 4, 600);
   const before = await cash(db, A);
