@@ -96,6 +96,18 @@ Deno.serve(async req => {
     const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer /, "");
     const { data: { user } } = await admin.auth.getUser(token);
     if (!user) return json({ error: "Connexion requise." }, 401);
+
+    // Compte : pseudo + mot de passe. Adresse interne déjà confirmée (aucun e-mail envoyé), même identifiant : rien n'est perdu.
+    // Sert aussi à changer de mot de passe.
+    if (body.action === "register") {
+      const password = String(body.password ?? "");
+      if (password.length < 8) return json({ error: "Mot de passe trop court : 8 caractères au moins." }, 400);
+      const { data: p } = await admin.from("profiles").select("id").eq("id", user.id).maybeSingle();
+      if (!p) return json({ error: "Choisis d'abord ton pseudo." }, 400);
+      const { error } = await admin.auth.admin.updateUserById(user.id, { email: `${user.id}@joueurs.aurelys.invalid`, email_confirm: true, password });
+      return error ? json({ error: error.message }, 400) : json({ ok: true });
+    }
+
     const row = await loadState();
     if (!row || !usable(row.state)) return json({ error: "Marché indisponible, réessaie dans un instant." }, 503);
 

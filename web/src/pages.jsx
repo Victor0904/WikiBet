@@ -61,7 +61,7 @@ export function Account({ account, me, title, patrimoine, openStake, objects, ca
           <div className="row"><span>Faillites</span><b>{me.bankruptcies}</b></div>
         </div>
       </div>
-      {account && <AccountLink account={account} />}
+      {account && <AccountLink account={account} pseudo={me.pseudo} />}
       <div className="panel bk">
         <p><b>Faillite</b>Sous 2 000 W (solde, mises en cours et valeur de revente de tes objets et bonus), tu peux repartir à {CAP0_TXT}. Tes paris en cours sont perdus, tes objets restent à toi, et le compteur de faillites augmente.</p>
         <button type="button" className="btn" disabled={!canRestart} onClick={onRestart}>Repartir</button>

@@ -1,4 +1,4 @@
-// Comptes (e-mail), classement des gains, amis et guildes.
+// Comptes (pseudo et mot de passe), classement des gains, amis et guildes.
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 const City = lazy(() => import("./City.jsx")); // Three.js n'est chargé qu'à l'ouverture d'une ville
 import { W, sW, cls } from "./format.js";
@@ -13,56 +13,54 @@ function useAct() {
   return [act, busy, out];
 }
 
-// Se connecter à un compte existant (e-mail et mot de passe).
+// Se connecter à un compte existant (pseudo et mot de passe).
 export function LoginPanel({ account, warn }) {
-  const [email, setEmail] = useState(""), [pw, setPw] = useState(""), [act, busy, out] = useAct();
+  const [pseudo, setPseudo] = useState(""), [pw, setPw] = useState(""), [act, busy, out] = useAct();
   return (
-    <form className="auth" onSubmit={e => { e.preventDefault(); act(() => account.emailSignIn(email, pw)) }}>
-      {warn && <p className="muted small">Ta partie actuelle n'a pas de compte : elle sera remplacée par celle du compte.</p>}
-      <input type="email" autoComplete="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)} required />
-      <input type="password" autoComplete="current-password" placeholder="Mot de passe" value={pw} onChange={e => setPw(e.target.value)} required />
+    <form className="auth" onSubmit={e => { e.preventDefault(); act(() => account.signIn(pseudo, pw)) }}>
+      {warn && <p className="muted small">Ta partie actuelle n'a pas de mot de passe : elle sera remplacée par celle du compte.</p>}
+      <input name="username" autoComplete="username" placeholder="Pseudo" value={pseudo} onChange={e => setPseudo(e.target.value)} required />
+      <input name="password" type="password" autoComplete="current-password" placeholder="Mot de passe" value={pw} onChange={e => setPw(e.target.value)} required />
       <button className="btn primary" type="submit" disabled={busy}>Se connecter</button>
-      <button type="button" className="link" disabled={busy || !email}
-        onClick={() => act(() => account.resetPassword(email), `Lien envoyé à ${email} pour choisir un nouveau mot de passe.`)}>Mot de passe oublié ?</button>
       {out}
     </form>
   );
 }
 
-// Encadré « Compte » de Mon compte : lier la partie, choisir un mot de passe, se déconnecter.
-export function AccountLink({ account }) {
-  const [u, setU] = useState(undefined), [login, setLogin] = useState(false), [form, setForm] = useState(false);
-  const [email, setEmail] = useState(""), [pw, setPw] = useState(""), [act, busy, out] = useAct();
+// Choisir ou changer son mot de passe. Le pseudo, caché, sert d'identifiant au gestionnaire de mots de passe du navigateur.
+function PasswordForm({ account, pseudo, label }) {
+  const [pw, setPw] = useState(""), [act, busy, out] = useAct();
+  return (
+    <form className="auth" onSubmit={e => { e.preventDefault(); act(() => account.register(pseudo, pw)) }}>
+      <input name="username" autoComplete="username" value={pseudo} readOnly hidden />
+      <input name="password" type="password" autoComplete="new-password" placeholder="Mot de passe (8 caractères au moins)" minLength={8} value={pw} onChange={e => setPw(e.target.value)} required />
+      <button className="btn primary" type="submit" disabled={busy}>{label}</button>
+      {out}
+    </form>
+  );
+}
+
+// Encadré « Compte » de Mon compte : choisir un mot de passe, se connecter, se déconnecter.
+export function AccountLink({ account, pseudo }) {
+  const [u, setU] = useState(undefined), [login, setLogin] = useState(false), [change, setChange] = useState(false), [act, busy, out] = useAct();
   useEffect(() => { account.user().then(setU).catch(() => setU(null)) }, [account]);
   if (!u) return null;
-  const mail = u.identities?.some(i => i.provider === "email");
-  const needPw = account.recovery || (mail && !u.user_metadata?.pw);
   return (
     <div className="panel auth-panel">
       <b>Compte</b>
-      {account.error && <p className="error">{account.error}</p>}
-      {needPw ? (
-        <form className="auth" onSubmit={e => { e.preventDefault(); act(() => account.setPassword(pw)) }}>
-          <p className="muted">E-mail confirmé : {u.email}. Choisis ton mot de passe.</p>
-          <input type="password" autoComplete="new-password" placeholder="Mot de passe (8 caractères au moins)" minLength={8} value={pw} onChange={e => setPw(e.target.value)} required />
-          <button className="btn primary" type="submit" disabled={busy}>Enregistrer</button>
-          {out}
-        </form>
-      ) : u.is_anonymous ? (login ? <><LoginPanel account={account} warn /><button type="button" className="link" onClick={() => setLogin(false)}>Retour</button></> : <>
-        <p className="muted">Ta partie n'est liée à aucun compte. Lie-la pour la garder et la retrouver sur un autre appareil.</p>
-        {u.new_email && <p className="accent">Lien envoyé à {u.new_email}. Ouvre-le pour confirmer ton e-mail.</p>}
-        {form ? (
-          <form className="auth" onSubmit={e => { e.preventDefault(); act(() => account.emailLink(email), `Lien envoyé à ${email}. Ouvre-le, puis choisis ton mot de passe.`) }}>
-            <input type="email" autoComplete="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
-            <button className="btn" type="submit" disabled={busy}>Recevoir le lien de confirmation</button>
-          </form>
-        ) : <button type="button" className="btn" onClick={() => setForm(true)}>Créer un compte avec un e-mail</button>}
-        {out}
-        <button type="button" className="link" onClick={() => setLogin(true)}>Déjà un compte ? Se connecter</button>
-      </>) : <>
-        <p className="muted">Connecté{u.email ? ` · ${u.email}` : ""}. Ta partie est sauvegardée.</p>
+      {u.email ? <>
+        <p className="muted">Connecté en tant que {pseudo}. Ta partie est sauvegardée.</p>
+        {change ? <PasswordForm account={account} pseudo={pseudo} label="Changer le mot de passe" />
+          : <button type="button" className="link" onClick={() => setChange(true)}>Changer de mot de passe</button>}
         <button type="button" className="btn" disabled={busy} onClick={() => act(() => account.signOut())}>Se déconnecter</button>
         {out}
+      </> : login ? <>
+        <LoginPanel account={account} warn />
+        <button type="button" className="link" onClick={() => setLogin(false)}>Retour</button>
+      </> : <>
+        <p className="muted">Ta partie n'a pas de mot de passe. Choisis-en un pour la retrouver avec ton pseudo, ici ou sur un autre appareil.</p>
+        <PasswordForm account={account} pseudo={pseudo} label="Enregistrer" />
+        <button type="button" className="link" onClick={() => setLogin(true)}>Déjà un compte ? Se connecter</button>
       </>}
     </div>
   );

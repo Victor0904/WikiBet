@@ -46,7 +46,6 @@ function Game({ api }) {
   const [me, setMe] = useState(undefined), [bets, setBets] = useState([]), [board, setBoard] = useState([]);
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
   const [aurDetail, setAurDetail] = useState(null), [posView, setPosView] = useState("open"), [more, setMore] = useState(null);
-  useEffect(() => { if (api.account?.landed) { setTab("more"); setMore("account") } }, [api]); // retour d'un lien e-mail
   // « Comment jouer » s'ouvre tout seul à la première visite.
   const [firstVisit, setFirstVisit] = useState(() => { try { return !localStorage.getItem("wb-howto") } catch { return false } });
   const [pref, setPref] = useState({ lev: 5, shorizon: "15", stake: 500 });
@@ -204,19 +203,29 @@ function MiniTicker({ aur, bets, onOpen }) {
 }
 
 function Onboarding({ api, onDone }) {
-  const [pseudo, setPseudo] = useState(""), [err, setErr] = useState(null), [login, setLogin] = useState(!!api.account?.error);
+  const [pseudo, setPseudo] = useState(""), [pw, setPw] = useState(""), [err, setErr] = useState(null), [login, setLogin] = useState(false);
+  // En ligne, le compte se crée tout de suite avec un mot de passe : on se reconnecte avec son pseudo, le navigateur s'en souvient.
+  const submit = async e => {
+    e.preventDefault();
+    try { await api.createProfile(pseudo) } catch (x) { return setErr(x.message) }
+    if (!api.account) return onDone();
+    try { await api.account.register(pseudo.trim(), pw) } catch (x) { setErr(`Partie créée, mais mot de passe refusé : ${x.message} Tu pourras le choisir dans Mon compte.`); setTimeout(onDone, 4000) }
+  };
   return (
     <div className="center">
-      <form className="onboard" onSubmit={async e => { e.preventDefault(); try { await api.createProfile(pseudo); onDone() } catch (x) { setErr(x.message) } }}>
+      <form className="onboard" onSubmit={submit}>
         <Logo big />
         <p className="muted">Une bourse inventée, Aurelys, dont les cours naissent des ordres des joueurs et des bots. Tu démarres avec {W(CAP0)}.</p>
         <label htmlFor="pseudo">Ton pseudo</label>
-        <input id="pseudo" value={pseudo} onChange={e => setPseudo(e.target.value)} minLength={2} maxLength={20} required autoFocus />
+        <input id="pseudo" name="username" autoComplete="username" value={pseudo} onChange={e => setPseudo(e.target.value)} minLength={2} maxLength={20} required autoFocus />
+        {api.account && <>
+          <label htmlFor="pw">Mot de passe</label>
+          <input id="pw" name="password" type="password" autoComplete="new-password" placeholder="8 caractères au moins" value={pw} onChange={e => setPw(e.target.value)} minLength={8} required />
+        </>}
         {err && <p className="error">{err}</p>}
         <button className="btn primary" type="submit">Entrer sur le marché</button>
       </form>
       {api.account && <div className="onboard">
-        {api.account.error && <p className="error">{api.account.error}</p>}
         {login ? <LoginPanel account={api.account} /> : <button type="button" className="link" onClick={() => setLogin(true)}>Déjà un compte ? Se connecter</button>}
       </div>}
     </div>

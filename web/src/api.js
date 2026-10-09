@@ -11,11 +11,7 @@ export async function connect() {
   const url = import.meta.env.VITE_SUPABASE_URL, key = import.meta.env.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) return (await import("./demo.js")).demoApi();
 
-  // Retour d'un lien e-mail : lien de nouveau mot de passe, ou erreur à afficher. Lu avant que Supabase ne nettoie l'adresse.
-  const back = new URLSearchParams(location.hash.slice(1) + "&" + location.search.slice(1));
-  const recovery = back.get("type") === "recovery", authError = back.get("error_description");
-  if (authError) history.replaceState(null, "", location.pathname);
-  const sb = createClient(url, key);
+  const sb = createClient(url, key); // session gardée dans le navigateur (localStorage) : on reste connecté
   let { data: { session } } = await sb.auth.getSession();
   if (!session) {
     const r = await sb.auth.signInAnonymously();
@@ -41,20 +37,22 @@ export async function connect() {
   // Écart entre l'horloge du téléphone et celle du serveur, pour que tout le monde voie la même minute.
   const t0 = Date.now(), st = await rpc("server_time"), offset = Date.parse(st) - (t0 + Date.now()) / 2;
 
-  // Comptes : la partie anonyme devient un vrai compte en liant un e-mail (même identifiant, rien n'est perdu).
+  // Comptes : pseudo + mot de passe. La partie anonyme devient un compte (même identifiant, rien n'est perdu).
   const home = location.origin + location.pathname;
   const auth = async (p, reload) => { const { data, error } = await p; if (error) throw new Error(authMsg(error)); if (reload) location.replace(home); return data };
+  const signIn = async (pseudo, password) => {
+    const email = await rpc("login_email", { p_pseudo: pseudo });
+    if (!email) throw new Error("Pseudo ou mot de passe incorrect.");
+    return auth(sb.auth.signInWithPassword({ email, password }), true);
+  };
 
   return {
     mode: "supabase", uid,
     account: {
-      recovery, error: authError && authMsg({ message: authError }),
-      landed: !!(back.get("type") || authError), // retour d'un lien : on ouvre Mon compte
       user: async () => (await sb.auth.getUser()).data.user,
-      emailLink: email => auth(sb.auth.updateUser({ email }, { emailRedirectTo: home })),
-      setPassword: password => auth(sb.auth.updateUser({ password, data: { pw: true } }), true),
-      emailSignIn: (email, password) => auth(sb.auth.signInWithPassword({ email, password }), true),
-      resetPassword: email => auth(sb.auth.resetPasswordForEmail(email, { redirectTo: home })),
+      signIn,
+      // Crée le compte ou change le mot de passe (côté serveur), puis se reconnecte : le navigateur propose d'enregistrer le mot de passe.
+      register: async (pseudo, password) => { await invoke("aurelys", { action: "register", password }); return signIn(pseudo, password) },
       signOut: () => auth(sb.auth.signOut(), true),
     },
     now: () => Date.now() + offset,
@@ -120,7 +118,7 @@ export async function connect() {
 // Messages d'erreur de Supabase Auth, en français.
 function authMsg(e) {
   const m = `${e.code ?? ""} ${e.message ?? ""}`;
-  return /invalid_credentials|Invalid login/i.test(m) ? "E-mail ou mot de passe incorrect."
+  return /invalid_credentials|Invalid login/i.test(m) ? "Pseudo ou mot de passe incorrect."
     : /email_exists|already been registered|already registered/i.test(m) ? "Cet e-mail a déjà un compte : connecte-toi."
     : /weak_password|at least 6/i.test(m) ? "Mot de passe trop court : 8 caractères au moins."
     : /email_not_confirmed|not confirmed/i.test(m) ? "Confirme d'abord ton e-mail avec le lien reçu."
