@@ -501,10 +501,10 @@ export function AurelysCard({ b, aur, now, onClose, onAuto, Facts }) {
   const q = aur.quotes[b.aur], ticks = aur.ticks[b.aur], x = aurLive(b, q, ticks), t0 = Date.parse(b.created_at), [busy, setBusy] = useState(false), [auto, setAuto] = useState(false);
   // Cours minute par minute tant qu'on les a (dernière heure réelle), sinon bougies d'une heure d'Aurelys.
   const cs = (aur.candles[b.aur] ?? []).filter(k => k[0] * 1000 > t0 - 300000), recent = (ticks ?? []).filter(k => k[0] * 1000 > t0);
-  const pts = [[t0, b.entry], ...((ticks?.[0]?.[0] ?? Infinity) * 1000 <= t0 ? recent.map(k => [k[0] * 1000, k[1]]) : cs.map(k => [k[0] * 1000 + 299000, k[4]])), [now, x.px]];
-  const d = x.lq / x.px - 1;
+  const pts = [[t0, b.entry], ...((ticks?.[0]?.[0] ?? Infinity) * 1000 <= t0 ? recent.map(k => [k[0] * 1000, k[1]]) : cs.map(k => [Math.min(now, (k[0] + 60 * SPM) * 1000), k[4]])), [now, x.px]];
+  const d = x.lq / x.px - 1, danger = !x.hit && x.value <= .25 * b.stake; // proche de la liquidation : la carte clignote
   return (
-    <article className={"pos " + (x.net >= 0 ? "gain" : "loss")}>
+    <article className={"pos " + (x.net >= 0 ? "gain" : "loss") + (danger ? " danger" : "")}>
       <div className="pos-h">
         <b className="who"><TkIcon tk={b.aur} size={22} />{BY[b.aur]?.name ?? b.aur}</b>
         <span className={"side " + b.dir}>{b.dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×{b.lev}</span>

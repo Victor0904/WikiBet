@@ -63,7 +63,7 @@ export default function QG({ api, catalog, inv, me, owner, self, patrimoine, ope
         </div>
         {patrimoine != null && <div className="r mono"><b className="big-num">{W(patrimoine)}</b><small>patrimoine</small></div>}
       </div>
-      {self && <p className="muted small">Solde {W(me.cash)} · en jeu {W(openStake)} · objets revendables {W(resale)} · logements {W(homes)} (ne se revendent pas, comptés à 60 % au classement)</p>}
+      {self && <p className="muted small">Solde {W(me.cash)} · positions {W(openStake)} · objets revendables {W(resale)} · logements {W(homes)} (ne se revendent pas, comptés à 60 % au classement)</p>}
 
       <Scene level={level} items={decor} accent={accent} pnl={self ? pnl : null} trophies={wall} souvenirs={souv} live={self ? live : null} onReady={s => { scn.current = s }} />
       <button type="button" className="btn ghost photo-btn" onClick={() => scn.current && sharePhoto(scn.current.snapshot(`${self ? "Mon QG" : `Le QG de ${owner.pseudo}`} sur Aurelys`), "QG Aurelys")}>📷 Photo</button>

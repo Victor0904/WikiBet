@@ -1,6 +1,7 @@
 // Accès au jeu. Avec les clés Supabase (.env.local) : la vraie base partagée.
 // Sans clés : mode démo, la même base SQL tourne dans le navigateur (voir demo.js).
 import { createClient } from "@supabase/supabase-js";
+import { BOTS } from "./format.js";
 
 // Les identifiants bigint et les cotes numeric arrivent parfois en texte : on normalise une fois ici.
 export const normBet = b => ({ ...b, id: Number(b.id), odds: b.odds == null ? null : Number(b.odds) });
@@ -68,6 +69,7 @@ export async function connect() {
     },
   };
   // Abonnement déjà accordé : on le rattache au compte du moment (après une connexion, l'identifiant change).
+  rows(sb.from("profiles").select("id").eq("bot", true)).then(r => r.forEach(x => BOTS.add(x.id))).catch(() => { });
   if (canPush && Notification.permission === "granted") push.status().then(s => s === "on" && push.enable()).catch(() => { });
 
   return {

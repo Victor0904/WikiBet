@@ -90,6 +90,8 @@ async function tick(lead: number) {
     if (error) console.error("ordre auto", d, error.message);
   }
   await pushLiquidations().catch(e => console.error("push", e));
+  const bots = await admin.rpc("bots_play"); // joueurs fictifs : chacun agit toutes les 2 à 12 min
+  if (bots.error) console.error("bots", bots.error.message);
   return { t: S.t, liquidated };
 }
 
@@ -123,8 +125,15 @@ Deno.serve(async req => {
     if (body.action === "tick") return json(await tick(Number(body.lead) || 20));
     // Texte de la notification, demandé par le service worker avec son adresse d'abonnement (secrète).
     if (body.action === "push_info") {
-      const rows = must(await admin.rpc("push_info", { p_endpoint: String(body.endpoint ?? "") })) as { aur: string; dir: string; lev: number; stake: number }[];
-      return json({ lines: rows.map(r => `${BY[r.aur]?.name ?? r.aur} ${r.dir === "up" ? "▲" : "▼"} ×${r.lev} · mise de ${new Intl.NumberFormat("fr-FR").format(Math.round(r.stake))} W perdue`) });
+      const rows = must(await admin.rpc("push_info", { p_endpoint: String(body.endpoint ?? "") })) as { kind: string; aur: string; dir: string; lev: number; stake: number; lq: number }[];
+      const nf = (v: number, d = 0) => new Intl.NumberFormat("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
+      const liq = rows.filter(r => r.kind === "liq").length;
+      return json({
+        title: liq > 1 ? `${liq} positions liquidées` : liq ? "Position liquidée" : "Liquidation proche",
+        lines: rows.map(r => `${BY[r.aur]?.name ?? r.aur} ${r.dir === "up" ? "▲" : "▼"} ×${r.lev} · ` + (r.kind === "liq"
+          ? `mise de ${nf(r.stake)} W perdue`
+          : `ne vaut plus que ${r.kind} % de ta mise, liquidation à ${nf(r.lq, 2)}`)),
+      });
     }
 
     // Ordres : le joueur doit être connecté (jeton de session, pas la clé publique).

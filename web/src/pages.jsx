@@ -15,10 +15,10 @@ export function PushPanel({ push, compact }) {
     <div className={"panel push-panel" + (compact ? " compact" : "")}>
       {!compact && <b>Notifications</b>}
       {st === "on" ? <>
-        <p className="muted small">Tu es prévenu sur cet appareil quand une position est liquidée, même site fermé.</p>
+        <p className="muted small">Tu es prévenu sur cet appareil quand une position ne vaut plus que 25 %, puis 10 % de sa mise, et quand elle est liquidée, même site fermé.</p>
         <button type="button" className="btn" disabled={busy} onClick={() => run(push.disable)}>Couper les notifications</button>
       </> : st === "off" ? <>
-        <p className="muted small">Être prévenu sur cet appareil quand une position est liquidée, même site fermé.</p>
+        <p className="muted small">Être prévenu sur cet appareil avant la liquidation d'une position (à 25 %, puis 10 % de la mise), et quand elle est liquidée, même site fermé.</p>
         <button type="button" className="btn primary" disabled={busy} onClick={() => run(push.enable)}>Activer les notifications</button>
       </> : st === "denied" ? <p className="muted small">Notifications bloquées : autorise-les pour ce site dans les réglages du navigateur.</p>
         : <p className="muted small">{ios ? "Sur iPhone : ajoute Aurelys à l'écran d'accueil (Partager, puis « Sur l'écran d'accueil »), ouvre-le depuis là, puis active les notifications ici." : "Ce navigateur ne gère pas les notifications."}</p>}
@@ -52,11 +52,11 @@ const STEPS = [
   ["La Bourse d'Aurelys", "Un pays fictif, 13 entreprises inventées, une bourse ouverte 24 h/24. Un jour d'Aurelys dure 1 h réelle : tu as le temps de lire et de réfléchir. Les prix naissent des ordres de bots aux caractères différents, de baleines et des joueurs. Ton propre ordre fait bouger le prix : plus il est gros, et plus l'action est petite, plus tu paies cher."],
   ["Résultats et consensus", "Avant chaque publication de résultats, les analystes annoncent ce qu'ils attendent. Le cours réagit à la surprise, pas au chiffre : +12 % quand on attendait +8 %, ça monte ; +12 % quand on attendait +15 %, ça baisse. Les indices sortent avant : commandes, rumeurs, révisions des analystes."],
   ["Des entreprises branchées sur le réel", "Granterre la pluie et la chaleur en Beauce, Helvane la consommation électrique française, Lumirue les jours fériés et la météo du week-end. Ces chiffres sont réels et à venir : celui qui voit venir une canicule ou un pont a un temps d'avance."],
-  ["Prendre position", "▲ si tu penses que le cours va monter, ▼ s'il va baisser. Ton gain suit la variation, multipliée par le levier : à ×5, +2 % de cours font +10 % sur ta mise. Le ×10 se débloque après 30 positions clôturées. Frais de 0,1 % du montant engagé à l'ouverture et à la clôture. Si la position perd toute sa mise, elle est liquidée."],
+  ["Prendre position", "▲ si tu penses que le cours va monter, ▼ s'il va baisser. Ton gain suit la variation, multipliée par le levier : à ×5, +2 % de cours font +10 % sur ta mise. Leviers ×1 à ×15 pour tous, ×20 avec un logement (QG), ×25 dans une guilde qui a une salle des marchés. Sur une jeune pousse, ×5 au plus. Frais de 0,1 % du montant engagé à l'ouverture et à la clôture. Si la position perd toute sa mise, elle est liquidée."],
   ["Investir sur le long terme", "Dans la fiche d'une entreprise, « Investir » achète de vraies actions : sans levier, sans liquidation, à garder aussi longtemps que tu veux. Certaines versent un dividende chaque jour d'Aurelys. De jeunes entreprises entrent régulièrement en bourse : avec 50 000 W de patrimoine, tu peux souscrire à leur levée de fonds avant la cotation. Elles peuvent beaucoup rapporter… ou faire faillite. Lis leurs articles dans le Courrier d'Aurelys."],
-  ["Ton QG", "Dépense tes gains : logements, déco en 3D, thèmes, titres et bonus. Un plus grand logement donne aussi un historique plus long et plus d'alertes de prix. Tes trophées s'affichent au mur. Le classement compte ton patrimoine (solde, mises en cours et 60 % de la valeur de tes objets)."],
+  ["Ton QG", "Dépense tes gains : logements, déco en 3D, thèmes, titres et bonus. Un plus grand logement donne aussi un historique plus long et plus d'alertes de prix. Tes trophées s'affichent au mur. Le classement compte ton patrimoine (solde, valeur actuelle de tes positions, actions et 60 % de la valeur de tes objets)."],
   ["Classements, amis et guildes", "Trois classements : les gains du jour (remis à zéro à minuit), les gains de tous les temps et le patrimoine. Ajoute tes amis par leur pseudo, ou rejoins une guilde de 30 traders au plus. Lie ta partie à un e-mail dans Mon compte pour la garder."],
-  ["Salaire et faillite", "+500 W toutes les 11 minutes où tu as parié. Sous 2 000 W (solde, mises et valeur de revente de tes objets), tu peux repartir à " + CAP0_TXT + " depuis Mon compte. Le compteur de faillites est visible de tous."],
+  ["Salaire et faillite", "Toutes les 11 minutes, un salaire de 10 % de tes mises sur Aurelys (500 W au plus) ; une position compte si elle est restée ouverte au moins 1 minute. Sous 2 000 W (solde, mises et valeur de revente de tes objets), tu peux repartir à " + CAP0_TXT + " depuis Mon compte. Le compteur de faillites est visible de tous."],
 ];
 
 export function HowTo({ onBack, first }) {
@@ -80,7 +80,7 @@ export function Account({ account, push, me, title, patrimoine, openStake, objec
         <div className="rows mono">
           <div className="row"><span>Patrimoine</span><b>{W(patrimoine)}</b></div>
           <div className="row"><span>Solde</span><b>{W(me.cash)}</b></div>
-          <div className="row"><span>Mises en cours</span><b>{W(openStake)}</b></div>
+          <div className="row"><span>Positions (valeur actuelle)</span><b>{W(openStake)}</b></div>
           <div className="row"><span>Objets et logements du QG (60 %)</span><b>{W(objects)}</b></div>
           <div className="row"><span>Faillites</span><b>{me.bankruptcies}</b></div>
         </div>
@@ -88,7 +88,7 @@ export function Account({ account, push, me, title, patrimoine, openStake, objec
       {account && <AccountLink account={account} pseudo={me.pseudo} />}
       {push && <PushPanel push={push} />}
       <div className="panel bk">
-        <p><b>Faillite</b>Sous 2 000 W (solde, mises en cours et valeur de revente de tes objets et bonus), tu peux repartir à {CAP0_TXT}. Tes paris en cours sont perdus, tes objets restent à toi, et le compteur de faillites augmente.</p>
+        <p><b>Faillite</b>Sous 2 000 W (solde, valeur actuelle de tes positions et de tes actions, valeur de revente de tes objets et bonus), tu peux repartir à {CAP0_TXT}. Tes paris en cours sont perdus, tes objets restent à toi, et le compteur de faillites augmente.</p>
         <button type="button" className="btn" disabled={!canRestart} onClick={onRestart}>Repartir</button>
       </div>
       {demo && <p className="fine">Mode démo locale : ta partie est enregistrée dans ce navigateur uniquement, sans compte.</p>}

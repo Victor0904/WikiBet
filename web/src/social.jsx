@@ -1,7 +1,7 @@
 // Comptes (pseudo et mot de passe), classement des gains, amis et guildes.
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 const City = lazy(() => import("./City.jsx")); // Three.js n'est chargé qu'à l'ouverture d'une ville
-import { W, sW, cls } from "./format.js";
+import { W, sW, cls, BOTS } from "./format.js";
 import { Segmented, SubHeader } from "./nav.jsx";
 
 // ===== Comptes =====
@@ -89,6 +89,7 @@ const useLoad = (load, deps) => {
   return [rows, reload];
 };
 const sub = (...a) => a.filter(Boolean).join(" · ");
+export const BotTag = ({ id }) => BOTS.has(id) ? <i className="gtag bot" title="Joueur fictif, géré par le jeu">bot</i> : null;
 
 export function Ranking({ api, me, wealth, onVisit }) {
   const [period, setPeriod] = useState("today"), [scope, setScope] = useState("all");
@@ -105,7 +106,7 @@ export function Ranking({ api, me, wealth, onVisit }) {
             {rows.map((p, i) => (
               <button type="button" key={p.id} className={"brow" + (p.id === me.id ? " me" : "")} onClick={() => onVisit(p)} aria-label={`Voir le QG de ${p.pseudo}`}>
                 <span className="rk mono">{i + 1}</span>
-                <span><b>{p.pseudo}{p.guild && <> <i className="gtag">{p.guild}</i></>}</b><small>{sub(p.title, `${p.bets} pari${p.bets > 1 ? "s" : ""} clôturé${p.bets > 1 ? "s" : ""}`)}</small></span>
+                <span><b>{p.pseudo}<BotTag id={p.id} />{p.guild && <> <i className="gtag">{p.guild}</i></>}</b><small>{sub(p.title, `${p.bets} pari${p.bets > 1 ? "s" : ""} clôturé${p.bets > 1 ? "s" : ""}`)}</small></span>
                 <span className={"r mono " + cls(p.gain)}>{sW(p.gain)}</span>
               </button>
             ))}
@@ -201,7 +202,7 @@ function GuildView({ api, me, g, mine, canJoin, run, onVisit }) {
         {(members ?? []).map(m => (
           <div key={m.id} className={"brow frow" + (m.id === me.id ? " me" : "")}>
             <button type="button" className="fname" onClick={() => onVisit(m)} aria-label={`Voir le QG de ${m.pseudo}`}>
-              <b>{m.pseudo}{m.owner && <small className="accent"> · fondateur</small>}</b>
+              <b>{m.pseudo}<BotTag id={m.id} />{m.owner && <small className="accent"> · fondateur</small>}</b>
               <small className="mono">jour <span className={cls(m.today)}>{sW(m.today)}</span> · total <span className={cls(m.total)}>{sW(m.total)}</span></small>
             </button>
             <span className="f-acts">{boss && m.id !== me.id && <button type="button" className="btn ghost" onClick={() => run(() => api.guildKick(m.id), `${m.pseudo} a quitté la guilde.`)}>Exclure</button>}</span>

@@ -520,7 +520,7 @@ button:active:not(:disabled) { transform: scale(.96) }
 .cons-box, .real-box { display: flex; flex-direction: column; gap: 4px }
 .cons-box p, .real-box p { margin: 0 }
 .real-box { border-color: color-mix(in srgb, var(--up) 40%, var(--line)) }
-.heat.map { display: block; position: relative; aspect-ratio: 4 / 3; max-height: 70vh }
+.heat.map { display: block; position: relative; width: 100%; aspect-ratio: 4 / 3; max-height: 70vh }
 .heat.map .hcell { position: absolute; min-height: 0; border: 2px solid var(--bg); border-radius: 8px; padding: 6px 8px; overflow: hidden }
 .troph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 8px }
 .troph { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; opacity: .55 }
@@ -617,3 +617,9 @@ button:active:not(:disabled) { transform: scale(.96) }
 /* Notifications */
 .push-panel { display: flex; flex-direction: column; gap: 8px }
 .push-panel.compact { margin-bottom: 10px }
+
+/* Position proche de la liquidation (valeur sous 25 % de la mise) */
+.pos.danger { animation: pos-danger 1s ease-in-out infinite alternate; border-color: var(--down) }
+@keyframes pos-danger { from { box-shadow: 0 0 0 1px var(--down) } to { box-shadow: 0 0 0 3px var(--down), 0 0 18px rgba(240, 75, 92, .45) } }
+@media (prefers-reduced-motion: reduce) { .pos.danger { animation: none; box-shadow: 0 0 0 2px var(--down) } }
+.gtag.bot { color: var(--faint); border-style: dashed }

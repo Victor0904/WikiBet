@@ -7,7 +7,7 @@ import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx
 import { BY as AUR, slipEstimate, FEE, gameClock } from "../supabase/functions/_shared/aurelys.js";
 import { Dock, Segmented, SubHeader, Logo } from "./nav.jsx";
 import { MoreMenu, HowTo, Account, Legal, PushPanel } from "./pages.jsx";
-import { Ranking, Friends, Guilds, LoginPanel } from "./social.jsx";
+import { Ranking, Friends, Guilds, LoginPanel, BotTag } from "./social.jsx";
 import Portfolio from "./Portfolio.jsx";
 const QG = lazy(() => import("./QG.jsx")); // Three.js n'est chargé qu'à l'ouverture du QG
 
@@ -101,7 +101,8 @@ function Game({ api }) {
   const equipped = cat => catalog.find(i => i.category === cat && inv[i.id]?.equipped);
   const accent = THEMES[equipped("theme")?.id] ?? DEFAULT_ACCENT, myTitle = equipped("title")?.name, effect = equipped("effect")?.id;
   useEffect(() => { document.documentElement.style.setProperty("--accent", accent) }, [accent]);
-  const openStake = open.reduce((a, b) => a + b.stake, 0);
+  // Positions ouvertes à leur valeur actuelle (frais de clôture déduits), comme le patrimoine en SQL (open_value).
+  const openStake = open.reduce((a, b) => a + (b.kind === "aurelys" ? aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).value : b.stake), 0);
   const objectsValue = catalog.filter(i => i.kind !== "bonus" && (inv[i.id]?.qty ?? 0) > 0).reduce((a, i) => a + Math.floor(i.price * .6), 0);
   const positions = open.filter(b => b.kind === "aurelys");
   const pnl = positions.length ? Math.round(positions.reduce((a, b) => a + aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).net, 0)) : null;
@@ -130,7 +131,7 @@ function Game({ api }) {
     r => `Clôturée : ${sW(r.payout - r.stake - feeOpen(r))}${feeOpen(r) ? ` (frais ${W(r.fees)})` : ""}`);
   const howtoDone = () => { try { localStorage.setItem("wb-howto", "1") } catch { } setFirstVisit(false); setMore(null); setTab("market") };
   const holdPx = h => h.status === "listed" || h.status === "core" ? aur.quotes[h.tk]?.p ?? h.price : h.price; // cours en direct
-  const patrimoine = me.cash + openStake + objectsValue + holds.reduce((a, h) => a + h.qty * holdPx(h), 0);
+  const holdsValue = holds.reduce((a, h) => a + h.qty * holdPx(h), 0), patrimoine = me.cash + openStake + objectsValue + holdsValue;
   const showHowto = firstVisit || (tab === "more" && more === "howto");
 
   return (
@@ -179,7 +180,7 @@ function Game({ api }) {
             : more === "friends" ? <Friends api={api} say={say} onVisit={visitQG} onBack={() => setMore(null)} />
             : more === "guilds" ? <Guilds api={api} me={me} say={say} onVisit={visitQG} onBack={() => setMore(null)} accent={accent} />
             : more === "account" ? <Account account={api.account} push={api.push} me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"}
-                canRestart={me.cash + openStake + catalog.filter(i => i.kind !== "home").reduce((a, i) => a + Math.floor(i.price * .6) * (inv[i.id]?.qty ?? 0), 0) < BK_LIMIT} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} onBack={() => setMore(null)} />
+                canRestart={me.cash + openStake + holdsValue + catalog.filter(i => i.kind !== "home").reduce((a, i) => a + Math.floor(i.price * .6) * (inv[i.id]?.qty ?? 0), 0) < BK_LIMIT} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} onBack={() => setMore(null)} />
             : more === "legal" ? <Legal onBack={() => setMore(null)} />
             : <MoreMenu go={setMore} me={me} title={myTitle} />)}
           </>}
@@ -347,7 +348,7 @@ function InvestSheet({ api, tk, mode, qty: q0, aur, me, hold, onClose, onDone })
       <form className="sheet" role="dialog" aria-modal="true" aria-label={title} onSubmit={async e => { e.preventDefault(); if (!ok) return; setBusy(true);
         await onDone({ mode, tk, amount, qty }, round ? `Souscription de ${W(amount)} à ${d?.name}` : sell ? `Vendu ${nf2.format(qty)} actions` : `${W(amount)} investis dans ${d?.name}`); setBusy(false) }}>
         <div className="sheet-h"><b>{title}</b><button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button></div>
-        {gate && <p className="error small">Les levées de fonds demandent 50 000 W disponibles : solde, mises, actions et objets revendables, sans les logements (tu en as {W(patrimoine)}).</p>}
+        {gate && <p className="error small">Les levées de fonds demandent 50 000 W disponibles : solde, valeur actuelle des positions, actions et objets revendables, sans les logements (tu en as {W(patrimoine)}).</p>}
         {sell ? <>
           <label>Part à vendre</label>
           <div className="seg" role="group" aria-label="Part à vendre">{[[.25, "25 %"], [.5, "50 %"], [1, "Tout"]].map(([v, l]) => <button key={v} type="button" aria-pressed={share === v} onClick={() => setShare(v)}>{l}</button>)}</div>
@@ -379,12 +380,12 @@ function Board({ board, me, onVisit }) {
         {board.map((p, i) => (
           <button type="button" key={p.id} className={"brow" + (p.id === me.id ? " me" : "")} onClick={() => onVisit(p)} aria-label={`Voir le QG de ${p.pseudo}`}>
             <span className="rk mono">{i + 1}</span>
-            <span><b>{p.pseudo}</b><small>{[p.title, HOME_NAMES[p.home ?? 0], p.bankruptcies > 0 && `${p.bankruptcies} faillite${p.bankruptcies > 1 ? "s" : ""}`].filter(Boolean).join(" · ")}</small></span>
+            <span><b>{p.pseudo}<BotTag id={p.id} /></b><small>{[p.title, HOME_NAMES[p.home ?? 0], p.bankruptcies > 0 && `${p.bankruptcies} faillite${p.bankruptcies > 1 ? "s" : ""}`].filter(Boolean).join(" · ")}</small></span>
             <span className="r mono">{W(p.patrimoine ?? p.cash)}<small>solde {W(p.cash)}</small></span>
           </button>
         ))}
       </div>
-      <p className="fine">Classement au patrimoine : solde, mises en cours et 60 % du prix des objets du QG. Touche un joueur pour visiter son QG.</p>
+      <p className="fine">Classement au patrimoine : solde, valeur actuelle des positions, actions et 60 % du prix des objets du QG. Touche un joueur pour visiter son QG.</p>
     </section>
   );
 }
@@ -409,7 +410,8 @@ function Ticket({ api, aur, now, me, ticket, level, openCount, pref, setPref, on
   const set = p => setPref(x => ({ ...x, ...p }));
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
   // Aurelys : ×20 avec un logement, ×25 dans une guilde qui a une salle des marchés (vérifié par le serveur).
-  const [maxLev, setMaxLev] = useState(15);
+  // Jeunes pousses : ×5 au plus (vérifié par le serveur).
+  const [lev0, setMaxLev] = useState(15), young = aur.young.some(s => s.tk === ticket.tk), maxLev = young ? Math.min(5, lev0) : lev0;
   useEffect(() => { api.aurMaxLev().then(n => setMaxLev(+n)).catch(() => {}) }, [api]);
   useEffect(() => { if (pref.lev > maxLev) setPref(x => ({ ...x, lev: maxLev })) }, [maxLev, pref.lev, setPref]);
   const fee = stake * pref.lev * FEE;
@@ -430,7 +432,8 @@ function Ticket({ api, aur, now, me, ticket, level, openCount, pref, setPref, on
       </div>
       <label>Levier</label>
       <div className="seg" role="group" aria-label="Levier">{AUR_LEVS.map(v => <button key={v} type="button" aria-pressed={pref.lev === v} disabled={v > maxLev} onClick={() => set({ lev: v })}>×{v}{v > maxLev ? " 🔒" : ""}</button>)}</div>
-      {maxLev < 25 && <p className="muted small">{maxLev < 20 ? "×20 : achète un logement dans ton QG (studio ou plus). " : ""}×25 : rejoins une guilde qui a une salle des marchés.</p>}
+      {young ? <p className="muted small">Jeune pousse, très volatile : levier ×5 au plus.</p>
+        : maxLev < 25 && <p className="muted small">{maxLev < 20 ? "×20 : achète un logement dans ton QG (studio ou plus). " : ""}×25 : rejoins une guilde qui a une salle des marchés.</p>}
       <div className="rows mono">
         <div className="row"><span>Cours actuel</span><b>{aurPx(p)}</b></div>
         <div className="row"><span>Impact de ton ordre (estimé)</span><b>{dir === "up" ? "+" : "−"}{nf2.format(sl * 100)} %</b></div>

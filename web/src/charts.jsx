@@ -7,7 +7,7 @@ const Dot = ({ x, y, h, color }) => <span className="dot" style={{ left: `${x}%`
 // [x0, x1] jusqu'à l'échéance. Pointillé = valeur d'entrée ; zone verte du côté gagnant, rouge du côté perdant.
 export function PositionChart({ id, entry, dir, pts, x0, x1, h = 64 }) {
   const v = pts.map(p => p[1]), lo = Math.min(entry, ...v), r = (Math.max(entry, ...v) - lo) || entry * .01;
-  const X = x => (x - x0) / Math.max(1e-9, x1 - x0) * 100, Y = p => 6 + (1 - (p - lo) / r) * (h - 12), ye = Y(entry);
+  const X = x => Math.min(100, Math.max(0, (x - x0) / Math.max(1e-9, x1 - x0) * 100)), Y = p => 6 + (1 - (p - lo) / r) * (h - 12), ye = Y(entry);
   const [xn, last] = pts[pts.length - 1], win = (dir === "up" ? 1 : -1) * (last - entry) >= 0, col = win ? "var(--up)" : "var(--down)";
   const line = pathD(pts.map(([x, p]) => [X(x), Y(p)])), area = `${line}L${X(xn).toFixed(2)},${ye.toFixed(2)}L${X(pts[0][0]).toFixed(2)},${ye.toFixed(2)}Z`;
   const [over, under] = dir === "up" ? ["var(--up-soft)", "var(--down-soft)"] : ["var(--down-soft)", "var(--up-soft)"];

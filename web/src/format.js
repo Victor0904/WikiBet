@@ -16,4 +16,6 @@ export const PERKS = [{ hist: 1, alerts: 1, pos: 3 }, { hist: 3, alerts: 2, pos:
 export const AUTO_LV = 3, TRIGGER_LV = 4;
 export const THEMES = { theme_cyan: "#3CC8E6", theme_violet: "#A78BFA", theme_rose: "#F472B6", theme_or: "#E8C547" };
 export const DEFAULT_ACCENT = "#F5B83D";
+// Joueurs fictifs (profiles.bot), chargés au démarrage : toujours affichés comme tels.
+export const BOTS = new Set();
 export const CAP0_TXT = "10 000 W"; // capital de départ, pour les textes

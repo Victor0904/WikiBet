@@ -72,7 +72,7 @@ test("fin de séance : positions à échéance, duels réglés sur les vraies vu
   near(rows[0].payout, tradeValue(t, engine.price(tk, d, 115)), "position fermée à son échéance");
   const va = engine.BY[duel.a].views[d + 1], vb = engine.BY[duel.b].views[d + 1];
   near(rows[1].payout, va > vb ? 500 * duel.oa : 0, "duel");
-  near(await cash(db, A), 10000 - 1500 + rows[0].payout + rows[1].payout + 500, "solde final avec un seul salaire");
+  near(await cash(db, A), 10000 - 1500 + rows[0].payout + rows[1].payout, "solde final : le salaire ne compte que les positions Aurelys");
 });
 
 test("un joueur ne peut ni toucher à son solde ni clôturer la position d'un autre", async () => {

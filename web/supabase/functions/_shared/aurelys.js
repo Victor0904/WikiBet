@@ -65,6 +65,22 @@ export const LINKS = {
   LMR: { src: "Jours fériés à venir et météo du week-end à Paris (Open-Meteo)", beta: .3 },
 };
 const DIV = STOCKS.reduce((a, s) => a + s.p0 * s.shares, 0) / 1000; // AUR-12 vaut 1 000 au départ
+// AUR-12 : pondéré par la capitalisation, mais une société pèse au plus 15 % (l'excédent va aux autres, au prorata).
+// Avant (octobre 2026), Nexora pesait la moitié de l'indice : une seule nouvelle le faisait chuter de 3 %.
+const IDX_CAP = .15;
+export function capWeights(caps) {
+  const tot = caps.reduce((a, b) => a + b, 0);
+  let w = caps.map(c => c / tot);
+  for (let k = 0; k < caps.length; k++) {
+    const over = w.reduce((a, x) => a + Math.max(0, x - IDX_CAP), 0); if (over < 1e-12) break;
+    const free = w.reduce((a, x) => a + (x < IDX_CAP ? x : 0), 0);
+    w = w.map(x => x >= IDX_CAP ? IDX_CAP : x + over * x / free);
+  }
+  return w;
+}
+// Valeur fondamentale rappelée vers son ancre (bénéfice × PER de référence) : demi-vie de 10 jours d'Aurelys.
+// Sans ce rappel, la valeur dérivait sans fin (Nexora ×5 en 130 jours) et acheter puis attendre suffisait.
+const ANCHOR_K = Math.LN2 / (10 * DAY);
 
 export const CHARACTERS = [
   { name: "Ilan Varesko", role: "PDG de Vélisse Motors", tk: "VLS", bio: "Tweete trop. Une phrase de lui fait bouger le titre de ±8 %." },
@@ -276,10 +292,10 @@ const T = {
   essai: {
     up: ["Ombrelune : l'essai de phase III de l'OMB-{K} atteint son critère principal", "Succès pour l'OMB-{K} : le Dr Orsini parle d'une « avancée majeure »", "L'agence de santé autorise l'OMB-{K}"],
     down: ["OMB-{K} : échec de la phase III", "Ombrelune suspend l'essai de l'OMB-{K} après des effets indésirables", "L'agence de santé rejette l'OMB-{K}"],
-    text: ["Le Dr Maëlle Orsini présentera les données complètes en conférence.", "Le traitement visait un marché de plusieurs milliards d'aurels."],
+    text: ["Le Dr Maëlle Orsini présentera les données complètes en conférence.", "Le traitement visait un marché de plusieurs milliards de W."],
   },
   contrat: {
-    up: ["{N} décroche un contrat de {M} Mds d'aurels", "{N} signe une commande géante avec l'État", "Partenariat stratégique pour {N}", "{N} remporte un appel d'offres international"],
+    up: ["{N} décroche un contrat de {M} Mds de W", "{N} signe une commande géante avec l'État", "Partenariat stratégique pour {N}", "{N} remporte un appel d'offres international"],
     text: ["Le contrat court sur plusieurs années.", "Les détails financiers n'ont pas été communiqués."],
   },
   scandale: {
@@ -458,6 +474,7 @@ function hourly(S, R, out) {
     // Couleur de la nouvelle : le niveau (au-dessus ou sous la normale), comme sur la fiche ; l'effet sur la valeur suit le changement.
     publish(S, out, { tk, cat: "reel", title: `${BY[tk].name} : ${sg.txt}`, text: `${LINKS[tk].src}. ${d > 0 ? "Mieux" : "Moins bien"} qu'au relevé précédent.`,
       mag: LINKS[tk].beta * d, sent: Math.max(-1, Math.min(1, (Math.abs(sg.z) > .02 ? sg.z : d) * 6)), hl: 360 });
+    if (x.prem != null) x.prem += Math.log(Math.max(.05, 1 + LINKS[tk].beta * d)); // un chiffre réel déplace aussi l'ancre : effet durable
   }
   // Macro : marches aléatoires lentes, rappelées vers leur moyenne.
   S.g += .02 * (1.5 - S.g) + gauss(R) * .04; S.pi += .02 * (2.4 - S.pi) + gauss(R) * .03;
@@ -576,7 +593,7 @@ function whaleFlow(S, R, out, s, Lt) {
 /* ===== Crises ===== */
 const CRISES = {
   bulle: [
-    [0, { tk: "NXR", cat: "crise", title: "Nexora dépasse les 30 Mds d'aurels de capitalisation : la folie de l'IA continue", sent: .8, mag: 0, hl: 240 }, "euphorie"],
+    [0, { tk: "NXR", cat: "crise", title: "Nexora dépasse les 30 Mds de W de capitalisation : la folie de l'IA continue", sent: .8, mag: 0, hl: 240 }, "euphorie"],
     [240, { sector: "tech", cat: "crise", title: "Bulle de l'IA : Nexora publie des résultats décevants, la Tech plonge", sent: -1, mag: { NXR: -.4, _: -.25 }, hl: 480 }, "krach"],
   ],
   banque: [
@@ -675,19 +692,21 @@ function tick(S, R, out, pending) {
   S.follow = S.follow.filter(f => f.t > t);
 
   // Facteurs communs : marché (tendance du régime) et secteurs.
-  const mk = reg.drift / 60 + gauss(R) * .006 / Math.sqrt(DAY) * reg.vol;
+  const mkd = reg.drift / 60, mk = gauss(R) * .006 / Math.sqrt(DAY) * reg.vol; // tendance du régime : cours seulement
   const sk = Object.fromEntries(Object.keys(SECTORS).map(k => [k, gauss(R) * .005 / Math.sqrt(DAY) * reg.vol]));
   const sentM = sentOf(S, "mkt", t), sentS = Object.fromEntries(Object.keys(SECTORS).map(k => [k, sentOf(S, "sec:" + k, t)]));
   const fear = 15 * Math.sqrt(S.vix / VIX_BASE), yr = 365 * DAY;
 
-  let cap = 0, vol = 0, allHalt = S.haltAll > t;
+  let vol = 0, allHalt = S.haltAll > t;
   const sub = [], { secs, fr } = secondsOf(t); // cours de chaque seconde réelle de la minute (voir plus bas)
   for (const s of listed(S)) {
     const x = S.st[s.tk], sec = SECTORS[s.sector];
     // Valeur fondamentale : croissance (modulée par la macro), incertitude, facteurs communs.
     const mu = (s.mu + sec.cyc * (S.g - 1.5) * .04 + sec.infl * (S.pi - 2.4) * .03) / yr;
-    const f = s.beta * mk + sk[s.sector];
-    x.v += mu + gauss(R) * .3 * s.sig / Math.sqrt(DAY) + f;
+    const f = s.beta * mk + sk[s.sector], fd = s.beta * mkd;
+    // Ancre : bénéfice × PER de référence (40 pour une jeune pousse), avec la prime du moment figée au premier passage.
+    const base = Math.log(x.eps * (s.per || 40)); x.prem ??= x.v - base;
+    x.v += mu + gauss(R) * .3 * s.sig / Math.sqrt(DAY) + f - (x.v - base - x.prem) * ANCHOR_K;
     const Lt = s.L * act;
     let q = 0, v = 0;
     const halted = allHalt || x.halt > t;
@@ -722,7 +741,7 @@ function tick(S, R, out, pending) {
       const wq = whaleFlow(S, R, out, s, Lt), pq = pending[s.tk] ?? 0;
       q += wq + pq; v += Math.abs(wq) + Math.abs(pq);
       const qb = q - pq, imp = (qb ? impact(S, s, qb, act) : 0) + (pq ? playerImpact(S, s, pq) : 0);
-      x.lp += PERM * imp + f; x.tmp = x.tmp * Math.exp(-1 / TAU) + (1 - PERM) * imp;
+      x.lp += PERM * imp + f + fd; x.tmp = x.tmp * Math.exp(-1 / TAU) + (1 - PERM) * imp;
     }
     const p = priceOf(x), last = x.h[x.h.length - 1];
     // Indicateurs suivis par les bots : moyennes mobiles exponentielles, RSI, historique de 4 h.
@@ -736,21 +755,27 @@ function tick(S, R, out, pending) {
       x.halt = t + 15; x.cb = t;
       publish(S, out, { tk: s.tk, cat: "suspension", title: `Séance suspendue sur ${s.name} après un mouvement de ${pctTxt(p / x.h[x.h.length - 61] - 1).replace(/^(\d)/, "+$1")}`, sent: 0, mag: 0, hl: 30 });
     }
-    if (BY[s.tk]) cap += p * s.shares; vol += v; // l'AUR-12 ne compte que la cote principale
+    vol += v; // l'AUR-12 ne compte que la cote principale (sub)
     // Une minute d'Aurelys = SPM secondes : entre le cours précédent et le nouveau, un pont brownien donne un vrai cours
     // à chaque seconde (même volatilité, cours atteignables par les ordres et la liquidation).
     const ps = bridge(R, last, p, halted ? 0 : s.sig / Math.sqrt(DAY), fr), hl = halted || x.halt > t;
-    if (BY[s.tk]) sub.push({ s, ps });
+    if (BY[s.tk]) sub.push({ s, ps, last });
     ps.forEach((q, k) => out.ticks.push({ t: secs[k], tk: s.tk, p: +q.toPrecision(7), v: Math.round(v / secs.length), halt: hl }));
   }
-  const idx = cap / DIV, ri = Math.log(idx / S.idx);
+  // Indice chaîné : chaque minute, variation pondérée (poids plafonnés, calculés sur les cours de la minute précédente).
+  const w = capWeights(sub.map(({ s, last }) => last * s.shares)), i0 = S.idx;
+  const ip = k => +(i0 * sub.reduce((a, { ps, last }, j) => a + w[j] * ps[k] / last, 0)).toPrecision(7);
+  const idx = ip(secs.length - 1), ri = Math.log(idx / S.idx);
   S.vix += (ri * ri - S.vix) / 120; S.idx = idx; S.idxHi = Math.max(idx, S.idxHi * (1 - 1 / 2880));
   S.idxH.push(idx); if (S.idxH.length > 61) S.idxH.shift();
   if (!allHalt && t - (S.cbAll ?? 0) > 60 && S.idxH.length > 60 && idx / S.idxH[0] - 1 < -.07) {
     S.haltAll = t + 15; S.cbAll = t;
     publish(S, out, { cat: "suspension", title: "AUR-12 : chute de plus de 7 %, toute la cote est suspendue 15 minutes", sent: -.3, mag: 0, hl: 60 });
   }
-  const ip = k => +(sub.reduce((a, { s, ps }) => a + ps[k] * s.shares, 0) / DIV).toPrecision(7);
+  // Humeur : une baisse de plus de 3 % de l'indice en une heure d'Aurelys fait passer le marché en nervosité.
+  if (S.idxH.length > 60 && idx / S.idxH[0] - 1 < -.03 && S.reg !== "nervosite" && S.reg !== "krach") {
+    S.reg = "nervosite"; S.regAge = 0; publish(S, out, REGIME_NEWS.nervosite(R));
+  }
   for (let k = 0; k < secs.length - 1; k++) out.ticks.push({ t: secs[k], tk: INDEX, p: ip(k), v: Math.round(vol / secs.length), halt: allHalt });
   out.ticks.push({ t: secs[secs.length - 1], tk: INDEX, p: ip(secs.length - 1), v: Math.round(vol / secs.length), halt: allHalt,
     x: { reg: S.reg, regAge: S.regAge, vixa: Math.round(fear * 10) / 10, r: Math.round(S.r * 100) / 100, g: Math.round(S.g * 100) / 100, pi: Math.round(S.pi * 100) / 100,
@@ -768,7 +793,7 @@ function macroNews(S, R, out) {
     const pi = Math.max(0, S.pi + gauss(R) * .3), up = pi >= S.pi; S.pi = pi;
     publish(S, out, { cat: "macro", title: `Inflation : ${pi.toFixed(1).replace(".", ",")} % sur un an, ${up ? "en accélération" : "en repli"}`, sent: up ? -.3 : .3, mag: Object.fromEntries(STOCKS.map(s => [s.tk, (up ? 1 : -1) * .01 * SECTORS[s.sector].infl])), hl: 360 });
   } else {
-    const t = pick(R, [["Tensions à la frontière nord : les marchés s'inquiètent", { MRV: -.06, HLV: .04, KST: .03, _: -.01 }], ["Accord commercial historique avec les pays voisins", { MRV: .05, FRC: .03, _: .01 }], ["Grève générale dans les ports d'Aurelys", { MRV: -.08, LMR: -.02, _: -.005 }]]);
+    const t = pick(R, [["Tensions à la frontière nord : les marchés s'inquiètent", { MRV: -.06, HLV: .04, KST: .03, _: -.01 }], ["Accord commercial historique avec les pays voisins", { MRV: .05, FRC: .03, _: .01 }], ["Grève générale dans les ports d'Aurelys", { MRV: -.08, LMR: -.02, _: -.005 }], ["Fin de la grève : les ports d'Aurelys tournent à plein", { MRV: .07, LMR: .01, _: .005 }]]);
     const neg = Object.values(t[1]).reduce((a, b) => a + b, 0) < 0;
     publish(S, out, { cat: "macro", title: t[0], sent: neg ? -.5 : .4, mag: t[1], hl: 360 });
   }

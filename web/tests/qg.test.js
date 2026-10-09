@@ -93,18 +93,22 @@ test("bonus assurance : une position liquidée rend 50 % de la mise, une seule f
   assert.equal(await cash(db, A), before + 500);
 });
 
-test("bonus salaire doublé : 1 000 W par séance pendant l'heure active ; la faillite garde les objets", async () => {
+test("salaire : 10 % des mises Aurelys tenues 1 min (500 W au plus), doublé par le bonus ; la faillite garde les objets", async () => {
   const db = await freshDb();
   await setClock(db, 4, 100);
   await login(db, A, "alice");
   await buy(db, "salaire_x2"); await buy(db, "plante");
   await db.query("select use_bonus('salaire_x2')");
-  await db.query("select open_trade($1, 'up', 1, 100, 'close')", [engine.STOCKS[0].tk]);
+  await db.query("insert into aur_ticks (tk, t, p) values ('HLV', now() - interval '2 seconds', 20)");
+  const open = (st) => db.query("select aur_open($1, 'HLV', 'up', 1, $2, 0)", [A, st]);
+  await open(1000); await open(1500); // 2 500 W tenus 1 min : 250 W
+  await db.query("update bets set created_at = now() - interval '2 minutes'");
+  await open(3000); // ouverte à l'instant : ne compte pas
   await setClock(db, 4, 600);
   const before = await cash(db, A);
-  await db.query("select settle()");
-  const { rows: [b] } = await db.query("select payout from bets");
-  assert.equal(await cash(db, A), before + b.payout + 1000);
+  await db.query("select settle()"); await db.query("select settle()");
+  assert.equal(await cash(db, A), before + 2 * 250, "250 W, doublés, une seule fois");
+  await db.query("update bets set status = 'lost', payout = 0");
   await db.query("update profiles set cash = 100 where id = $1", [A]);
   await db.query("select restart()");
   assert.equal((await inv(db, A)).plante.qty, 1, "les objets survivent à la faillite");
