@@ -243,13 +243,21 @@ function NewsItem({ n, now, onDetail, onRead }) {
   );
 }
 
+// Recherche sans accents ni majuscules : « helvane » trouve Helvane Énergie.
+const fold = s => (s ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+
 function News({ aur, now, onDetail, onRead }) {
-  const [f, setF] = useState("Tout"), [shown, setShown] = useState(null), [major, setMajor] = useState(false);
+  const [f, setF] = useState("Tout"), [shown, setShown] = useState(null), [major, setMajor] = useState(false), [q, setQ] = useState("");
   const top = aur.news[0]?.id ?? 0, lim = shown ?? top;
   useEffect(() => { if (shown == null && top) setShown(top) }, [top, shown]);
   const fresh = aur.news.filter(n => n.id > lim).length;
   const list = aur.news.filter(n => n.id <= lim && (!major || isMajor(n)) && (f === "Tout" || n.sector === f || BY[n.tk]?.sector === f || (f === "Marché" && !n.tk && !n.sector)));
-  const une = list.find(isMajor) ?? list[0];
+  // Recherche : les articles des entreprises trouvées (nom ou code) passent en tête, puis ceux qui citent le texte cherché.
+  const k = fold(q.trim()), hits = k ? new Set(Object.values(BY).filter(s => fold(s.name).includes(k) || fold(s.tk) === k).map(s => s.tk)) : null;
+  const rank = n => !k ? 0 : hits.has(n.tk) ? 0 : fold(n.title).includes(k) ? 1 : 2;
+  if (k) list.sort((a, b) => rank(a) - rank(b)); // tri stable : du plus récent au plus ancien dans chaque groupe
+  const found = k ? list.filter(n => rank(n) < 2).length : 0;
+  const une = k ? null : list.find(isMajor) ?? list[0];
   return (
     <div>
       <div className="paper-mast"><b>Le Courrier d'Aurelys</b><span className="mono">édition de {clock(now)}</span></div>
@@ -264,6 +272,8 @@ function News({ aur, now, onDetail, onRead }) {
         {calendar(sec(now), 6, aur.young).map(e => <CalRow key={e.m + (e.tk ?? "")} e={e} aur={aur} now={now} />)}
         <p className="muted small">Avant un rendez-vous, le marché est nerveux : la volatilité monte.</p>
       </div>
+      <input type="search" className="news-search" placeholder="Rechercher une entreprise (Nexora, SLM…)" value={q} onChange={e => setQ(e.target.value)} aria-label="Rechercher une entreprise dans le journal" />
+      {k && <p className="muted small">{found ? `${found} article${found > 1 ? "s" : ""} en tête${hits.size ? ` : ${[...hits].map(tk => BY[tk].name).join(", ")}` : ""}.` : "Aucun article des 2 dernières heures ne correspond."}</p>}
       <div className="chips" role="group" aria-label="Filtre">
         <button type="button" aria-pressed={major} onClick={() => setMajor(v => !v)}>★ Majeures</button>
         {["Tout", "Marché", ...Object.keys(SECTORS)].map(k => <button key={k} type="button" aria-pressed={f === k} onClick={() => setF(k)}>{SECTORS[k]?.name ?? k}</button>)}

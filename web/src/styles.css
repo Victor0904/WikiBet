@@ -623,3 +623,4 @@ button:active:not(:disabled) { transform: scale(.96) }
 @keyframes pos-danger { from { box-shadow: 0 0 0 1px var(--down) } to { box-shadow: 0 0 0 3px var(--down), 0 0 18px rgba(240, 75, 92, .45) } }
 @media (prefers-reduced-motion: reduce) { .pos.danger { animation: none; box-shadow: 0 0 0 2px var(--down) } }
 .gtag.bot { color: var(--faint); border-style: dashed }
+.news-search { width: 100%; margin: 12px 0 8px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; font-size: 16px; color: var(--ink) }
