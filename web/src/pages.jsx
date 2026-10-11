@@ -137,7 +137,7 @@ export function HowTo({ onBack, first }) {
   );
 }
 
-export function Account({ account, push, me, title, patrimoine, openStake, objects, canRestart, onRestart, onBank, demo, onBack }) {
+export function Account({ account, push, me, title, patrimoine, openStake, objects, canRestart, onRestart, demo, onBack }) {
   return (
     <section className="account">
       <SubHeader title="Mon compte" onBack={onBack} />
@@ -152,7 +152,6 @@ export function Account({ account, push, me, title, patrimoine, openStake, objec
           <div className="row"><span>Faillites</span><b>{me.bankruptcies}</b></div>
         </div>
       </div>
-      {onBank && <Bank me={me} onBank={onBank} />}
       {account && <AccountLink account={account} pseudo={me.pseudo} />}
       {push && <PushPanel push={push} />}
       <div className="panel bk">
@@ -165,12 +164,16 @@ export function Account({ account, push, me, title, patrimoine, openStake, objec
 }
 
 // Banque : dépôt et retrait sans frais, 0,1 % d'intérêt à chaque jour d'Aurelys (1 h réelle) sur 100 000 W au plus (bank_move, aur_dividends).
-function Bank({ me, onBank }) {
+export function Bank({ me, onBank }) {
   const [v, setV] = useState(""), [busy, setBusy] = useState(false), amt = Math.floor(+String(v).replace(",", ".") || 0), bank = me.bank ?? 0;
   const go = async sign => { setBusy(true); if (await onBank(sign * amt)) setV(""); setBusy(false) };
   return (
     <div className="panel bank">
       <p><b>Banque</b> · 0,1 % d'intérêt à chaque jour d'Aurelys (1 h réelle), sur {W(100000)} de dépôt au plus. Dépôt et retrait sans frais, à tout moment. L'argent déposé ne sert pas aux paris.</p>
+      <div className="rows mono">
+        <div className="row"><span>Dépôt</span><b>{W(bank)}</b></div>
+        <div className="row"><span>Solde disponible</span><b>{W(me.cash)}</b></div>
+      </div>
       <p className="small muted">Intérêt du prochain jour : {W(Math.round(Math.min(bank, 100000) * 0.1) / 100)}</p>
       <div className="add-row">
         <input className="mono" inputMode="numeric" placeholder="Montant" value={v} onChange={e => setV(e.target.value)} aria-label="Montant" />

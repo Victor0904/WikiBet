@@ -5,7 +5,7 @@ import { useAurelys } from "./aurelys.js";
 import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
 import { BY as AUR, slipEstimate, FEE, gameClock } from "../supabase/functions/_shared/aurelys.js";
 import { Dock, Segmented, SubHeader, Logo } from "./nav.jsx";
-import { Profile, HowTo, Account, Legal, PushPanel } from "./pages.jsx";
+import { Profile, HowTo, Account, Legal, PushPanel, Bank } from "./pages.jsx";
 import { Ranking, Friends, Guilds, LoginPanel, BotTag } from "./social.jsx";
 import Portfolio from "./Portfolio.jsx";
 const QG = lazy(() => import("./QG.jsx")); // Three.js n'est chargé qu'à l'ouverture du QG
@@ -38,7 +38,7 @@ export default function Game({ api, onNoProfile }) {
 
   const [me, setMe] = useState(undefined), [bets, setBets] = useState([]), [board, setBoard] = useState([]);
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
-  const [aurDetail, setAurDetail] = useState(null), [posView, setPosView] = useState("open"), [more, setMore] = useState(null);
+  const [aurDetail, setAurDetail] = useState(null), [posView, setPosView] = useState("open"), [qgView, setQgView] = useState("qg"), [more, setMore] = useState(null);
   // « Comment jouer » s'ouvre tout seul à la première visite.
   const [firstVisit, setFirstVisit] = useState(() => { try { return !localStorage.getItem("wb-howto") } catch { return false } });
   const [pref, setPref] = useState({ lev: 5, shorizon: "15", stake: 500 });
@@ -166,7 +166,9 @@ export default function Game({ api, onNoProfile }) {
             </> : <History bets={withReferrals(bets.filter(b => b.status !== "open"), refs)} />}
           </>}
 
-          {tab === "qg" && <Suspense fallback={<p className="muted pad">Chargement du QG…</p>}>
+          {tab === "qg" && !visit && <Segmented label="QG" value={qgView} onChange={setQgView} options={[["qg", "QG"], ["bank", "Banque"]]} />}
+          {tab === "qg" && !visit && qgView === "bank" ? <Bank me={me} onBank={amt => run(() => api.bankMove(amt), () => amt > 0 ? `${W(amt)} déposés à la banque.` : `${W(-amt)} retirés de la banque.`)} />
+          : tab === "qg" && <Suspense fallback={<p className="muted pad">Chargement du QG…</p>}>
             {visit
               ? <QG api={api} catalog={catalog} inv={visit.inv} owner={visit.row} self={false} patrimoine={visit.row.patrimoine} pnl={null}
                   accent={THEMES[catalog.find(i => i.category === "theme" && visit.inv[i.id]?.equipped)?.id] ?? DEFAULT_ACCENT} onBack={() => setVisit(null)} />
@@ -178,7 +180,7 @@ export default function Game({ api, onNoProfile }) {
             more === "board" ? <><SubHeader title="Classement" onBack={() => setMore(null)} /><Ranking api={api} me={me} onVisit={visitQG} wealth={<Board board={board} me={me} onVisit={visitQG} />} /></>
             : more === "friends" ? <Friends api={api} say={say} onVisit={visitQG} onBack={() => setMore(null)} />
             : more === "guilds" ? <Guilds api={api} me={me} say={say} onVisit={visitQG} onBack={() => setMore(null)} accent={accent} />
-            : more === "account" ? <Account account={api.account} push={api.push} me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"} onBank={amt => run(() => api.bankMove(amt), () => amt > 0 ? `${W(amt)} déposés à la banque.` : `${W(-amt)} retirés de la banque.`)}
+            : more === "account" ? <Account account={api.account} push={api.push} me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"}
                 canRestart={me.cash + (me.bank ?? 0) + openStake + holdsValue + catalog.filter(i => i.kind !== "home").reduce((a, i) => a + Math.floor(i.price * .6) * (inv[i.id]?.qty ?? 0), 0) < BK_LIMIT} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} onBack={() => setMore(null)} />
             : more === "legal" ? <Legal onBack={() => setMore(null)} />
             : more === "notifs" && api.push ? <><SubHeader title="Notifications" onBack={() => setMore(null)} /><PushPanel push={api.push} /></>
