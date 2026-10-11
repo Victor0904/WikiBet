@@ -111,6 +111,7 @@ export async function connect() {
     aurTriggerCancel: id => rpc("aur_trigger_cancel", { p_id: id }),
     myTriggers: async () => rows(sb.from("aur_triggers").select("*").or(`status.eq.wait,done_at.gt.${new Date(Date.now() - 864e5).toISOString()}`).order("id", { ascending: false })),
     restart: () => rpc("restart"),
+    bankMove: amount => rpc("bank_move", { p_amount: amount }), // > 0 : dépôt, < 0 : retrait
     myBets: async minSession => (await rows(sb.from("bets").select("*").eq("user_id", uid).or(`status.eq.open,session.gte.${minSession}`).order("id", { ascending: false }))).map(normBet),
     leaderboard: async () => (await rpc("leaderboard")).map(normBoard),
     gainsBoard: (period, scope) => rpc("gains_board", { p_period: period, p_scope: scope }),

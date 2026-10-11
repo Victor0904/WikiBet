@@ -518,21 +518,21 @@ export const aurLive = (b, q, ticks) => {
   return { px: p, value, net: value - b.stake - b.fees, closeFee, lq, hit, halt: q?.halt };
 };
 
-// Stop et objectif d'une position (loft) : un cours vide retire l'ordre. Vérifiés par le serveur (aur_set_auto).
-function AutoForm({ b, onAuto, onDone }) {
+// Objectif (pour tous) et stop (loft) d'une position : un cours vide retire l'ordre. Vérifiés par le serveur (aur_set_auto).
+function AutoForm({ b, onAuto, canStop, onDone }) {
   const [sl, setSl] = useState(b.sl ?? ""), [tp, setTp] = useState(b.tp ?? ""), [busy, setBusy] = useState(false);
   const num = v => String(v).trim() === "" ? null : +String(v).replace(",", ".");
   return (
-    <form className="auto-form" onSubmit={async e => { e.preventDefault(); setBusy(true); const r = await onAuto(b.id, num(sl), num(tp)); setBusy(false); if (r) onDone() }}>
-      <label>Stop<input className="mono" inputMode="decimal" placeholder="aucun" value={sl} onChange={e => setSl(e.target.value)} /></label>
+    <form className="auto-form" onSubmit={async e => { e.preventDefault(); setBusy(true); const r = await onAuto(b.id, canStop ? num(sl) : null, num(tp)); setBusy(false); if (r) onDone() }}>
+      {canStop && <label>Stop<input className="mono" inputMode="decimal" placeholder="aucun" value={sl} onChange={e => setSl(e.target.value)} /></label>}
       <label>Objectif<input className="mono" inputMode="decimal" placeholder="aucun" value={tp} onChange={e => setTp(e.target.value)} /></label>
       <button type="submit" className="btn" disabled={busy}>OK</button>
-      <p className="muted small">Dès que le cours touche un seuil, la position est clôturée au cours du marché (prix qui peut différer un peu du seuil).</p>
+      <p className="muted small">Dès que le cours touche {canStop ? "un seuil" : "l'objectif"}, la position est clôturée au cours du marché (prix qui peut différer un peu du seuil).{canStop ? "" : " Stop : avec le loft (QG)."}</p>
     </form>
   );
 }
 
-export function AurelysCard({ b, aur, now, onClose, onAuto, Facts }) {
+export function AurelysCard({ b, aur, now, onClose, onAuto, canStop, onDetail, Facts }) {
   const q = aur.quotes[b.aur], ticks = aur.ticks[b.aur], x = aurLive(b, q, ticks), t0 = Date.parse(b.created_at), [busy, setBusy] = useState(false), [auto, setAuto] = useState(false);
   // Cours minute par minute tant qu'on les a (dernière heure réelle), sinon bougies d'une heure d'Aurelys.
   const cs = (aur.candles[b.aur] ?? []).filter(k => k[0] * 1000 > t0 - 300000), recent = (ticks ?? []).filter(k => k[0] * 1000 > t0);
@@ -541,11 +541,13 @@ export function AurelysCard({ b, aur, now, onClose, onAuto, Facts }) {
   return (
     <article className={"pos " + (x.net >= 0 ? "gain" : "loss") + (danger ? " danger" : "")}>
       <div className="pos-h">
-        <b className="who"><TkIcon tk={b.aur} size={22} />{BY[b.aur]?.name ?? b.aur}</b>
+        <button type="button" className="who link" onClick={() => onDetail?.(b.aur)} aria-label={`Voir le marché de ${BY[b.aur]?.name ?? b.aur}`}><TkIcon tk={b.aur} size={22} /><b>{BY[b.aur]?.name ?? b.aur}</b> <small className="muted">marché ›</small></button>
         <span className={"side " + b.dir}>{b.dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×{b.lev}</span>
       </div>
       <div className="pos-pnl mono"><span className={cls(x.net)}>{sW(x.net)}</span><span className={cls(x.net)}>{pct(x.net / b.stake)}</span></div>
-      <PositionChart id={b.id} entry={b.entry} dir={b.dir} pts={pts} x0={t0} x1={Math.max(now, t0 + 60 * SPM * 1000)} />
+      <div className="pos-chart" role="button" tabIndex={0} onClick={() => onDetail?.(b.aur)} onKeyDown={e => e.key === "Enter" && onDetail?.(b.aur)} aria-label="Voir le graphique du marché">
+        <PositionChart id={b.id} entry={b.entry} dir={b.dir} pts={pts} x0={t0} x1={Math.max(now, t0 + 60 * SPM * 1000)} h={130} fmt={px} />
+      </div>
       <Facts items={[
         ["Mise", `${W(b.stake)} · ×${b.lev}`],
         ["Valeur (frais déduits)", W(x.value), cls(x.net)],
@@ -558,9 +560,8 @@ export function AurelysCard({ b, aur, now, onClose, onAuto, Facts }) {
         b.tp != null && ["Objectif", px(b.tp), "up"],
         x.halt && ["Clôture", "à la reprise de la cotation"],
       ]} />
-      {onAuto ? (auto ? <AutoForm b={b} onAuto={onAuto} onDone={() => setAuto(false)} />
-        : <button type="button" className="link" onClick={() => setAuto(true)}>{b.sl != null || b.tp != null ? "Modifier le stop et l'objectif" : "Ajouter un stop ou un objectif"}</button>)
-        : <p className="muted small">Stop et objectif automatiques : avec le loft (QG).</p>}
+      {onAuto && (auto ? <AutoForm b={b} onAuto={onAuto} canStop={canStop} onDone={() => setAuto(false)} />
+        : <button type="button" className="link" onClick={() => setAuto(true)}>{b.sl != null || b.tp != null ? (canStop ? "Modifier le stop et l'objectif" : "Modifier l'objectif") : canStop ? "Ajouter un stop ou un objectif" : "Ajouter un objectif (take profit)"}</button>)}
       {x.hit
         ? <p className="muted small">Seuil de liquidation touché, règlement en cours…</p>
         : <button type="button" className="btn primary" disabled={busy || x.halt} onClick={async () => { setBusy(true); await onClose(b); setBusy(false) }}>Clôturer · {W(x.value)}</button>}

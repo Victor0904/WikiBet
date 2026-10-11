@@ -84,7 +84,7 @@ export default function QG({ api, catalog, inv, me, owner, self, patrimoine, ope
       {self && <div className="panel perks">
         <b>Avantages de ton logement</b>
         <p className="muted small">{PERKS[level].pos} positions ouvertes en même temps · historique de tes paris sur {PERKS[level].hist} jour{PERKS[level].hist > 1 ? "s" : ""} · {PERKS[level].alerts} alerte{PERKS[level].alerts > 1 ? "s" : ""} de prix sur Aurelys{level >= AUTO_LV ? " · stop et objectif automatiques" : ""}{level >= TRIGGER_LV ? " · ordres à déclenchement" : ""}.</p>
-        {next && <p className="muted small">{next.name} : {PERKS[level + 1].pos} positions, {PERKS[level + 1].hist} jours d'historique, {PERKS[level + 1].alerts} alertes{level + 1 === AUTO_LV ? ", stop et objectif automatiques sur tes positions" : ""}{level + 1 === TRIGGER_LV ? ", ordres à déclenchement (ouvrir quand le cours atteint un seuil)" : ""}.</p>}
+        {next && <p className="muted small">{next.name} : {PERKS[level + 1].pos} positions, {PERKS[level + 1].hist} jours d'historique, {PERKS[level + 1].alerts} alertes{level + 1 === AUTO_LV ? ", stop automatique sur tes positions" : ""}{level + 1 === TRIGGER_LV ? ", ordres à déclenchement (ouvrir quand le cours atteint un seuil)" : ""}.</p>}
       </div>}
 
       {self && next && (

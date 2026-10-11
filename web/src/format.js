@@ -12,7 +12,7 @@ export const clock = ms => Number.isFinite(+ms) ? hhmm.format(ms) : "—";
 // QG : noms des logements (palier 0 = chambre offerte) et couleurs des thèmes.
 export const HOME_NAMES = ["Chambre", "Studio", "Open space", "Loft", "Penthouse", "Villa", "Manoir", "Château", "Île privée"];
 // Avantages durables du logement : jours d'historique des paris, alertes de prix sur Aurelys.
-// pos : positions Aurelys ouvertes en même temps (aur_max_pos en SQL). Stop et objectif dès le loft (3), ordres à déclenchement au penthouse (4).
+// pos : positions Aurelys ouvertes en même temps (aur_max_pos en SQL). Stop dès le loft (3), objectif pour tous, ordres à déclenchement au penthouse (4).
 export const PERKS = [{ hist: 1, alerts: 1, pos: 3 }, { hist: 3, alerts: 2, pos: 5 }, { hist: 7, alerts: 3, pos: 8 }, { hist: 30, alerts: 5, pos: 12 }, { hist: 90, alerts: 10, pos: 20 },
   { hist: 180, alerts: 15, pos: 25 }, { hist: 365, alerts: 20, pos: 30 }, { hist: 730, alerts: 30, pos: 40 }, { hist: 1095, alerts: 50, pos: 50 }];
 export const AUTO_LV = 3, TRIGGER_LV = 4;

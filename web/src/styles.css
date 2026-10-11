@@ -75,6 +75,14 @@ h2 .muted { font: 400 12.5px var(--f-body) }
 .pos-pnl span + span { font-size: 14px }
 .pos-x { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--faint); flex-wrap: wrap }
 .tchart { position: relative }
+.tplot { position: relative; height: 100% }
+.tchart.scaled { padding-right: 58px }
+.tchart .tax { position: absolute; right: 0; transform: translateY(-50%); font-size: 10.5px; color: var(--faint); line-height: 1; padding: 2px 4px; border-radius: 4px }
+.tchart .tax.entry { color: var(--muted) }
+.tchart .tax.last.up { background: var(--up); color: #08090D } .tchart .tax.last.down { background: var(--down); color: #fff }
+.pos-chart { cursor: pointer; border-radius: 6px }
+.pos-chart:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.pos-h .who.link { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); text-decoration: none; padding: 0 }
 .tchart svg, .spark { display: block; width: 100%; height: 100%; overflow: visible }
 .dot { position: absolute; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--panel2); transform: translate(-50%, -50%) }
 
@@ -463,7 +471,7 @@ button:active:not(:disabled) { transform: scale(.96) }
 .hcell span { font-size: 13px; font-weight: 600 }
 .chips.legend button { display: flex; align-items: center; gap: 6px }
 .chips.legend i { width: 10px; height: 3px; border-radius: 2px }
-.aur-chart { height: 280px; touch-action: pan-y }
+.aur-chart { height: 380px; touch-action: pan-y }
 .aur-chart .tip { position: absolute; left: 8px; top: 6px; right: 70px; font-size: 10.5px; color: var(--ink); background: rgba(8, 9, 13, .85); border-radius: 4px; padding: 2px 6px; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 .nmark { position: absolute; top: 4px; width: 12px; height: 12px; padding: 0; border-radius: 50%; border: 2px solid var(--bg); transform: translateX(-50%); z-index: 2 }
 .nmark::before { content: ""; position: absolute; inset: -10px } /* cible tactile plus large que la pastille */

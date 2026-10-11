@@ -124,13 +124,13 @@ export default function Game({ api, onNoProfile }) {
 
   const go = t => { setTab(t); if (t !== "more") setMore(null); window.scrollTo({ top: 0 }) };
   const feeOpen = r => r.kind === "aurelys" ? r.stake * r.lev * FEE : 0; // frais d'ouverture, en plus de la mise
-  const onAuto = homeLevel >= AUTO_LV ? (id, sl, tp) => run(() => api.aurSetAuto(id, sl, tp), () => sl == null && tp == null ? "Stop et objectif retirés." : "Stop et objectif enregistrés.") : null;
+  const onAuto = (id, sl, tp) => run(() => api.aurSetAuto(id, sl, tp), () => sl == null && tp == null ? "Ordres retirés." : "Ordres enregistrés."), canStop = homeLevel >= AUTO_LV; // objectif pour tous, stop dès le loft
   const cancelTrigger = id => run(() => api.aurTriggerCancel(id), () => "Ordre annulé.");
   const closeTrade = b => run(() => b.kind === "aurelys" ? api.aurOrder({ action: "close", id: b.id }) : api.closeTrade(b.id),
     r => `Clôturée : ${sW(r.payout - r.stake - feeOpen(r))}${feeOpen(r) ? ` (frais ${W(r.fees)})` : ""}`);
   const howtoDone = () => { try { localStorage.setItem("wb-howto", "1") } catch { } setFirstVisit(false); setMore(null); setTab("market") };
   const holdPx = h => h.status === "listed" || h.status === "core" ? aur.quotes[h.tk]?.p ?? h.price : h.price; // cours en direct
-  const holdsValue = holds.reduce((a, h) => a + h.qty * holdPx(h), 0), patrimoine = me.cash + openStake + objectsValue + holdsValue;
+  const holdsValue = holds.reduce((a, h) => a + h.qty * holdPx(h), 0), patrimoine = me.cash + (me.bank ?? 0) + openStake + objectsValue + holdsValue;
   const showHowto = firstVisit || (tab === "more" && more === "howto");
 
   return (
@@ -144,7 +144,7 @@ export default function Game({ api, onNoProfile }) {
       <div className="layout">
         <aside className="rail">
           <Triggers list={triggers} onCancel={cancelTrigger} />
-          <Positions now={now} aur={aur} bets={open} onClose={closeTrade} onAuto={onAuto} />
+          <Positions now={now} aur={aur} bets={open} onClose={closeTrade} onAuto={onAuto} canStop={canStop} onDetail={setAurDetail} />
         </aside>
 
         <main className="main">
@@ -160,7 +160,7 @@ export default function Game({ api, onNoProfile }) {
             : posView === "open" ? <>
               {api.push && positions.length > 0 && <PushPanel push={api.push} compact />}
               <Triggers list={triggers} onCancel={cancelTrigger} />
-              {open.length ? <Positions vertical now={now} aur={aur} bets={open} onClose={closeTrade} onAuto={onAuto} />
+              {open.length ? <Positions vertical now={now} aur={aur} bets={open} onClose={closeTrade} onAuto={onAuto} canStop={canStop} onDetail={setAurDetail} />
                 : <div className="empty-state"><b>Aucun pari en cours</b><p className="muted">Prends position sur une action d'Aurelys.</p>
                     <div className="empty-acts"><button type="button" className="btn primary" onClick={() => go("market")}>Marché</button></div></div>}
             </> : <History bets={withReferrals(bets.filter(b => b.status !== "open"), refs)} />}
@@ -178,8 +178,8 @@ export default function Game({ api, onNoProfile }) {
             more === "board" ? <><SubHeader title="Classement" onBack={() => setMore(null)} /><Ranking api={api} me={me} onVisit={visitQG} wealth={<Board board={board} me={me} onVisit={visitQG} />} /></>
             : more === "friends" ? <Friends api={api} say={say} onVisit={visitQG} onBack={() => setMore(null)} />
             : more === "guilds" ? <Guilds api={api} me={me} say={say} onVisit={visitQG} onBack={() => setMore(null)} accent={accent} />
-            : more === "account" ? <Account account={api.account} push={api.push} me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"}
-                canRestart={me.cash + openStake + holdsValue + catalog.filter(i => i.kind !== "home").reduce((a, i) => a + Math.floor(i.price * .6) * (inv[i.id]?.qty ?? 0), 0) < BK_LIMIT} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} onBack={() => setMore(null)} />
+            : more === "account" ? <Account account={api.account} push={api.push} me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"} onBank={amt => run(() => api.bankMove(amt), () => amt > 0 ? `${W(amt)} déposés à la banque.` : `${W(-amt)} retirés de la banque.`)}
+                canRestart={me.cash + (me.bank ?? 0) + openStake + holdsValue + catalog.filter(i => i.kind !== "home").reduce((a, i) => a + Math.floor(i.price * .6) * (inv[i.id]?.qty ?? 0), 0) < BK_LIMIT} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} onBack={() => setMore(null)} />
             : more === "legal" ? <Legal onBack={() => setMore(null)} />
             : more === "notifs" && api.push ? <><SubHeader title="Notifications" onBack={() => setMore(null)} /><PushPanel push={api.push} /></>
             : <Profile api={api} me={me} title={myTitle} home={HOME_NAMES[homeLevel]} board={board} patrimoine={patrimoine} refs={refs} accent={accent}
@@ -241,10 +241,10 @@ function Triggers({ list, onCancel }) {
   );
 }
 
-function Positions({ now, aur, bets, onClose, onAuto, vertical }) {
+function Positions({ now, aur, bets, onClose, onAuto, canStop, onDetail, vertical }) {
   if (!bets.length && !vertical) return <div className="panel empty-pos"><h2>Mes positions</h2><p className="muted">Aucune position ouverte. Choisis une action d'Aurelys et prends position à la hausse ou à la baisse.</p></div>;
   const list = [...bets].filter(b => b.kind === "aurelys").sort((a, b) => b.id - a.id);
-  const cards = list.map(b => <AurelysCard key={b.id} b={b} aur={aur} now={now} onClose={onClose} onAuto={onAuto} Facts={Facts} />);
+  const cards = list.map(b => <AurelysCard key={b.id} b={b} aur={aur} now={now} onClose={onClose} onAuto={onAuto} canStop={canStop} onDetail={onDetail} Facts={Facts} />);
   if (vertical) return <div className="pos-list vertical">{cards}</div>;
   return (
     <section className="panel">

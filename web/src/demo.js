@@ -85,6 +85,7 @@ export async function demoApi() {
     aurTriggerCancel: id => act("select aur_trigger_cancel($1)", [id]),
     myTriggers: () => all("select * from aur_triggers where user_id = $1 and (status = 'wait' or done_at > now() - interval '1 day') order by id desc", [UID]),
     restart: () => act("select * from restart()"),
+    bankMove: amount => act("select * from bank_move($1)", [amount]),
     myBets: async min => (await all("select * from bets where user_id = $1 and (status = 'open' or session >= $2) order by id desc", [UID, min])).map(normBet),
     leaderboard: async () => (await all("select * from leaderboard()")).map(normBoard),
     gainsBoard: (period, scope) => all("select * from gains_board($1, $2)", [period, scope]),

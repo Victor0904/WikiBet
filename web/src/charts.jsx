@@ -5,15 +5,20 @@ const Dot = ({ x, y, h, color }) => <span className="dot" style={{ left: `${x}%`
 
 // Position : la valeur suivie (cours ou spectateurs) de l'ouverture jusqu'à maintenant, sur toute la fenêtre
 // [x0, x1] jusqu'à l'échéance. Pointillé = valeur d'entrée ; zone verte du côté gagnant, rouge du côté perdant.
-export function PositionChart({ id, entry, dir, pts, x0, x1, h = 64 }) {
+// Avec fmt : échelle de prix à droite (plus haut, plus bas, entrée, dernier cours).
+export function PositionChart({ id, entry, dir, pts, x0, x1, h = 64, fmt }) {
   const v = pts.map(p => p[1]), lo = Math.min(entry, ...v), r = (Math.max(entry, ...v) - lo) || entry * .01;
   const X = x => Math.min(100, Math.max(0, (x - x0) / Math.max(1e-9, x1 - x0) * 100)), Y = p => 6 + (1 - (p - lo) / r) * (h - 12), ye = Y(entry);
   const [xn, last] = pts[pts.length - 1], win = (dir === "up" ? 1 : -1) * (last - entry) >= 0, col = win ? "var(--up)" : "var(--down)";
   const line = pathD(pts.map(([x, p]) => [X(x), Y(p)])), area = `${line}L${X(xn).toFixed(2)},${ye.toFixed(2)}L${X(pts[0][0]).toFixed(2)},${ye.toFixed(2)}Z`;
   const [over, under] = dir === "up" ? ["var(--up-soft)", "var(--down-soft)"] : ["var(--down-soft)", "var(--up-soft)"];
-  const cid = "c" + id;
-  return (
-    <div className="tchart" style={{ height: h }}>
+  const cid = "c" + id, hi = lo + r;
+  // Étiquettes de l'échelle : entrée et dernier cours d'abord, plus haut et plus bas s'ils ne les chevauchent pas.
+  const labels = [];
+  if (fmt) for (const [v, c] of [[last, "last " + (win ? "up" : "down")], [entry, "entry"], [hi, ""], [lo, ""]])
+    if (labels.every(l => Math.abs(Y(l.v) - Y(v)) > 13)) labels.push({ v, c });
+  const plot = (
+    <div className="tplot">
       <svg viewBox={`0 0 100 ${h}`} preserveAspectRatio="none" aria-hidden="true">
         <clipPath id={cid + "a"}><rect x="0" y="0" width="100" height={ye} /></clipPath>
         <clipPath id={cid + "b"}><rect x="0" y={ye} width="100" height={h - ye} /></clipPath>
@@ -24,6 +29,12 @@ export function PositionChart({ id, entry, dir, pts, x0, x1, h = 64 }) {
       </svg>
       <Dot x={X(pts[0][0])} y={ye} h={h} color="var(--muted)" />
       <Dot x={X(xn)} y={Y(last)} h={h} color={col} />
+    </div>
+  );
+  return (
+    <div className={"tchart" + (fmt ? " scaled" : "")} style={{ height: h }}>
+      {plot}
+      {labels.map(l => <span key={l.c || l.v} className={"tax mono " + l.c} style={{ top: `${Y(l.v) / h * 100}%` }}>{fmt(l.v)}</span>)}
     </div>
   );
 }
