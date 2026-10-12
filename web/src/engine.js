@@ -18,7 +18,8 @@ export const toOdds = p => Math.max(1.08, Math.round(MARGIN / p * 100) / 100);
 // Valeur d'une position : mise × (1 + levier × sens × variation), jamais sous 0.
 export const tradeValue = (b, px) => Math.max(0, b.stake * (1 + b.lev * (b.dir === "up" ? 1 : -1) * (px / b.entry - 1)));
 // Cours qui liquide la position (valeur nulle).
-export const liqPrice = b => b.entry * (1 - (b.dir === "up" ? 1 : -1) / b.lev);
+// Cours de liquidation : la valeur y tombe à `amort` × mise (talent Amortisseur, 0 sans lui). Même calcul que aur_lq en SQL.
+export const liqPrice = b => b.entry * (1 - (b.dir === "up" ? 1 : -1) * (1 - (b.amort ?? 0)) / b.lev);
 
 export function createEngine(data) {
   const META = data.articles, RAW = data.views;

@@ -122,7 +122,7 @@ export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscri
 }
 
 // Rumeurs des 7 derniers jours (aur_rumor_list) : l'issue n'arrive du serveur qu'une fois la résolution publiée.
-const RUMOR_ST = { open: ["En cours", "flat"], ok: ["Confirmée", "up"], no: ["Démentie", "down"] };
+const RUMOR_ST = { open: ["En cours", "flat"], ok: ["Confirmée", "up"], no: ["Démentie", "down"], void: ["Sans suite (société radiée)", "flat"] };
 function Rumors({ data, now, onDetail }) {
   const [st, setSt] = useState("all"), [sector, setSector] = useState("");
   if (!data) return <p className="muted small">Chargement…</p>;
@@ -622,7 +622,7 @@ function realizedVol(cs) {
 export const aurLive = (b, q, ticks, feeRate = FEE, cut = 1) => {
   const t0 = Date.parse(b.created_at) / 1000, lq = liqPrice(b);
   const hit = (ticks ?? []).some(([t, p]) => t > t0 && (b.dir === "up" ? p <= lq : p >= lq));
-  const p = q?.p ?? b.entry, c = closeQuote(b, p, feeRate, cut), value = hit ? 0 : c.value;
+  const p = q?.p ?? b.entry, c = closeQuote(b, p, feeRate, cut), value = hit ? (b.amort ?? 0) * b.stake : c.value;
   return { px: p, value, net: value - b.stake - b.fees, closeFee: c.fee, exitPx: c.px, sl: c.sl, lq, hit, halt: q?.halt };
 };
 

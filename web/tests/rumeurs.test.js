@@ -51,3 +51,13 @@ test("rumeurs : issue cachée tant que la résolution n'est pas publiée, table 
   assert.equal((await db.query("select * from aur_rumors")).rows.length, 0, "table des rumeurs illisible");
   await db.exec("reset role");
 });
+
+test("rumeurs : société radiée avant la résolution, « Sans suite », sans l'issue", async () => {
+  const db = await freshDb(); await login(db, A, "alice"); st = 0;
+  const t = Math.floor(await now(db));
+  await store(db, [{ t: t - 60, tk: "SLM", p: 10, v: 0 }], [{ id: 5, t: t - 50, tk: "SLM", cat: "rumeur", title: "Rumeur SLM", text: "", sent: .5, fiab: .3, rok: true }]);
+  await db.query("update aur_stocks set status = 'delisted' where tk = 'SLM'");
+  const r = (await list(db)).list[0];
+  assert.equal(r.status, "void"); assert.equal(r.res_t, null);
+  assert.ok(!/"ok"\s*:\s*(true|false)|rok/.test(JSON.stringify(r)), "aucune issue");
+});

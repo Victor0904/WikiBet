@@ -9,7 +9,7 @@ const RENTE = [10, 20, 30, 50, 70, 100];
 const ULT_MIN = 10; // points dans la branche pour son talent ultime (talent_buy)
 export const TREE = [
   { key: "prudence", name: "Prudence", items: [
-    { code: "amort", name: "Amortisseur", max: 5, fx: r => `Une liquidation par jour te rend ${3 * r} % de sa mise (1 500 W au plus)` },
+    { code: "amort", name: "Amortisseur", max: 5, fx: r => `Liquidation plus tôt : tu gardes ${3 * r} % de la mise au lieu de tout perdre` },
     { code: "frais", name: "Frais réduits", max: 5, fx: r => `Frais d'ouverture et de clôture −${5 * r} %` },
     { code: "sangfroid", name: "Sang-froid", max: 1, fx: () => "Alerte quand une position ne vaut plus que 40 % de sa mise (au lieu de 25 %)" },
     { code: "filet", name: "Filet", max: 1, fx: () => "Stop sur tes positions, sans le loft" },
@@ -23,7 +23,7 @@ export const TREE = [
     { code: "rentier", name: "Rentier", max: 1, ult: true, fx: () => "Argent passif doublé le lendemain d'une position clôturée en gain" },
   ] },
   { key: "info", name: "Information", items: [
-    { code: "avant", name: "Avant-première", max: 3, fx: r => `Actualités ${[3, 6, 10][r - 1]} s avant les autres` },
+    { code: "avant", name: "Avant-première", max: 3, fx: r => `Actualités ${[3, 6, 10][r - 1]} s avant les autres (15 s au plus avec l'agence de presse)` },
     { code: "flair", name: "Flair", max: 3, fx: r => `Indice « crédible » ou « douteuse » sur les rumeurs en cours, juste ${[60, 65, 70][r - 1]} fois sur 100` },
     { code: "archiviste", name: "Archiviste", max: 3, fx: r => `${2 * r} alertes de prix en plus` },
     { code: "analyste", name: "Analyste", max: 2, fx: r => r === 1 ? "Courbe MACD sur la fiche d'une action" : "MACD, et repérage des cassures et doubles sommets ou creux" },
@@ -34,7 +34,7 @@ export const TREE = [
     { code: "discretion", name: "Discrétion", max: 4, fx: r => `Tes ordres font bouger le cours ${String(2.5 * r).replace(".", ",")} % de moins` },
     { code: "calibre", name: "Gros calibre", max: 3, fx: r => `Tu peux engager ${10 * r} % de plus par action` },
     { code: "timing", name: "Timing", max: 1, fx: () => "Stop et objectif exécutés au cours exact qui les touche" },
-    { code: "kraken", name: "Kraken", max: 1, ult: true, fx: () => "Un ordre par jour d'Aurelys (1 h) sans faire bouger le cours" },
+    { code: "kraken", name: "Kraken", max: 1, ult: true, fx: () => "Un ordre passé à la main par jour d'Aurelys (1 h) sans faire bouger le cours" },
   ] },
 ];
 const BY_CODE = Object.fromEntries(TREE.flatMap(b => b.items.map(t => [t.code, t])));

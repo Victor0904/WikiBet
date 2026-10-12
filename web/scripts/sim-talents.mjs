@@ -11,7 +11,9 @@ const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 42
 const gauss = () => Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(2 * Math.PI * rnd());
 const t4 = () => { const c = gauss() ** 2 + gauss() ** 2 + gauss() ** 2 + gauss() ** 2; return gauss() / Math.sqrt(c / 4) / Math.SQRT2 }; // variance 1
 const VR = 2, STEP = 10; // volatilité réalisée / affichée ; pas de 10 min d'Aurelys
-const AMORT = (rank, stake) => Math.min(1500, .03 * rank * stake); // une liquidation par jour réel
+// Amortisseur (migration 20261027500000_reglages.sql) : la position est clôturée quand elle ne vaut plus que 3 % de sa mise par
+// rang, et ce reste est rendu. Salaire : plein sous 20 000 W de patrimoine, nul à 100 000 W (salary_factor).
+const SAL = w => Math.min(1, Math.max(0, (100000 - w) / 80000));
 const DISC = .025, FEES = .05;
 // Niveau : 2 500 W de gain net par niveau jusqu'au 5, 5 000 W jusqu'au 15, puis 10 000 W (même calcul que talent_level en SQL).
 export const levelOf = h => h < 12500 ? Math.floor(Math.max(0, h) / 2500) : h < 62500 ? 5 + Math.floor((h - 12500) / 5000) : 15 + Math.floor((h - 62500) / 10000);
@@ -23,14 +25,14 @@ function trade(s, dir, lev, stake, hold, edge, T, kraken) {
   const sd = s.sig / Math.sqrt(1440) * VR * Math.sqrt(STEP), steps = Math.max(1, Math.round(hold / STEP));
   const mu = edge * sd * Math.sqrt(steps) / steps; // avance du joueur : `edge` écart type sur toute la durée, dans son sens
   let r = Math.log(1 + dir * sl0); // r = ln(entrée / cours) ; l'entrée est dégradée par l'impact
-  const val = r => 1 + lev * dir * (Math.exp(-r) - 1);
+  const keep = .03 * (T.amort ?? 0), val = r => 1 + lev * dir * (Math.exp(-r) - 1) - keep; // valeur au-dessus du seuil de clôture
   // Seuil de liquidation ; entre deux pas, probabilité de l'avoir touché (pont brownien), sinon les allers-retours
   // manqués au travers du seuil donnent une espérance positive qui n'existe pas en jeu (cours à la seconde).
-  const rb = -Math.log(1 - dir / lev), side = Math.sign(rb);
+  const rb = -Math.log(1 - dir * (1 - keep) / lev), side = Math.sign(rb);
   for (let i = 0; i < steps; i++) {
     const r0 = r, u = rnd(); r -= dir * mu + sd * t4(); // tirages identiques d'une combinaison de talents à l'autre
     const d0 = side * (rb - r0), d1 = side * (rb - r);
-    if (val(r) <= 0 || d1 <= 0 || u < Math.exp(-2 * d0 * d1 / (sd * sd))) return { net: -stake - fee, liq: 1 };
+    if (val(r) <= 0 || d1 <= 0 || u < Math.exp(-2 * d0 * d1 / (sd * sd))) return { net: keep * stake - stake - fee, liq: 1 };
   }
   const exit = Math.exp(-r) * (1 - dir * sl1), pay = Math.max(0, stake * (1 + lev * dir * (exit - 1)) - fee);
   return { net: pay - stake - fee, liq: 0 };
@@ -56,7 +58,7 @@ console.log(`  → la meilleure combinaison reste à ${worst.toFixed(2)} % par p
 console.log("\nA2. Ferme de l'Amortisseur (5 rangs) : une seule position par jour réel, faite pour être liquidée, avec Frais 5 + Discrétion 4 + Kraken");
 let farm = { ev: -Infinity };
 for (const lev of [10, 15, 25]) for (const hold of [360, 1440]) for (const stake of [2000, 5000, 10000, 50000]) {
-  const e = evOf(lev, hold, stake, { fees: 5, disc: 4 }, true, 20000), day = e.ev + e.liq * AMORT(5, stake);
+  const e = evOf(lev, hold, stake, { fees: 5, disc: 4, amort: 5 }, true, 20000), day = e.ev;
   if (day > farm.ev) farm = { ev: day, lev, hold, stake, liq: e.liq };
 }
 console.log(`  Meilleure : ×${farm.lev}, ${farm.hold / 60} h, ${farm.stake} W → ${farm.ev >= 0 ? "+" : ""}${Math.round(farm.ev)} W par jour (liquidée ${Math.round(farm.liq * 100)} % des fois)`);
@@ -78,16 +80,15 @@ function month(P, T, run) {
   seed = 1000 + run; let cash = 10000, cum = 0, hwm = 0, bk = 0; const hold = 30000; // le très bon joueur garde 30 000 W en actions (rendement 3 %)
   const extra = { rente: 0, sal: 0, div: 0, amort: 0 };
   for (let d = 0; d < P.days; d++) {
-    const nT = Math.round(P.trades * (T.multi ? (P.pos + T.multi) / P.pos : 1)); let won = false, stakes = 0, amortUsed = false;
+    const nT = Math.round(P.trades * (T.multi ? (P.pos + T.multi) / P.pos : 1)); let won = false, stakes = 0;
     for (let i = 0; i < nT; i++) {
       const s = core[Math.floor(rnd() * core.length)], dir = rnd() < .5 ? 1 : -1;
       const cap = CAP_MULT * s.L * (1 + .1 * (T.cal ?? 0)), stake = Math.min(cash * P.stakeP, cap / P.lev);
       const x = trade(s, dir, P.lev, stake, P.hold, P.edge, T, !!T.kraken && i < P.aurDays); // un ordre sans impact par jour d'Aurelys
       cash += x.net; cum += x.net; hwm = Math.max(hwm, cum); stakes += stake; if (x.net > 0) won = true;
-      if (x.liq && T.amort && !amortUsed) { const a = AMORT(T.amort, stake); cash += a; extra.amort += a; amortUsed = true } // hors niveau
       if (cash < 2000) { cash = 10000; bk++ }
     }
-    const wealth = cash + (P.edge ? hold : 0), f = Math.min(1, Math.max(0, (100000 - wealth) / 80000)), boost = 1 + .05 * (T.fid ?? 0);
+    const wealth = cash + (P.edge ? hold : 0), f = SAL(wealth), boost = 1 + .05 * (T.fid ?? 0);
     const sal = P.sessions * Math.min(500 * boost, stakes / P.sessions * .1 * boost) * f; cash += sal; extra.sal += sal;
     const rente = RENTE[T.rente ?? 0] * (T.rentier && won ? 2 : 1); cash += rente; extra.rente += rente; // par jour réel
     if (P.edge) { const dv = hold * .03 / 365 * 24 * (1 + .05 * (T.div ?? 0)); cash += dv; extra.div += dv } // 24 jours d'Aurelys par jour réel
@@ -145,7 +146,7 @@ function career(P, run, days = 90) {
         if (streak >= 5) give("SERIE_5"); if (streak >= 10) give("SERIE_10"); if (zl >= 100) give("ZERO_LIQ");
         if (cash < 2000) { cash = 10000; target = null }
       }
-      const f = Math.min(1, Math.max(0, (100000 - cash) / 80000)); cash += Math.min(500 * P.sessions, P.trades * cash * P.stakeP * .1) * f; // salaire
+      const f = SAL(cash); cash += Math.min(500 * P.sessions, P.trades * cash * P.stakeP * .1) * f; // salaire
     }
     run_days = played ? run_days + 1 : 0;
     if (run_days >= 7) { give("ASSIDU_7"); give("FIDELE") } if (run_days >= 30) give("ASSIDU_30");

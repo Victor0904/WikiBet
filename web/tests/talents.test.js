@@ -87,7 +87,7 @@ test("talents Audace : Discrétion, Kraken (une fois par jour d'Aurelys), Gros c
   await give(db, "multitache", 2);
   await open(db, "up", 1, 10); await open(db, "up", 1, 10);
   await assert.rejects(open(db, "up", 1, 10), /Au plus 5/);
-  // Timing : l'objectif part du cours qui l'a touché.
+  // Timing : l'objectif part du cours qui l'a touché. Le Kraken armé n'est pas consommé par un ordre automatique.
   for (const timing of [false, true]) {
     await db.query("delete from bets where user_id = $1", [A]); await db.query("delete from aur_ticks");
     if (timing) await give(db, "timing", 1);
@@ -96,26 +96,30 @@ test("talents Audace : Discrétion, Kraken (une fois par jour d'Aurelys), Gros c
     await db.query("select aur_set_auto($1, null, 10.5)", [b.id]);
     await db.query("insert into aur_ticks (tk, t, p) values ('SLM', clock_timestamp(), 10.6), ('SLM', clock_timestamp() + interval '1 millisecond', 10.2)");
     await new Promise(r => setTimeout(r, 10)); // les deux cours sont passés
+    await db.query("update profiles set kraken_day = null where id = $1", [A]); await db.query("select kraken_arm(true)");
     await db.query("select aur_auto_exec('close', $1, 0)", [b.id]);
+    assert.equal((await db.query("select kraken_armed from profiles where id = $1", [A])).rows[0].kraken_armed, true, "Kraken gardé pour un ordre à la main");
     near((await db.query("select exit from bets where id = $1", [b.id])).rows[0].exit, timing ? 10.6 : 10.2, `Timing ${timing}`);
   }
 });
 
-test("talents Prudence : Frais réduits, Amortisseur (une fois par jour, 1 500 W au plus), Filet, Phénix (une fois par semaine)", async () => {
+test("talents Prudence : Frais réduits, Amortisseur (clôture au seuil, sans cadeau), Filet, Phénix (une fois par semaine)", async () => {
   const db = await freshDb(); await login(db, A, "alice");
   await db.query("update profiles set cash = 1e6 where id = $1", [A]);
   await give(db, "frais", 5);
   near((await db.query("select my_fee_rate() as r")).rows[0].r, .00075, "−25 %");
   await tick(db, 10, 3);
-  await give(db, "amort", 5);
-  const liquidate = async stake => { await tick(db, 10); const b = await open(db, "up", 10, stake); await tick(db, 8.9); return close(db, b.id) };
+  await give(db, "amort", 5); // 5 rangs : la position est clôturée quand elle ne vaut plus que 15 % de sa mise
+  const liquidate = async stake => { await tick(db, 10, 0); const b = await open(db, "up", 10, stake); await tick(db, 8.9, 0); return close(db, b.id) };
   let b = await liquidate(1000);
-  assert.equal(b.payout, 150); assert.equal(b.insured, true);
-  b = await liquidate(1000); assert.equal(b.payout, 0, "une fois par jour réel");
-  await db.query("delete from talent_uses"); await tick(db, 10);
-  b = await liquidate(12000); assert.equal(b.payout, 1500, "1 500 W au plus");
+  assert.equal(b.closed_by, "liq"); near(b.exit, 9.15, "liquidée à 9,15 (il reste 15 %), pas à 9");
+  near(b.payout, 150, "la valeur restante"); assert.ok(!b.insured, "pas un remboursement");
+  const c0 = await cash(db, A);
+  b = await liquidate(12000);
+  near(b.payout, 1800, "chaque liquidation, sans plafond : c'est ce qui reste de la position");
+  near(await cash(db, A) - c0, -12000 - 120000 * .00075 + 1800, "mise et frais perdus, reste rendu une seule fois");
   // Filet : stop sans le loft.
-  await tick(db, 10); b = await open(db, "up", 1, 100);
+  await tick(db, 10, 0); b = await open(db, "up", 1, 100);
   await assert.rejects(db.query("select aur_set_auto($1, 9.5, null)", [b.id]), /loft/);
   await give(db, "filet", 1);
   await db.query("select aur_set_auto($1, 9.5, null)", [b.id]);

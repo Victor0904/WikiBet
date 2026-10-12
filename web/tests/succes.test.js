@@ -96,3 +96,15 @@ test("succès : rétroactif sur l'historique, secrets masqués, classement de la
   await db.query("select ach_week_end(now() - interval '7 days', now())");
   assert.equal(await has(db, "TOP_100"), 1); assert.equal(await has(db, "CHAMPION"), 1);
 });
+
+test("succès : Renaissance se regagne en tradant (gain net), pas avec le salaire", async () => {
+  const db = await freshDb(); await player(db);
+  await trade(db, { stake: 1000, lev: 5, to: 10.5 }); // gain
+  await trade(db, { stake: 1000, lev: 10, to: 8.9 }); // liquidée
+  const tgt = (await db.query("select renais_target, tal_cum from profiles where id = $1", [A])).rows[0];
+  assert.ok(tgt.renais_target > tgt.tal_cum, "cible : le gain net d'avant la liquidation");
+  await db.query("update profiles set cash = cash + 1e6, last_seen = now() where id = $1", [A]); await db.query("select settle()");
+  assert.equal(await has(db, "RENAISSANCE"), 0, "le patrimoine (salaire, dons) ne suffit pas");
+  for (let i = 0; i < 6; i++) await trade(db, { stake: 1000, lev: 5, to: 10.5 });
+  assert.equal(await has(db, "RENAISSANCE"), 1);
+});
