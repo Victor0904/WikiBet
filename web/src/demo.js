@@ -13,7 +13,7 @@ import { initState, advance, slip } from "../supabase/functions/_shared/aurelys.
 const UID = "00000000-0000-4000-8000-000000000001";
 
 export async function demoApi() {
-  const db = new PGlite("idb://wikibourse-demo-14"); // changer le numéro quand la migration change
+  const db = new PGlite("idb://wikibourse-demo-15"); // changer le numéro quand la migration change
   if (import.meta.env.DEV) window.__wbDemo = db; // tests d'écran (tests/browser.js) : données de démo forcées
   const ready = (await db.query("select to_regclass('public.bets') is not null as ok")).rows[0].ok;
   if (!ready) {
@@ -67,7 +67,9 @@ export async function demoApi() {
     aurTerms: async () => (await all("select my_terms() as r"))[0].r,
     aurInsider: async () => (await all("select aur_insider() as r"))[0].r,
     myTalents: async () => (await all("select my_talents() as r"))[0].r,
-    achievements: () => all("select a.*, exists (select 1 from user_achievements u where u.code = a.code and u.user_id = $1) as got from achievements a order by points, name", [UID]),
+    myAchievements: async () => (await all("select my_achievements() as r"))[0].r,
+    myUnlocks: async since => (await all("select my_unlocks($1) as r", [since]))[0].r,
+    articleRead: id => all("select article_read($1)", [id]),
     talentBuy: async code => (await act("select talent_buy($1) as r", [code])).r,
     talentReset: async () => (await act("select talent_reset() as r")).r,
     krakenArm: async on => (await all("select kraken_arm($1) as r", [on]))[0].r,

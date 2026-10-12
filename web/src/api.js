@@ -98,11 +98,9 @@ export async function connect() {
     aurTerms: () => rpc("my_terms"),
     aurInsider: () => rpc("aur_insider"),
     myTalents: () => rpc("my_talents"),
-    achievements: async () => {
-      const [all, mine] = await Promise.all([rows(sb.from("achievements").select("*").order("points")), rows(sb.from("user_achievements").select("code").eq("user_id", uid))]);
-      const got = new Set(mine.map(x => x.code));
-      return all.map(a => ({ ...a, got: got.has(a.code) }));
-    },
+    myAchievements: () => rpc("my_achievements"),
+    myUnlocks: since => rpc("my_unlocks", { p_since: since }),
+    articleRead: id => rpc("article_read", { p_id: id }),
     talentBuy: code => rpc("talent_buy", { p_code: code }),
     talentReset: () => rpc("talent_reset"),
     krakenArm: on => rpc("kraken_arm", { p_on: on }),

@@ -175,22 +175,43 @@ export function Talents({ api, tal, setTal, say }) {
   );
 }
 
-// Succès : 2e source de points de talent (1, 2 ou 3 points selon la difficulté).
+// Succès : 2e source de points de talent (36 au plus). Tout est décidé par le serveur (my_achievements) ; les secrets
+// restent « ??? » avec leur indice jusqu'au déblocage.
+const amount = (v, unit) => unit === "W" ? W(v) : `${Math.floor(v)}${unit ? " " + unit : ""}`;
 function Achievements({ api, onBack }) {
-  const [list, setList] = useState(null);
-  useEffect(() => { api.achievements?.().then(setList).catch(() => setList([])) }, [api]);
+  const [data, setData] = useState(null);
+  useEffect(() => { api.myAchievements?.().then(setData).catch(() => setData({ list: [], total: 0, points: 0, max_points: 36 })) }, [api]);
+  if (!data) return <p className="muted pad">Chargement…</p>;
+  const got = data.list.filter(a => a.at).length, cats = [...new Set(data.list.map(a => a.cat))];
   return (
     <section className="talents">
-      <button type="button" className="link" onClick={onBack}>‹ Talents</button>
-      <h2>Succès</h2>
-      {list === null ? <p className="muted">Chargement…</p> : !list.length ? <p className="muted">La liste des succès arrive bientôt. Chacun rapportera 1, 2 ou 3 points de talent.</p>
-        : list.map(a => (
-          <article key={a.code} className={"tal-card" + (a.got ? " on" : "")}>
-            <div className="tal-card-h"><Icon k="ult" /><b>{a.name}</b><span className="mono">{a.points} pt{a.points > 1 ? "s" : ""}</span></div>
-            <p>{a.descr}</p>
-            <p className={a.got ? "up" : "muted"}>{a.got ? "✓ Obtenu" : "○ Pas encore"}</p>
-          </article>
-        ))}
+      <button type="button" className="link tal-back" onClick={onBack}>‹ Talents</button>
+      <header className="panel ach-head">
+        <h2>Succès</h2>
+        <p className="mono">{got} / {data.total} succès · {data.points} / {data.max_points} points de talent gagnés</p>
+      </header>
+      {cats.map(c => (
+        <div key={c} className="ach-cat">
+          <h3>{c}</h3>
+          {data.list.filter(a => a.cat === c).map(a => {
+            const done = !!a.at, bar = !done && a.goal && a.cur != null;
+            return (
+              <article key={a.code} className={"ach" + (done ? " done" : "")}>
+                <span className="ach-ico" aria-hidden="true">{done ? "★" : a.secret ? "?" : "☆"}</span>
+                <div className="ach-b">
+                  <div className="ach-h"><b>{a.name}</b><span className={"ach-pts" + (a.points ? " on" : "")}>{a.points ? `+${a.points} pt${a.points > 1 ? "s" : ""}` : "badge"}</span></div>
+                  <p>{a.descr ?? <>Indice : « {a.hint} »</>}</p>
+                  {bar && <div className="tal-gauge">
+                    <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={a.goal} aria-valuenow={Math.min(a.cur, a.goal)} aria-label={`Progression : ${a.name}`}><i style={{ width: `${100 * Math.min(1, a.cur / a.goal)}%` }} /></div>
+                    <small className="mono">{amount(Math.min(a.cur, a.goal), a.unit === "W" ? "W" : null)} / {amount(a.goal, a.unit)}</small>
+                  </div>}
+                  {done && <small className="ach-date">Débloqué le {new Date(a.at).toLocaleDateString("fr-FR")}</small>}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ))}
     </section>
   );
 }

@@ -91,6 +91,23 @@ export default function Game({ api, onNoProfile }) {
   const [tal, setTal] = useState(null), loadTal = () => api.myTalents?.().then(setTal).catch(() => {});
   useEffect(() => { loadTal(); const id = setInterval(loadTal, 60000); return () => clearInterval(id) }, [api]); // eslint-disable-line
   const ranks = tal?.ranks ?? {};
+  // Succès débloqués par le serveur depuis la dernière visite : un bandeau (lien vers les talents s'il y a des points à dépenser).
+  const unlockCheck = useRef(null);
+  useEffect(() => {
+    let alive = true; const KEY = "wb-succes-vu";
+    const check = unlockCheck.current = async () => {
+      let since = null; try { since = localStorage.getItem(KEY) } catch { }
+      const r = await api.myUnlocks?.(since).catch(() => null); if (!alive || !r) return;
+      try { localStorage.setItem(KEY, r.now) } catch { }
+      if (!r.list.length) return;
+      const pts = r.list.reduce((a, x) => a + x.points, 0), plus = pts ? ` (+${pts} point${pts > 1 ? "s" : ""} de talent)` : "";
+      const text = r.list.length === 1 ? `Succès débloqué : ${r.list[0].name}${plus}` : `${r.list.length} succès débloqués${since ? "" : " d'après ton historique"}${plus}`;
+      setToast({ text, tone: "up", long: true, at: Date.now(), action: r.free > 0 ? { label: "Voir mes talents", go: () => { setVisit(null); setTab("qg"); setQgView("talents") } } : null });
+      loadTal();
+    };
+    check(); const id = setInterval(check, 30000);
+    return () => { alive = false; clearInterval(id) };
+  }, [api]); // eslint-disable-line
   const aur = useAurelys(api, tab === "market" || tab === "actions" || !!aurDetail || alerts.length > 0 || bets.some(b => b.status === "open" && b.kind === "aurelys"));
   aur.ranks = ranks;
   const beat = Math.floor(now / 2500);
@@ -134,7 +151,7 @@ export default function Game({ api, onNoProfile }) {
   const feeOpen = r => r.kind === "aurelys" ? r.fee_open ?? r.stake * r.lev * FEE : 0; // frais d'ouverture, en plus de la mise
   const onAuto = (id, sl, tp) => run(() => api.aurSetAuto(id, sl, tp), () => sl == null && tp == null ? "Ordres retirés." : "Ordres enregistrés."), canStop = homeLevel >= AUTO_LV || !!ranks.filet; // objectif pour tous, stop dès le loft (ou talent Filet)
   const cancelTrigger = id => run(() => api.aurTriggerCancel(id), () => "Ordre annulé.");
-  const closeTrade = b => run(() => b.kind === "aurelys" ? api.aurOrder({ action: "close", id: b.id }).finally(() => { aur.kraken = false; loadTal() }) : api.closeTrade(b.id),
+  const closeTrade = b => run(() => b.kind === "aurelys" ? api.aurOrder({ action: "close", id: b.id }).finally(() => { aur.kraken = false; loadTal(); setTimeout(() => unlockCheck.current?.(), 1500) }) : api.closeTrade(b.id),
     r => `Clôturée : ${sW(r.payout - r.stake - feeOpen(r))}${feeOpen(r) ? ` (frais ${W(r.fees)})` : ""}`);
   const howtoDone = () => { try { localStorage.setItem("wb-howto", "1") } catch { } setFirstVisit(false); setMore(null); setTab("market") };
   const holdPx = h => h.status === "listed" || h.status === "core" ? aur.quotes[h.tk]?.p ?? h.price : h.price; // cours en direct
@@ -213,7 +230,8 @@ export default function Game({ api, onNoProfile }) {
             : await run(() => api.aurOrder({ action: "open", ...args }), b => `Position ${b.dir === "up" ? "▲" : "▼"} ×${b.lev} ouverte · ${W(b.stake)} à ${aurPx(b.entry)} (frais ${W(b.fees)})`);
           if (r) setTicket(null);
         }} />}
-      {toast && <div className={"toast " + (toast.tone || "")} role="status" onClick={() => setToast(null)}>{toast.text}</div>}
+      {toast && <div className={"toast " + (toast.tone || "")} role="status" onClick={() => setToast(null)}>{toast.text}
+        {toast.action && <button type="button" className="toast-act" onClick={e => { e.stopPropagation(); setToast(null); toast.action.go() }}>{toast.action.label}</button>}</div>}
       {effect && <Rain kind={effect} at={rain} />}
     </div>
   );

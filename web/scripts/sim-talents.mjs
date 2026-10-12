@@ -104,3 +104,83 @@ for (const [name, P] of Object.entries(PROFILES)) {
     console.log(`    ${k.padEnd(26)} ${d >= 0 ? "+" : ""}${Math.round(d)} W en 30 jours (${Math.round(100 * d / base.cash)} %), niveau ${a.level.toFixed(1)}`);
   }
 }
+
+// ===== C. Points de talent avec les succès, à 7, 30 et 90 jours =====
+// Les succès liés au trading sont tirés des trades simulés ; le reste suit des hypothèses (LIFE) : jours joués, humeur du
+// marché, articles lus, logement, guilde, filleuls, classements de la semaine. Points : même liste que la migration
+// 20261027300000_succes.sql (les autres succès sont des badges à 0 point, qui comptent pour Collectionneur et Légende).
+const PTS = { FIRST_TRADE: 1, SERIE_5: 1, SERIE_10: 2, COUP_50: 1, COUP_100: 2, SNIPER: 1, CONTRARIEN: 1, MAIN_FER: 1, VETERAN: 2, ASSIDU_7: 1, ASSIDU_30: 2,
+  GAIN_100K: 1, GAIN_500K: 1, GAIN_1M: 2, PAT_1M: 1, FERIE: 1, TOUS_SECTEURS: 2, SURPRISES: 1, RENAISSANCE: 1, ZERO_LIQ: 2, PARRAIN: 1, MENTOR: 1,
+  GUILDE_TOP3: 1, TOP_10: 1, CHAMPION: 2, COLLECTIONNEUR: 1, LEGENDE: 2 };
+if (Object.values(PTS).reduce((a, b) => a + b, 0) !== 36) throw new Error("points des succès : 36 attendus");
+// Proposition (SIM_PTS=propose) : points seulement pour les succès difficiles ; les faciles deviennent des badges.
+if (process.env.SIM_PTS === "propose") for (const c of Object.keys(PTS)) PTS[c] = { FIRST_TRADE: 1, SERIE_10: 2, COUP_50: 1, COUP_100: 2, MAIN_FER: 1, ASSIDU_30: 2, GAIN_100K: 1, GAIN_500K: 1, GAIN_1M: 2, PAT_1M: 1, SURPRISES: 1, MENTOR: 1, TOP_10: 1, CHAMPION: 2, LEGENDE: 2 }[c] ?? 0;
+const CAP = Object.values(PTS).reduce((a, b) => a + b, 0);
+const LIFE = {
+  moyen: { ...PROFILES.moyen, play: .85, reads: 2, home: 3, guild: 2, ref: null, top100: .3, top10: 0, champion: 0, guildTop3: .15, stops: 0 },
+  "gros joueur": { ...PROFILES["très bon"], play: .97, reads: 5, home: 1, guild: 1, ref: 20, top100: 1, top10: .5, champion: .1, guildTop3: .4, stops: .3 },
+};
+const HOLD_S = P => P.hold * 2.5; // secondes réelles
+function career(P, run, days = 90) {
+  seed = 5000 + run; let cash = 10000, cum = 0, hwm = 0, streak = 0, zl = 0, valid = 0, stops = 0, surprises = 0, run_days = 0, target = null;
+  const got = new Set(), won = {}, snaps = {};
+  const pts = () => Math.min(CAP, [...got].reduce((a, c) => a + (PTS[c] ?? 0), 0));
+  const give = c => got.add(c);
+  for (let d = 1; d <= days; d++) {
+    const played = rnd() < P.play; let lmrWin = false;
+    if (played) {
+      for (let i = 0; i < P.trades; i++) {
+        const s = core[Math.floor(rnd() * core.length)], dir = rnd() < .5 ? 1 : -1, stake = Math.min(cash * P.stakeP, CAP_MULT * s.L / P.lev);
+        const before = cash, x = trade(s, dir, P.lev, stake, P.hold, P.edge, {}, false), w = x.net > 0;
+        cash += x.net; cum += x.net; hwm = Math.max(hwm, cum); valid++; give("FIRST_TRADE"); give("SALAIRE");
+        streak = w ? streak + 1 : 0; zl = x.liq ? 0 : zl + 1;
+        if (x.liq && target == null) target = before;
+        if (rnd() < P.stops) stops++;
+        if (w) {
+          give("FIRST_GREEN"); (won[s.tk] ??= 0); won[s.tk]++; if (s.tk === "LMR") lmrWin = true;
+          if (rnd() < .5) give("INDICIEL");
+          const r = rnd(); if ((dir > 0 && r < .12) || (dir < 0 && r > .88)) give("CONTRARIEN"); // ouvert en Nervosité (à la hausse) ou en Euphorie (à la baisse)
+          if (rnd() < HOLD_S(P) / (7 * 3600)) { give("SNIPER"); if (rnd() < .7) surprises++ } // résultats de la société pendant la position
+          if (rnd() < .02) give("BIEN_INFORME");
+        }
+        if (streak >= 5) give("SERIE_5"); if (streak >= 10) give("SERIE_10"); if (zl >= 100) give("ZERO_LIQ");
+        if (cash < 2000) { cash = 10000; target = null }
+      }
+      const f = Math.min(1, Math.max(0, (100000 - cash) / 80000)); cash += Math.min(500 * P.sessions, P.trades * cash * P.stakeP * .1) * f; // salaire
+    }
+    run_days = played ? run_days + 1 : 0;
+    if (run_days >= 7) { give("ASSIDU_7"); give("FIDELE") } if (run_days >= 30) give("ASSIDU_30");
+    if (lmrWin && rnd() < 11 / 365) give("FERIE");
+    if (valid >= 50) give("SCALPEUR"); if (valid >= 500) give("VETERAN");
+    if (stops >= 20) give("DISCIPLINE"); if (surprises >= 5) give("SURPRISES");
+    for (const [tk, c] of [["GTR", "AGRONOME"], ["HLV", "ELECTRICIEN"], ["LMR", "FLANEUR"]]) if ((won[tk] ?? 0) >= 5) give(c);
+    if (core.every(s => won[s.tk])) give("TOUS_SECTEURS");
+    if (P.trades >= 5 && d >= 2) give("DIVERSIFIE");
+    if (P.reads * d >= 20) give("LECTEUR"); if (d >= P.home) give("PROPRIO"); if (d >= P.guild) give("GUILDE");
+    for (const [h, c] of [[10000, "GAIN_10K"], [50000, "GAIN_50K"], [100000, "GAIN_100K"], [500000, "GAIN_500K"], [1e6, "GAIN_1M"]]) if (hwm >= h) give(c);
+    if (cash >= 250000) give("PAT_250K"); if (cash >= 1e6) give("PAT_1M");
+    if (target != null && cash > target) { give("RENAISSANCE"); target = null }
+    if (P.ref && d >= P.ref) give("PARRAIN");
+    if (d % 7 === 0) {
+      if (rnd() < P.top100) give("TOP_100"); if (rnd() < P.top10) give("TOP_10"); if (rnd() < P.champion) give("CHAMPION");
+      if (rnd() < P.guildTop3) give("GUILDE_TOP3");
+    }
+    const all = levelOf(hwm) + pts();
+    if (all >= 11) give("SPECIALISTE"); if (all >= 24) give("POLYVALENT");
+    if (got.size >= 25) give("COLLECTIONNEUR"); if (got.size >= 45) give("LEGENDE");
+    if ([7, 30, 90].includes(d)) snaps[d] = { level: levelOf(hwm), ach: pts(), n: got.size, got: [...got] };
+  }
+  return snaps;
+}
+console.log("\nC. Points de talent : niveau (gain net) + succès (36 au plus), moyenne de 200 joueurs");
+for (const [name, P] of Object.entries(LIFE)) {
+  const acc = { 7: { level: 0, ach: 0, n: 0 }, 30: { level: 0, ach: 0, n: 0 }, 90: { level: 0, ach: 0, n: 0 } }, runs = 200;
+  const freq = {};
+  for (let r = 0; r < runs; r++) { const s = career(P, r); for (const d in acc) for (const k in acc[d]) acc[d][k] += s[d][k] / runs; for (const c of s[30].got) freq[c] = (freq[c] ?? 0) + 1 / runs }
+  console.log(`  Joueur ${name}`);
+  for (const d of [7, 30, 90]) {
+    const a = acc[d], tot = a.level + a.ach;
+    console.log(`    ${String(d).padStart(2)} jours : niveau ${a.level.toFixed(1)} + succès ${a.ach.toFixed(1)} pts (${a.n.toFixed(0)} succès) = ${tot.toFixed(1)} points, dont ${Math.round(100 * a.ach / tot)} % par les succès`);
+  }
+  console.log("    Succès à points obtenus à 30 jours (part des joueurs) : " + Object.entries(freq).filter(([c]) => PTS[c]).sort((a, b) => b[1] - a[1]).map(([c, p]) => `${c} ${PTS[c]} pt ${Math.round(100 * p)} %`).join(", "));
+}

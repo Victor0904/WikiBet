@@ -517,6 +517,20 @@ button:active:not(:disabled) { transform: scale(.96) }
 .tal-recap { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--panel2); border-radius: 10px }
 .tal-recap div { display: flex; flex-direction: column; gap: 2px }
 .sheet-acts { display: flex; flex-direction: column; gap: 2px }
+/* Succès */
+.tal-back { align-self: flex-start; min-height: 44px }
+.ach-head p { margin: 4px 0 0; font-size: 13px; color: var(--muted) }
+.ach-cat { display: flex; flex-direction: column; gap: 8px } .ach-cat h3 { margin: 6px 0 0; font: 700 15px/1.2 var(--f-cond); color: var(--muted); text-transform: uppercase; letter-spacing: .05em }
+.ach { display: flex; gap: 10px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; color: var(--muted) }
+.ach.done { color: var(--ink); border-color: rgba(245, 184, 61, .55) }
+.ach-ico { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--panel2); font-size: 14px }
+.ach.done .ach-ico { background: var(--accent); color: var(--accent-ink) }
+.ach-b { flex: 1; display: flex; flex-direction: column; gap: 4px } .ach-b p { margin: 0; font-size: 13.5px; line-height: 1.35 }
+.ach-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px } .ach-h b { font: 700 15px/1.2 var(--f-cond) }
+.ach-pts { flex: none; font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line) }
+.ach-pts.on { color: var(--accent); border-color: rgba(245, 184, 61, .5) }
+.ach-date { color: var(--accent) }
+.toast-act { display: block; margin-top: 6px; border: 0; background: none; padding: 4px 0; color: var(--accent); font-weight: 700; font-size: 14px }
 @media (min-width: 900px) { .tal-card p { font-size: 13px } }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 13px }
 .btn.fresh { width: 100%; margin-bottom: 8px }

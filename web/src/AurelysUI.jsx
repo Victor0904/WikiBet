@@ -115,7 +115,7 @@ export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscri
         : view === "news" ? <News aur={aur} now={now} onDetail={onDetail} onRead={setRead} />
         : view === "rumors" ? <Rumors data={rum} now={now} onDetail={onDetail} />
         : <Heat aur={aur} now={now} onDetail={onDetail} />}
-      {read && <Article n={read} now={now} onClose={() => setRead(null)} onDetail={tk => { setRead(null); onDetail(tk) }} />}
+      {read && <Article api={api} n={read} now={now} onClose={() => setRead(null)} onDetail={tk => { setRead(null); onDetail(tk) }} />}
       <p className="fine">Marché entièrement fictif : entreprises, personnages, cours et actualités sont simulés. Les prix naissent des ordres de bots (fondamentalistes, suiveurs de tendance, contrariens, chartistes, petits porteurs), de baleines et des joueurs : un gros ordre fait bouger le cours. Frais de 0,1 % du montant engagé à l'ouverture et à la clôture.</p>
     </section>
   );
@@ -299,7 +299,8 @@ function RoundClock({ d, now, stats }) {
 }
 
 // Un article du Courrier d'Aurelys, lu en entier.
-function Article({ n, now, onClose, onDetail }) {
+function Article({ api, n, now, onClose, onDetail }) {
+  useEffect(() => { api?.articleRead?.(n.id).catch(() => {}) }, [api, n.id]); // succès Lecteur assidu (compté par le serveur)
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
   const s = n.tk ? BY[n.tk] : null;
   return (
@@ -570,7 +571,7 @@ export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onClose
         <AurChart cs={cs} g={g} last={q?.p} ind={ind} marks={aur.news.filter(n => n.tk === tk)} onMark={setMark} hl={hl} />
         {hl && <p className="muted small">Trait ambre : la rumeur, {gwhen(hl * 1000, now)}.</p>}
         {aur.ranks.analyste >= 2 && (() => { const f = figuresOf(cs); return <p className="small">Figures : {f.length ? f.map(([n, d]) => <span key={n} className={d}>{d === "up" ? "▲" : "▼"} {n} </span>) : "aucune figure nette"} <span className="muted">(indicatif)</span></p> })()}
-        {mark && <Article n={mark} now={now} onClose={() => setMark(null)} onDetail={() => setMark(null)} />}
+        {mark && <Article api={api} n={mark} now={now} onClose={() => setMark(null)} onDetail={() => setMark(null)} />}
         <div className="qbtns">
           <button type="button" className="buy" disabled={!q || q.halt} onClick={() => onPick(tk, "up")}><span>▲ Hausse</span></button>
           <button type="button" className="sell" disabled={!q || q.halt} onClick={() => onPick(tk, "down")}><span>▼ Baisse</span></button>

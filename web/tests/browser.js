@@ -83,8 +83,14 @@ export async function forceTalents(b) {
     await window.__wbDemo.query("update profiles set tal_hwm = 112500 where not bot");
     await window.__wbDemo.query("insert into talents select p.id, v.c, v.r from profiles p, (values ('amort', 5), ('frais', 5), ('sangfroid', 1), ('filet', 1), ('phenix', 1), ('discretion', 3), ('multitache', 1)) v(c, r) where not p.bot on conflict do nothing");
     return true })()`);
-  await b.evaluate(`[...document.querySelectorAll("button")].find(x => x.textContent.trim() === "QG").click()`);
-  await b.evaluate(`[...document.querySelectorAll("button")].find(x => x.textContent.trim() === "Talents").click()`);
-  await b.waitFor("document.querySelector('.tal-pts b')?.textContent === '3'");
+  // Rouvrir l'écran pour relire ; un rechargement lancé avant l'écriture peut arriver après : on réessaie.
+  for (let i = 0; ; i++) {
+    await b.evaluate(`[...document.querySelectorAll("button")].find(x => x.textContent.trim() === "QG").click()`);
+    await b.evaluate(`[...document.querySelectorAll("button")].find(x => x.textContent.trim() === "Talents").click()`);
+    // Niveau 20 et Phénix pris (pas le nombre de points : un succès peut s'y ajouter, ex. « Trader confirmé » à 100 000 W).
+    try { await b.waitFor("document.querySelector('.tal-lv b')?.textContent === '20' && !!document.querySelector('.tal-card.ult.on')", 10000); break } catch (e) {
+      if (i >= 5) throw new Error(e.message + " ; affiché : " + await b.evaluate("document.querySelector('.talents')?.innerText.slice(0, 200) ?? document.body.innerText.slice(0, 300)"));
+    }
+  }
   await sleep(700); // fin du fondu d'entrée de l'écran
 }

@@ -453,7 +453,7 @@ function results(S, R, out, s) {
   const n = { tk: s.tk, cat: "resultats", title, text: pick(R, T.resultats.text), mag, sent: Math.max(-1, Math.min(1, surprise / 6)), hl: 360 };
   if (R() < .2) n.sentEff = -n.sent * .6; // « vendre la nouvelle »
   x.eps *= 1 + act / 400;
-  publish(S, out, n);
+  publish(S, out, n).surp = Math.abs(surprise) >= .5; // résultat « surprise » (au-dessus ou en dessous des attentes) : aur_results
   x.res = drawResult(R, s);
 }
 // Révision d'un analyste : le consensus se rapproche (un peu) du vrai chiffre. C'est un indice pour qui suit l'action.
