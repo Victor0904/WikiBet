@@ -35,7 +35,7 @@ export const Avatar = ({ pseudo, size = 56, accent }) => (
   <span className="avatar" style={{ width: size, height: size, fontSize: size * .38, background: accent }} aria-hidden="true">{initials(pseudo)}</span>
 );
 
-export function Profile({ api, me, title, home, board, patrimoine, refs, accent, say, go, onTrophies, hasPush }) {
+export function Profile({ api, me, tal, title, home, board, patrimoine, refs, accent, say, go, onTrophies, hasPush }) {
   const [guild, setGuild] = useState(undefined), [friends, setFriends] = useState(null), [troph, setTroph] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -62,7 +62,7 @@ export function Profile({ api, me, title, home, board, patrimoine, refs, accent,
         <Avatar pseudo={me.pseudo} accent={accent} />
         <div className="who-txt">
           <h1>{me.pseudo}{guild && <span className="gtag">{guild.tag}</span>}</h1>
-          <small>{[title, home].filter(Boolean).join(" · ")}</small>
+          <small>{[tal && !tal.bot && `Niveau ${tal.level}`, title, home].filter(Boolean).join(" · ")}</small>
         </div>
         <button type="button" className="gear" onClick={() => go("account")} aria-label="Mon compte">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.0 10.5L21.4 10.8L21.4 13.2L19.0 13.5L18.1 15.9L19.5 17.8L17.8 19.5L15.9 18.1L13.5 19.0L13.2 21.4L10.8 21.4L10.5 19.0L8.1 18.1L6.2 19.5L4.5 17.8L5.9 15.9L5.0 13.5L2.6 13.2L2.6 10.8L5.0 10.5L5.9 8.1L4.5 6.2L6.2 4.5L8.1 5.9L10.5 5.0L10.8 2.6L13.2 2.6L13.5 5.0L15.9 5.9L17.8 4.5L19.5 6.2L18.1 8.1Z" /><circle cx="12" cy="12" r="3" /></svg>
@@ -99,6 +99,9 @@ export function Profile({ api, me, title, home, board, patrimoine, refs, accent,
           <b>Amis</b>{!friends ? <span>…</span> : <><span>{friends.length ? `${online} en ligne` : "Ajouter des amis"}</span>
             {best && best.today > 0 && <small>Meilleur gain du jour : {best.pseudo}</small>}</>}
         </button>
+        {tal && !tal.bot && <button type="button" className="ptile panel" onClick={() => go("talents")}>
+          <b>Talents</b><span>Niveau {tal.level}</span><small>{tal.level + Number(tal.ach) - Number(tal.spent)} point{tal.level + Number(tal.ach) - Number(tal.spent) > 1 ? "s" : ""} à dépenser</small>
+        </button>}
         <button type="button" className="ptile panel" onClick={onTrophies}>
           <b>Trophées</b><span>{troph ? `${troph.filter(t => t.got).length}/${troph.length}` : "…"}</span><small>Voir mon QG</small>
         </button>

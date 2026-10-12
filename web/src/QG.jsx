@@ -47,8 +47,8 @@ export default function QG({ api, catalog, inv, me, owner, self, patrimoine, ope
   const owned = id => (inv[id]?.qty ?? 0) > 0;
   const level = Math.max(0, ...catalog.filter(i => i.kind === "home" && owned(i.id)).map(i => i.level));
   const decor = catalog.filter(i => i.kind === "decor" && owned(i.id)).map(i => i.id);
-  const resale = catalog.filter(i => (i.kind === "decor" || i.kind === "cosmetic") && owned(i.id)).reduce((a, i) => a + Math.floor(i.price * .6), 0);
-  const homes = catalog.filter(i => i.kind === "home" && owned(i.id)).reduce((a, i) => a + Math.floor(i.price * .6), 0);
+  const resale = catalog.filter(i => (i.kind === "decor" || i.kind === "cosmetic") && owned(i.id)).reduce((a, i) => a + Math.floor((i.list ?? i.price) * .6), 0);
+  const homes = catalog.filter(i => i.kind === "home" && owned(i.id)).reduce((a, i) => a + Math.floor((i.list ?? i.price) * .6), 0);
   const next = catalog.find(i => i.kind === "home" && i.level === level + 1);
   const setDone = SET_STREAM.filter(owned).length;
   const boost = me?.salary_boost_until && Date.parse(me.salary_boost_until) > Date.now() ? Date.parse(me.salary_boost_until) : null;
@@ -104,7 +104,7 @@ export default function QG({ api, catalog, inv, me, owner, self, patrimoine, ope
         <div className="shop">
           {catalog.filter(i => i.kind === tab).map(it => {
             const has = owned(it.id), qty = inv[it.id]?.qty ?? 0, locked = it.kind !== "home" && it.level > level;
-            const resale = Math.floor(it.price * .6), equipped = inv[it.id]?.equipped;
+            const resale = Math.floor((it.list ?? it.price) * .6), equipped = inv[it.id]?.equipped;
             let action;
             if (it.kind === "home") action = has ? <span className="muted small">{it.level === level ? "Ton logement" : "Déjà habité"}</span>
               : it.level === level + 1 ? <Confirm label={`Emménager · ${W(it.price)}`} confirm="Confirmer ?" disabled={me.cash < it.price} onClick={() => act(() => api.buyItem(it.id), () => `Emménagement réussi : ${it.name} !`)} />

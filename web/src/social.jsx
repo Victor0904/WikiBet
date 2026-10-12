@@ -106,7 +106,7 @@ export function Ranking({ api, me, wealth, onVisit }) {
             {rows.map((p, i) => (
               <button type="button" key={p.id} className={"brow" + (p.id === me.id ? " me" : "")} onClick={() => onVisit(p)} aria-label={`Voir le QG de ${p.pseudo}`}>
                 <span className="rk mono">{i + 1}</span>
-                <span><b>{p.pseudo}<BotTag id={p.id} />{p.guild && <> <i className="gtag">{p.guild}</i></>}</b><small>{sub(p.title, `${p.bets} pari${p.bets > 1 ? "s" : ""} clôturé${p.bets > 1 ? "s" : ""}`)}</small></span>
+                <span><b>{p.pseudo}<BotTag id={p.id} />{p.guild && <> <i className="gtag">{p.guild}</i></>}</b><small>{sub(p.level != null ? `niv. ${p.level}` : null, sub(p.title, `${p.bets} pari${p.bets > 1 ? "s" : ""} clôturé${p.bets > 1 ? "s" : ""}`))}</small></span>
                 <span className={"r mono " + cls(p.gain)}>{sW(p.gain)}</span>
               </button>
             ))}

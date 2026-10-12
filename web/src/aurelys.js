@@ -14,7 +14,7 @@ function toCandle(cs, t, p, v) {
 }
 
 export function useAurelys(api, active) {
-  const [, render] = useState(0), data = useRef({ ticks: {}, candles: {}, quotes: {}, feeRate: FEE, x: null, since: null, ok: false, news: [], young: [], rounds: [] });
+  const [, render] = useState(0), data = useRef({ ticks: {}, candles: {}, quotes: {}, feeRate: FEE, cut: 1, kraken: false, ranks: {}, x: null, since: null, ok: false, news: [], young: [], rounds: [] });
   // Historique : bougies des 3 dernières heures réelles (36 h d'Aurelys), au démarrage et après une longue absence.
   const loadHistory = async () => {
     const h = await api.aurHistory(null, 180), d = data.current;
@@ -48,9 +48,9 @@ export function useAurelys(api, active) {
   // Jeunes pousses (créées par le moteur) : inscrites dans le registre BY pour que tout l'écran les connaisse.
   useEffect(() => {
     let alive = true;
-    const load = () => Promise.all([api.aurStocks(), api.aurRounds().catch(() => []), api.aurFeeRate().catch(() => null)]).then(([rows, st, fr]) => {
+    const load = () => Promise.all([api.aurStocks(), api.aurRounds().catch(() => []), api.aurTerms().catch(() => null)]).then(([rows, st, tm]) => {
       if (!alive) return;
-      if (fr != null) data.current.feeRate = +fr; // salle des marchés de la guilde : frais réduits
+      if (tm) Object.assign(data.current, { feeRate: +tm.fee, cut: +tm.cut, kraken: !!tm.kraken }); // frais (salle des marchés, talent), impact (talents)
       data.current.roundStats = Object.fromEntries(st.map(r => [r.tk, { investors: +r.investors, total: +r.total }]));
       for (const r of rows) if (r.meta && r.status !== "core") BY[r.tk] = { ...r.meta, status: r.status, roundEnds: r.round_ends && Date.parse(r.round_ends), ipoPrice: r.ipo_price };
       Object.assign(data.current, { young: rows.filter(r => r.status === "listed").map(r => BY[r.tk]), rounds: rows.filter(r => r.status === "round").map(r => BY[r.tk]) });

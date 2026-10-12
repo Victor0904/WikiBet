@@ -94,6 +94,13 @@ export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscri
     load(); const id = setInterval(load, 10000); return () => { on = false; clearInterval(id) };
   }, [api]);
   const top = rum?.list[0]?.id ?? 0;
+  // Talent Initié : révisions du consensus déjà décidées, avant leur publication.
+  const [insider, setInsider] = useState([]), initie = !!aur.ranks.initie;
+  useEffect(() => {
+    if (!api || !initie) return; let on = true;
+    const load = () => api.aurInsider().then(d => on && setInsider(d)).catch(() => {});
+    load(); const id = setInterval(load, 10000); return () => { on = false; clearInterval(id) };
+  }, [api, initie]);
   useEffect(() => { if (view === "rumors" && top > seen) { setSeen(top); try { localStorage.setItem("wb-rumeurs", String(top)) } catch { } } }, [view, top, seen]);
   return (
     <section>
@@ -103,7 +110,7 @@ export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscri
       {!stocks && <div className="chips" role="group" aria-label="Vue">
         {VIEWS.map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}{k === "rumors" && top > seen && <i className="chip-dot" role="img" aria-label="nouvelle rumeur" />}</button>)}
       </div>}
-      {view === "board" ? <Board aur={aur} now={now} onDetail={onDetail} onNews={() => setView("news")} onRead={setRead} onList={onList} />
+      {view === "board" ? <Board aur={aur} now={now} insider={initie ? insider : null} onDetail={onDetail} onNews={() => setView("news")} onRead={setRead} onList={onList} />
         : view === "list" ? <List aur={aur} now={now} bets={bets} onPick={onPick} onDetail={onDetail} onSubscribe={onSubscribe} onRead={setRead} />
         : view === "news" ? <News aur={aur} now={now} onDetail={onDetail} onRead={setRead} />
         : view === "rumors" ? <Rumors data={rum} now={now} onDetail={onDetail} />
@@ -137,7 +144,8 @@ function Rumors({ data, now, onDetail }) {
             <span className="rumor-b">
               <small className="muted">{BY[r.tk]?.name ?? r.tk} · {r.tk} · {gwhen(r.t * 1000, now)}</small>
               <b>{r.title}</b>
-              <span className={"rtag " + tone}>{label}{r.res_t ? ` · ${gwhen(r.res_t * 1000, now)}` : ""}</span>
+              <span className="rtags"><span className={"rtag " + tone}>{label}{r.res_t ? ` · ${gwhen(r.res_t * 1000, now)}` : ""}</span>
+                {r.flair && <span className="rtag">Flair : {r.flair === "credible" ? "plutôt crédible" : "douteuse"}</span>}</span>
             </span>
             <span className={"mono " + (r.chg == null ? "muted" : cls(r.chg))}>{r.chg == null ? "—" : pct(r.chg)}</span>
           </button>
@@ -171,7 +179,7 @@ const CalRow = ({ e, aur, now }) => {
   return <div className="row"><span>{e.title}{c != null && <small className="cons"> · attendu {signed(c)}</small>}</span><b className="mono">{gwhen(e.at, now)}</b></div>;
 };
 
-function Board({ aur, now, onDetail, onNews, onRead, onList }) {
+function Board({ aur, now, insider, onDetail, onNews, onRead, onList }) {
   const x = aur.x, reg = REGIMES[x?.reg ?? "calme"], idx = closesOf(aur, INDEX, 36);
   // Palmarès figé une heure d'Aurelys (5 min réelles) pour ne pas bouger sous le doigt.
   const slot = Math.floor(now / 300000);
@@ -184,6 +192,11 @@ function Board({ aur, now, onDetail, onNews, onRead, onList }) {
         {idx.length > 1 ? <Spark path={idx} t={idx.length - 1} h={80} /> : <p className="muted small">Chargement…</p>}
         <p className="muted small">Moyenne des 13 sociétés, pondérée par leur capitalisation (1 000 au lancement).</p>
       </div>
+      {insider && <div className="panel">
+        <h2>Initié <span className="muted">révisions à venir</span></h2>
+        {insider.map(r => <button key={r.tk + r.t} type="button" className="row as-link" onClick={() => onDetail(r.tk)}><span>{r.title}</span><b className="mono">{gwhen(r.t * 1000, now)}</b></button>)}
+        {!insider.length && <p className="muted small">Aucune révision décidée pour l'instant.</p>}
+      </div>}
       <div className="tiles">
         <div className="tile wide-tile"><small>Humeur du marché{x?.regAge != null ? ` · depuis ${x.regAge < 1 ? "moins d'une heure" : `${x.regAge} h`}` : ""}</small><b>{reg.icon} {reg.name}</b><p className="muted small">{REG_TXT[x?.reg ?? "calme"]}</p></div>
         <div className="tile"><small>Peur (VIXA)</small><b className="mono">{x ? nf0.format(x.vixa) : "—"}</b></div>
@@ -453,8 +466,45 @@ function AurChart({ cs, g, last, ind, marks, onMark, hl }) {
         {hk && <span className="tip mono">{gLabel(hk.t, g)} · O {px(hk.o)} H {px(hk.h)} B {px(hk.l)} C {px(hk.c)} · vol. {nf0.format(hk.v)}</span>}
       </div>
       {ind.rsi && <RsiPanel v={rsi(closes)} />}
+      {ind.macd && <MacdPanel v={closes} />}
     </>
   );
+}
+// MACD 12-26-9 (talent Analyste) : différence de deux moyennes exponentielles, sa moyenne (signal) et l'écart (histogramme).
+const ema = (v, n) => { const k = 2 / (n + 1); let e = null; return v.map(x => e = e == null ? x : e + (x - e) * k) };
+function MacdPanel({ v }) {
+  const a = ema(v, 12), b = ema(v, 26), m = v.map((_, i) => a[i] - b[i]), s = ema(m, 9), h = m.map((x, i) => x - s[i]);
+  const H = 40, top = Math.max(...m.map(Math.abs), ...s.map(Math.abs), 1e-9), Y = x => H / 2 - x / top * (H / 2 - 2), w = 100 / v.length;
+  const line = a => a.map((x, i) => `${i ? "L" : "M"}${(i * w + w / 2).toFixed(2)},${Y(x).toFixed(2)}`).join("");
+  const cross = h.length > 1 && Math.sign(h.at(-1)) !== Math.sign(h.at(-2));
+  return (
+    <div className="rsi">
+      <svg viewBox={`0 0 100 ${H}`} preserveAspectRatio="none" aria-label="MACD 12-26-9">
+        {h.map((x, i) => <rect key={i} x={i * w + w * .2} width={w * .6} y={Math.min(Y(x), H / 2)} height={Math.abs(Y(x) - H / 2)} fill={x >= 0 ? "var(--up)" : "var(--down)"} opacity=".45" />)}
+        <path d={line(m)} fill="none" stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+        <path d={line(s)} fill="none" stroke="var(--muted)" strokeWidth="2" strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <span className="mono small">MACD {nf2.format(m.at(-1))} · signal {nf2.format(s.at(-1))}{cross ? (h.at(-1) > 0 ? " · croisement haussier" : " · croisement baissier") : ""}</span>
+    </div>
+  );
+}
+// Figures (talent Analyste, rang 2) : cassure du plus haut ou du plus bas des 20 dernières bougies, double sommet, double creux.
+// Indicatif : une figure ne garantit rien.
+export function figuresOf(cs) {
+  const k = cs.slice(-40); if (k.length < 20) return [];
+  const out = [], last = k.at(-1).c, prev = k.slice(-21, -1);
+  if (last > Math.max(...prev.map(x => x.h))) out.push(["Cassure de résistance", "up"]);
+  else if (last < Math.min(...prev.map(x => x.l))) out.push(["Cassure de support", "down"]);
+  const peaks = [], troughs = [];
+  for (let i = 3; i < k.length - 3; i++) {
+    const w = k.slice(i - 3, i + 4);
+    if (k[i].h === Math.max(...w.map(x => x.h))) peaks.push(i);
+    if (k[i].l === Math.min(...w.map(x => x.l))) troughs.push(i);
+  }
+  const [p1, p2] = peaks.slice(-2), [t1, t2] = troughs.slice(-2);
+  if (p2 != null && p2 - p1 >= 5 && Math.abs(k[p1].h / k[p2].h - 1) < .015 && last < Math.min(...k.slice(p1, p2 + 1).map(x => x.l)) * 1.01) out.push(["Double sommet", "down"]);
+  if (t2 != null && t2 - t1 >= 5 && Math.abs(k[t1].l / k[t2].l - 1) < .015 && last > Math.max(...k.slice(t1, t2 + 1).map(x => x.h)) * .99) out.push(["Double creux", "up"]);
+  return out;
 }
 function RsiPanel({ v }) {
   const H = 40, Y = x => H - x / 100 * H, d = v.map((x, i) => x == null ? null : `${(i / Math.max(1, v.length - 1) * 100).toFixed(2)},${Y(x).toFixed(2)}`).filter(Boolean).map((p, i) => (i ? "L" : "M") + p).join("");
@@ -515,10 +565,11 @@ export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onClose
         <div className="detail-price"><b className="mono">{px(q?.p)}</b><span className={"mono " + cls(c)}>{q?.halt ? "cotation suspendue" : `${c >= 0 ? "▲" : "▼"} ${pct(c)} jour`}</span></div>
         <div className="seg" role="group" aria-label="Unité de temps">{FRAMES.map(([v, l]) => <button key={v} type="button" aria-pressed={g === v} onClick={() => setG(v)}>{l}</button>)}</div>
         <div className="chips legend" role="group" aria-label="Indicateurs">
-          {MM.map(([k, l, col]) => <button key={k} type="button" aria-pressed={ind[k]} onClick={() => setInd(x => ({ ...x, [k]: !x[k] }))}><i style={{ background: col }} aria-hidden="true" />{l}</button>)}
+          {[...MM, ...(aur.ranks.analyste ? [["macd", "MACD", "var(--accent)"]] : [])].map(([k, l, col]) => <button key={k} type="button" aria-pressed={ind[k]} onClick={() => setInd(x => ({ ...x, [k]: !x[k] }))}><i style={{ background: col }} aria-hidden="true" />{l}</button>)}
         </div>
         <AurChart cs={cs} g={g} last={q?.p} ind={ind} marks={aur.news.filter(n => n.tk === tk)} onMark={setMark} hl={hl} />
         {hl && <p className="muted small">Trait ambre : la rumeur, {gwhen(hl * 1000, now)}.</p>}
+        {aur.ranks.analyste >= 2 && (() => { const f = figuresOf(cs); return <p className="small">Figures : {f.length ? f.map(([n, d]) => <span key={n} className={d}>{d === "up" ? "▲" : "▼"} {n} </span>) : "aucune figure nette"} <span className="muted">(indicatif)</span></p> })()}
         {mark && <Article n={mark} now={now} onClose={() => setMark(null)} onDetail={() => setMark(null)} />}
         <div className="qbtns">
           <button type="button" className="buy" disabled={!q || q.halt} onClick={() => onPick(tk, "up")}><span>▲ Hausse</span></button>
@@ -567,15 +618,15 @@ function realizedVol(cs) {
 /* ===== Position ===== */
 // Valeur en direct : ce que rapporterait la clôture maintenant (closeQuote : impact de l'ordre et frais de clôture
 // compris, même calcul que aur_close), et seuil de liquidation.
-export const aurLive = (b, q, ticks, feeRate = FEE) => {
+export const aurLive = (b, q, ticks, feeRate = FEE, cut = 1) => {
   const t0 = Date.parse(b.created_at) / 1000, lq = liqPrice(b);
   const hit = (ticks ?? []).some(([t, p]) => t > t0 && (b.dir === "up" ? p <= lq : p >= lq));
-  const p = q?.p ?? b.entry, c = closeQuote(b, p, feeRate), value = hit ? 0 : c.value;
+  const p = q?.p ?? b.entry, c = closeQuote(b, p, feeRate, cut), value = hit ? 0 : c.value;
   return { px: p, value, net: value - b.stake - b.fees, closeFee: c.fee, exitPx: c.px, sl: c.sl, lq, hit, halt: q?.halt };
 };
 
 // Détail avant de clôturer, recalculé à chaque cours : le montant final suit le cours au moment où le serveur exécute.
-function CloseSheet({ b, x, busy, onConfirm, onCancel }) {
+function CloseSheet({ b, x, kraken, busy, onConfirm, onCancel }) {
   useEffect(() => { const k = e => e.key === "Escape" && onCancel(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onCancel]);
   const n = b.stake * b.lev;
   return (
@@ -586,6 +637,7 @@ function CloseSheet({ b, x, busy, onConfirm, onCancel }) {
         <div className="row"><span>Impact de ton ordre ({pct(-x.sl)})</span><b className="mono">{px(x.exitPx)} · −{W(n * x.sl)}</b></div>
         <div className="row"><span>Frais de clôture</span><b className="mono">−{W(x.closeFee)}</b></div>
         <div className="row"><span>Tu recevras (environ)</span><b className={"mono " + cls(x.net)}>{W(x.value)} ({sW(x.net)})</b></div>
+        {kraken && <p className="small accent">Kraken armé : cette clôture part sans impact.</p>}
         <p className="muted small">Le montant suit le cours jusqu'à l'exécution par le serveur.</p>
         <button type="button" className="btn primary big" disabled={busy || x.halt} onClick={onConfirm}>Clôturer · {W(x.value)}</button>
       </div>
@@ -608,11 +660,11 @@ function AutoForm({ b, onAuto, canStop, onDone }) {
 }
 
 export function AurelysCard({ b, aur, now, onClose, onAuto, canStop, onDetail, Facts }) {
-  const q = aur.quotes[b.aur], ticks = aur.ticks[b.aur], x = aurLive(b, q, ticks, aur.feeRate), t0 = Date.parse(b.created_at), [busy, setBusy] = useState(false), [auto, setAuto] = useState(false), [ask, setAsk] = useState(false);
+  const q = aur.quotes[b.aur], ticks = aur.ticks[b.aur], x = aurLive(b, q, ticks, aur.feeRate, aur.cut), t0 = Date.parse(b.created_at), [busy, setBusy] = useState(false), [auto, setAuto] = useState(false), [ask, setAsk] = useState(false);
   // Cours minute par minute tant qu'on les a (dernière heure réelle), sinon bougies d'une heure d'Aurelys.
   const cs = (aur.candles[b.aur] ?? []).filter(k => k[0] * 1000 > t0 - 300000), recent = (ticks ?? []).filter(k => k[0] * 1000 > t0);
   const pts = [[t0, b.entry], ...((ticks?.[0]?.[0] ?? Infinity) * 1000 <= t0 ? recent.map(k => [k[0] * 1000, k[1]]) : cs.map(k => [Math.min(now, (k[0] + 60 * SPM) * 1000), k[4]])), [now, x.px]];
-  const d = x.lq / x.px - 1, danger = !x.hit && x.value <= .25 * b.stake; // proche de la liquidation : la carte clignote
+  const d = x.lq / x.px - 1, danger = !x.hit && x.value <= (aur.ranks.sangfroid ? .4 : .25) * b.stake; // proche de la liquidation : la carte clignote
   return (
     <article className={"pos " + (x.net >= 0 ? "gain" : "loss") + (danger ? " danger" : "")}>
       <div className="pos-h">
@@ -641,9 +693,9 @@ export function AurelysCard({ b, aur, now, onClose, onAuto, canStop, onDetail, F
       {x.hit
         ? <p className="muted small">Seuil de liquidation touché, règlement en cours…</p>
         : <button type="button" className="btn primary" disabled={busy || x.halt} onClick={() => setAsk(true)}>Clôturer · {W(x.value)}</button>}
-      {ask && !x.hit && <CloseSheet b={b} x={x} busy={busy} onCancel={() => setAsk(false)} onConfirm={async () => { setBusy(true); await onClose(b); setBusy(false); setAsk(false) }} />}
+      {ask && !x.hit && <CloseSheet b={b} x={aur.kraken ? aurLive(b, q, ticks, aur.feeRate, 0) : x} kraken={aur.kraken} busy={busy} onCancel={() => setAsk(false)} onConfirm={async () => { setBusy(true); await onClose(b); setBusy(false); setAsk(false) }} />}
     </article>
   );
 }
 
-export const aurCap = tk => CAP_MULT * BY[tk].L;
+export const aurCap = (tk, calibre = 0) => CAP_MULT * BY[tk].L * (1 + .1 * calibre); // talent Gros calibre : +10 % par rang

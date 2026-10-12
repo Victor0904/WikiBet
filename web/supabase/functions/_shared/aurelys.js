@@ -373,8 +373,9 @@ const playerImpact = (s, q) => Math.sign(q) * PK * Math.sqrt(Math.abs(q) / s.dep
 // Prix moyen d'exécution : la moitié du mouvement qu'il provoque. `S` ne sert qu'aux jeunes pousses absentes de BY (serveur).
 export const slip = (S, tk, notional) => Math.min(.2, Math.abs(playerImpact(defOf(S, tk), notional)) * 0.5);
 // Ce que rapporterait la clôture d'une position Aurelys au cours `p` : même calcul que aur_close (impact, frais, plancher 0).
-export const closeQuote = (b, p, feeRate = FEE) => {
-  const n = b.stake * b.lev, sens = b.dir === "up" ? 1 : -1, sl = slip(null, b.aur, n), px = p * (1 - sens * sl), fee = Math.max(1, n * feeRate);
+// `cut` : part de l'impact gardée (talent Discrétion, 0 avec le Kraken armé), donnée par my_terms().
+export const closeQuote = (b, p, feeRate = FEE, cut = 1) => {
+  const n = b.stake * b.lev, sens = b.dir === "up" ? 1 : -1, sl = slip(null, b.aur, n) * cut, px = p * (1 - sens * sl), fee = Math.max(1, n * feeRate);
   return { px, sl, fee, value: Math.max(0, Math.max(0, b.stake * (1 + b.lev * sens * (px / b.entry - 1))) - fee) };
 };
 
@@ -456,13 +457,19 @@ function results(S, R, out, s) {
   x.res = drawResult(R, s);
 }
 // Révision d'un analyste : le consensus se rapproche (un peu) du vrai chiffre. C'est un indice pour qui suit l'action.
+// Révision du consensus : décidée maintenant, publiée 1 h d'Aurelys plus tard (talent Initié : les initiés la voient dès
+// la décision, par la table cachée aur_revisions, où aur_store range les éléments `pre`). Jamais juste avant des résultats.
+const REV_LEAD = 60;
 function revision(S, R, out, s) {
   const x = S.st[s.tk], r = x.res; if (!r) return false;
   const d = r.act - r.cons; if (Math.abs(d) < 1) return false;
+  const day = Math.floor(S.t / DAY);
+  for (const dd of [day, day + 1]) { const t = resultsAt(s.i, dd); if (t != null && t > S.t && t - S.t <= REV_LEAD + 10) return false }
+  S.revq ??= []; if (S.revq.some(v => v.tk === s.tk)) return false;
   const nc = Math.round((r.cons + d * (.2 + .3 * R())) * 2) / 2; if (nc === r.cons) return false;
-  const up = nc > r.cons; r.cons = nc;
-  publish(S, out, { tk: s.tk, cat: "analyste", title: `Les analystes ${up ? "relèvent" : "abaissent"} leurs attentes pour ${s.name} : ${nc >= 0 ? "+" : "−"}${Math.abs(nc).toFixed(1).replace(".", ",")} % attendus`,
-    text: "Révision du consensus avant les prochains résultats.", mag: (up ? 1 : -1) * .004, sent: up ? .3 : -.3, hl: 240 });
+  const up = nc > r.cons, title = `Les analystes ${up ? "relèvent" : "abaissent"} leurs attentes pour ${s.name} : ${nc >= 0 ? "+" : "−"}${Math.abs(nc).toFixed(1).replace(".", ",")} % attendus`;
+  S.revq.push({ t: S.t + REV_LEAD, tk: s.tk, from: r.cons, act: r.act, nc, title });
+  out.news.push({ pre: true, t: Math.round(realOf(S.t + REV_LEAD)), t0: Math.round(realOf(S.t)), tk: s.tk, title });
   return true;
 }
 
@@ -686,6 +693,12 @@ function tick(S, R, out, pending) {
   }
   if (S.next.mkt <= t) { if (S.next.mkt) macroNews(S, R, out); S.next.mkt = t + Math.ceil(-Math.log(1 - R()) * 1440 / reg.news) }
   if (bcaAt(Math.floor(m / DAY)) === m) rateDecision(S, R, out);
+  for (const v of (S.revq ?? []).filter(v => v.t <= t)) {
+    const r = S.st[v.tk]?.res; if (!r || r.cons !== v.from || r.act !== v.act) continue; // résultats publiés entre-temps
+    r.cons = v.nc;
+    publish(S, out, { tk: v.tk, cat: "analyste", title: v.title, text: "Révision du consensus avant les prochains résultats.", mag: (v.nc > v.from ? 1 : -1) * .004, sent: v.nc > v.from ? .3 : -.3, hl: 240 });
+  }
+  if (S.revq) S.revq = S.revq.filter(v => v.t > t);
   for (const f of S.follow.filter(f => f.t <= t)) {
     const s = defOf(S, f.tk); if (!S.st[f.tk]) continue;
     const item = publish(S, out, f.ok
