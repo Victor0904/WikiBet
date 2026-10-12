@@ -125,7 +125,7 @@ const STEPS = [
   ["Investir sur le long terme", "Dans la fiche d'une entreprise, « Investir » achète de vraies actions : sans levier, sans liquidation, à garder aussi longtemps que tu veux. Certaines versent un dividende chaque jour d'Aurelys. De jeunes entreprises entrent régulièrement en bourse : avec 50 000 W de patrimoine, tu peux souscrire à leur levée de fonds avant la cotation. Elles peuvent beaucoup rapporter… ou faire faillite. Lis leurs articles dans le Courrier d'Aurelys."],
   ["Ton QG", "Dépense tes gains : logements, déco en 3D, thèmes, titres et bonus. Un plus grand logement donne aussi un historique plus long et plus d'alertes de prix. Tes trophées s'affichent au mur. Le classement compte ton patrimoine (solde, valeur actuelle de tes positions, actions et 60 % de la valeur de tes objets)."],
   ["Classements, amis et guildes", "Trois classements : les gains du jour (remis à zéro à minuit), les gains de tous les temps et le patrimoine. Ajoute tes amis par leur pseudo, ou rejoins une guilde de 30 traders au plus. Lie ta partie à un e-mail dans Mon compte pour la garder."],
-  ["Salaire et faillite", "Toutes les 11 minutes, un salaire de 10 % de tes mises sur Aurelys (500 W au plus). Une position compte si elle est restée ouverte une heure d'Aurelys (2 min 30) ; une hausse et une baisse sur la même action s'annulent. C'est une aide pour remonter : salaire plein sous 20 000 W de patrimoine, de moins en moins au-dessus, plus rien à 100 000 W. Sous 2 000 W (solde, mises et valeur de revente de tes objets), tu peux repartir à " + CAP0_TXT + " depuis Mon compte. Le compteur de faillites est visible de tous."],
+  ["Salaire et faillite", "Toutes les 11 minutes, un salaire de 10 % de tes mises sur Aurelys (500 W au plus). Une position compte si elle est restée ouverte une heure d'Aurelys (2 min 30) ; une hausse et une baisse sur la même action s'annulent. C'est une aide pour remonter : salaire plein sous 20 000 W de patrimoine, de moins en moins au-dessus, plus rien à 100 000 W. Sous 2 000 W (solde, mises et valeur de revente de tes objets), tu peux repartir à " + CAP0_TXT + " de patrimoine depuis Mon compte (tes logements gardés comptent à 60 %, avec au moins 2 000 W en caisse). Le compteur de faillites est visible de tous."],
 ];
 
 export function HowTo({ onBack, first }) {
@@ -158,7 +158,7 @@ export function Account({ account, push, me, title, patrimoine, openStake, objec
       {account && <AccountLink account={account} pseudo={me.pseudo} />}
       {push && <PushPanel push={push} />}
       <div className="panel bk">
-        <p><b>Faillite</b>Sous 2 000 W (solde, valeur actuelle de tes positions et de tes actions, valeur de revente de tes objets et bonus), tu peux repartir à {CAP0_TXT}. Tes paris en cours sont perdus, tes objets restent à toi, et le compteur de faillites augmente.</p>
+        <p><b>Faillite</b>Sous 2 000 W (solde, valeur actuelle de tes positions et de tes actions, valeur de revente de tes objets et bonus), tu peux repartir à {CAP0_TXT} de patrimoine : tes logements gardés comptent à 60 %, avec au moins 2 000 W en caisse. Tes paris en cours sont perdus, tes objets restent à toi, et le compteur de faillites augmente.</p>
         <button type="button" className="btn" disabled={!canRestart} onClick={onRestart}>Repartir</button>
       </div>
       {demo && <p className="fine">Mode démo locale : ta partie est enregistrée dans ce navigateur uniquement, sans compte.</p>}

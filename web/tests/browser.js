@@ -61,6 +61,20 @@ export async function launch() {
   };
 }
 
+// Joueur de démo connecté (première visite : la démo installe sa base), sur le Marché.
+export async function openApp(b, url) {
+  await b.goto(url);
+  await b.waitFor("document.readyState === 'complete' && !!document.querySelector('input')");
+  await b.evaluate(`localStorage.setItem("wb-howto", "1"); (() => { const i = document.querySelector("input"), set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    set.call(i, "Testeur"); i.dispatchEvent(new Event("input", { bubbles: true })); return true })()`);
+  await b.click("Entrer");
+  await b.waitFor("!!document.querySelector('.dock')", 120000);
+}
+// Éléments qui dépassent à droite de l'écran sans être dans une zone qui défile (rangée de filtres…) : vide si tout va bien.
+export const sticking = b => b.evaluate(`(() => { const W = document.documentElement.clientWidth, main = document.querySelector("main");
+  const inScroller = e => { for (let a = e.parentElement; a && a !== main; a = a.parentElement) if (getComputedStyle(a).overflowX !== "visible") return true; return false };
+  return [...main.querySelectorAll("*")].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > W + .5 && !inScroller(e) })
+    .slice(0, 6).map(e => e.tagName.toLowerCase() + "." + String(e.className).replace(/ /g, ".") + " → " + Math.round(e.getBoundingClientRect().right)) })()`);
 // Joueur de démo connecté, sur l'écran Talents.
 export async function openTalents(b, url) {
   await b.goto(url);

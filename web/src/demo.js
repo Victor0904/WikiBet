@@ -13,7 +13,11 @@ import { initState, advance, slip } from "../supabase/functions/_shared/aurelys.
 const UID = "00000000-0000-4000-8000-000000000001";
 
 export async function demoApi() {
-  const db = new PGlite("idb://wikibourse-demo-15"); // changer le numéro quand la migration change
+  // Base locale nommée d'après le contenu des migrations : toute nouvelle migration repart d'une base neuve (plus de
+  // numéro à changer à la main). Les bases des versions précédentes sont effacées du navigateur.
+  const name = "wikibourse-demo-" + migrations.reduce((h, s) => { for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) >>> 0; return h }, 7).toString(36);
+  try { indexedDB.databases?.().then(l => l.filter(d => d.name?.includes("wikibourse-demo-") && !d.name.includes(name)).forEach(d => indexedDB.deleteDatabase(d.name))).catch(() => {}) } catch { }
+  const db = new PGlite("idb://" + name);
   if (import.meta.env.DEV) window.__wbDemo = db; // tests d'écran (tests/browser.js) : données de démo forcées
   const ready = (await db.query("select to_regclass('public.bets') is not null as ok")).rows[0].ok;
   if (!ready) {

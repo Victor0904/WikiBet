@@ -147,7 +147,8 @@ export default function Game({ api, onNoProfile }) {
 
   // Talent Négociateur : la boutique affiche le prix payé ; la revente reste à 60 % du prix catalogue (list).
   const shop = ranks.negociateur ? catalog.map(i => ({ ...i, list: i.price, price: Math.round(i.price * (1 - .03 * ranks.negociateur)) })) : catalog;
-  const go = t => { setTab(t); if (t !== "more") setMore(null); window.scrollTo({ top: 0 }) };
+  // Un appui sur l'onglet déjà ouvert ramène à sa racine (Plus : retour au Profil depuis Classement, Mon compte…).
+  const go = t => { if (t !== "more" || t === tab) setMore(null); setTab(t); window.scrollTo({ top: 0 }) };
   const feeOpen = r => r.kind === "aurelys" ? r.fee_open ?? r.stake * r.lev * FEE : 0; // frais d'ouverture, en plus de la mise
   const onAuto = (id, sl, tp) => run(() => api.aurSetAuto(id, sl, tp), () => sl == null && tp == null ? "Ordres retirés." : "Ordres enregistrés."), canStop = homeLevel >= AUTO_LV || !!ranks.filet; // objectif pour tous, stop dès le loft (ou talent Filet)
   const cancelTrigger = id => run(() => api.aurTriggerCancel(id), () => "Ordre annulé.");
@@ -208,7 +209,7 @@ export default function Game({ api, onNoProfile }) {
             : more === "friends" ? <Friends api={api} say={say} onVisit={visitQG} onBack={() => setMore(null)} />
             : more === "guilds" ? <Guilds api={api} me={me} say={say} onVisit={visitQG} onBack={() => setMore(null)} accent={accent} />
             : more === "account" ? <Account account={api.account} push={api.push} me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"}
-                canRestart={me.cash + (me.bank ?? 0) + openStake + holdsValue + catalog.filter(i => i.kind !== "home").reduce((a, i) => a + Math.floor(i.price * .6) * (inv[i.id]?.qty ?? 0), 0) < BK_LIMIT} onRestart={() => run(() => api.restart(), () => `Nouveau départ : ${W(CAP0)}`)} onBack={() => setMore(null)} />
+                canRestart={me.cash + (me.bank ?? 0) + openStake + holdsValue + catalog.filter(i => i.kind !== "home").reduce((a, i) => a + Math.floor(i.price * .6) * (inv[i.id]?.qty ?? 0), 0) < BK_LIMIT} onRestart={() => run(() => api.restart(), p => `Nouveau départ : ${W(p?.cash ?? CAP0)} en caisse`)} onBack={() => setMore(null)} />
             : more === "legal" ? <Legal onBack={() => setMore(null)} />
             : more === "notifs" && api.push ? <><SubHeader title="Notifications" onBack={() => setMore(null)} /><PushPanel push={api.push} /></>
             : <Profile api={api} me={me} tal={tal} title={myTitle} home={HOME_NAMES[homeLevel]} board={board} patrimoine={patrimoine} refs={refs} accent={accent}
