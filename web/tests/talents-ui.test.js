@@ -26,6 +26,6 @@ test("écrans Talents et Succès : aucun débordement horizontal à 375 px", { s
     await b.click("Points gagnés via succès");
     await b.waitFor("!!document.querySelector('.ach-head')");
     await check("succès");
-    assert.match(await b.evaluate("document.querySelector('.ach-head p').textContent"), /\/ 51 succès · \d+ \/ 36 points/);
+    assert.match(await b.evaluate("document.querySelector('.ach-head p').textContent"), /\/ 51 succès · \d+ \/ 21 points/);
   } finally { await b.close(); await srv.close() }
 });

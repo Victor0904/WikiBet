@@ -109,13 +109,12 @@ for (const [name, P] of Object.entries(PROFILES)) {
 // Les succès liés au trading sont tirés des trades simulés ; le reste suit des hypothèses (LIFE) : jours joués, humeur du
 // marché, articles lus, logement, guilde, filleuls, classements de la semaine. Points : même liste que la migration
 // 20261027300000_succes.sql (les autres succès sont des badges à 0 point, qui comptent pour Collectionneur et Légende).
-const PTS = { FIRST_TRADE: 1, SERIE_5: 1, SERIE_10: 2, COUP_50: 1, COUP_100: 2, SNIPER: 1, CONTRARIEN: 1, MAIN_FER: 1, VETERAN: 2, ASSIDU_7: 1, ASSIDU_30: 2,
-  GAIN_100K: 1, GAIN_500K: 1, GAIN_1M: 2, PAT_1M: 1, FERIE: 1, TOUS_SECTEURS: 2, SURPRISES: 1, RENAISSANCE: 1, ZERO_LIQ: 2, PARRAIN: 1, MENTOR: 1,
-  GUILDE_TOP3: 1, TOP_10: 1, CHAMPION: 2, COLLECTIONNEUR: 1, LEGENDE: 2 };
-if (Object.values(PTS).reduce((a, b) => a + b, 0) !== 36) throw new Error("points des succès : 36 attendus");
-// Proposition (SIM_PTS=propose) : points seulement pour les succès difficiles ; les faciles deviennent des badges.
-if (process.env.SIM_PTS === "propose") for (const c of Object.keys(PTS)) PTS[c] = { FIRST_TRADE: 1, SERIE_10: 2, COUP_50: 1, COUP_100: 2, MAIN_FER: 1, ASSIDU_30: 2, GAIN_100K: 1, GAIN_500K: 1, GAIN_1M: 2, PAT_1M: 1, SURPRISES: 1, MENTOR: 1, TOP_10: 1, CHAMPION: 2, LEGENDE: 2 }[c] ?? 0;
+// Points validés par Victor (octobre 2026) : seuls les succès difficiles rapportent (21 points) ; avec la liste d'origine
+// (36 points), 78 % des points d'un joueur moyen à 30 jours venaient des succès, contre 26 % ainsi.
+const PTS = { FIRST_TRADE: 1, SERIE_10: 2, COUP_50: 1, COUP_100: 2, MAIN_FER: 1, ASSIDU_30: 2, GAIN_100K: 1, GAIN_500K: 1, GAIN_1M: 2, PAT_1M: 1,
+  SURPRISES: 1, MENTOR: 1, TOP_10: 1, CHAMPION: 2, LEGENDE: 2 };
 const CAP = Object.values(PTS).reduce((a, b) => a + b, 0);
+if (CAP !== 21) throw new Error("points des succès : 21 attendus");
 const LIFE = {
   moyen: { ...PROFILES.moyen, play: .85, reads: 2, home: 3, guild: 2, ref: null, top100: .3, top10: 0, champion: 0, guildTop3: .15, stops: 0 },
   "gros joueur": { ...PROFILES["très bon"], play: .97, reads: 5, home: 1, guild: 1, ref: 20, top100: 1, top10: .5, champion: .1, guildTop3: .4, stops: .3 },
@@ -172,7 +171,7 @@ function career(P, run, days = 90) {
   }
   return snaps;
 }
-console.log("\nC. Points de talent : niveau (gain net) + succès (36 au plus), moyenne de 200 joueurs");
+console.log("\nC. Points de talent : niveau (gain net) + succès (21 au plus), moyenne de 200 joueurs");
 for (const [name, P] of Object.entries(LIFE)) {
   const acc = { 7: { level: 0, ach: 0, n: 0 }, 30: { level: 0, ach: 0, n: 0 }, 90: { level: 0, ach: 0, n: 0 } }, runs = 200;
   const freq = {};

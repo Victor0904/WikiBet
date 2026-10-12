@@ -51,13 +51,13 @@ test("succès : idempotence (deux settle() = un seul déblocage) et Diversifié"
   assert.equal((await db.query("select achievement_grant($1, 'DIVERSIFIE') ok", [A])).rows[0].ok, false);
 });
 
-test("succès : 36 points au plus, réinitialiser les talents garde les points des succès", async () => {
+test("succès : 21 points au plus, réinitialiser les talents garde les points des succès", async () => {
   const db = await freshDb(); await player(db);
-  assert.equal((await db.query("select sum(points)::int s, count(*)::int n from achievements")).rows[0].s, 36);
+  assert.equal((await db.query("select sum(points)::int s, count(*)::int n from achievements")).rows[0].s, 21);
   await db.query("insert into achievements (code, name, descr, points) values ('BONUS', 'Bonus', 'test', 3)");
   await db.query("insert into aur_achievements (user_id, code) select $1, code from achievements", [A]);
   const t = (await db.query("select my_talents() t")).rows[0].t;
-  assert.equal(t.ach, 36, "plafond");
+  assert.equal(t.ach, 21, "plafond");
   await db.query("delete from aur_achievements where code <> 'FIRST_TRADE'");
   await db.query("select talent_buy('frais')"); await db.query("select talent_reset()");
   const t2 = (await db.query("select my_talents() t")).rows[0].t;

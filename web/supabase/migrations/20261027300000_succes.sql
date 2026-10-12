@@ -1,4 +1,5 @@
--- Succès (demande de Victor, octobre 2026) : 51 succès, 36 points de talent au plus, jamais de W. Chacun se débloque une
+-- Succès (demande de Victor, octobre 2026) : 51 succès, 21 points de talent au plus (36 dans la liste d'origine : réduits
+-- après la simulation C de scripts/sim-talents.mjs, sinon 78 % des points d'un joueur moyen à 30 jours venaient des succès), jamais de W. Chacun se débloque une
 -- fois (aur_achievements, insertion idempotente). Tout est évalué ici : à la clôture d'une position (déclencheur
 -- zz_achievements, après talents_gain), dans settle() (ach_tick, chaque minute) et sur quelques événements (logement,
 -- guilde, salaire, talents, présence, lecture d'un article). Trade valide : mise ≥ 100 W et tenu ≥ 150 s ; une perte casse
@@ -24,18 +25,18 @@ insert into achievements (code, cat, ord, name, descr, points, goal, unit, secre
   ('PROPRIO', 'Premiers pas', 5, 'Propriétaire', 'Acheter son premier logement (studio ou plus)', 0, null, null, false, null),
   ('GUILDE', 'Premiers pas', 6, 'Esprit de corps', 'Rejoindre une guilde', 0, null, null, false, null),
   ('SALAIRE', 'Premiers pas', 7, 'Fiche de paie', 'Toucher son premier salaire', 0, null, null, false, null),
-  ('SERIE_5', 'Trading', 10, 'Série de 5', '5 trades valides gagnants d''affilée (une perte remet à zéro)', 1, 5, 'gagnants d''affilée', false, null),
+  ('SERIE_5', 'Trading', 10, 'Série de 5', '5 trades valides gagnants d''affilée (une perte remet à zéro)', 0, 5, 'gagnants d''affilée', false, null),
   ('SERIE_10', 'Trading', 11, 'Série de 10', '10 trades valides gagnants d''affilée', 2, 10, 'gagnants d''affilée', false, null),
   ('COUP_50', 'Trading', 12, 'Coup de maître', 'Un trade à +50 % sur la mise (mise de 1 000 W ou plus, levier ×5 au plus)', 1, null, null, false, null),
   ('COUP_100', 'Trading', 13, 'Doublé', 'Un trade à +100 % sur la mise (mise de 1 000 W ou plus, levier ×5 au plus)', 2, null, null, false, null),
-  ('SNIPER', 'Trading', 14, 'Sniper', 'Position ouverte moins de 10 min avant des résultats, clôturée après, en gain', 1, null, null, false, null),
-  ('CONTRARIEN', 'Trading', 15, 'Contrarien', 'Gain à la hausse ouvert pendant la Nervosité, ou à la baisse pendant l''Euphorie', 1, null, null, false, null),
+  ('SNIPER', 'Trading', 14, 'Sniper', 'Position ouverte moins de 10 min avant des résultats, clôturée après, en gain', 0, null, null, false, null),
+  ('CONTRARIEN', 'Trading', 15, 'Contrarien', 'Gain à la hausse ouvert pendant la Nervosité, ou à la baisse pendant l''Euphorie', 0, null, null, false, null),
   ('MAIN_FER', 'Trading', 16, 'Main de fer', 'Trade valide tenu 24 h réelles ou plus, clôturé en gain', 1, null, null, false, null),
   ('SCALPEUR', 'Trading', 17, 'Habitué', '50 trades valides', 0, 50, 'trades valides', false, null),
-  ('VETERAN', 'Trading', 18, 'Vétéran', '500 trades valides', 2, 500, 'trades valides', false, null),
+  ('VETERAN', 'Trading', 18, 'Vétéran', '500 trades valides', 0, 500, 'trades valides', false, null),
   ('SANS_LEVIER', 'Trading', 19, 'Pied ferme', '10 trades valides gagnants à ×1', 0, 10, 'gagnants à ×1', false, null),
   ('DISCIPLINE', 'Trading', 20, 'Discipline', '20 trades valides clôturés avec un stop posé', 0, 20, 'trades avec stop', false, null),
-  ('ASSIDU_7', 'Trading', 21, 'Semaine pleine', 'Au moins un trade valide par jour, 7 jours d''affilée', 1, 7, 'jours d''affilée', false, null),
+  ('ASSIDU_7', 'Trading', 21, 'Semaine pleine', 'Au moins un trade valide par jour, 7 jours d''affilée', 0, 7, 'jours d''affilée', false, null),
   ('ASSIDU_30', 'Trading', 22, 'Mois plein', 'Au moins un trade valide par jour, 30 jours d''affilée', 2, 30, 'jours d''affilée', false, null),
   ('GAIN_10K', 'Gains de trading', 30, 'Premiers bénéfices', '10 000 W de gain net de trading (ton record)', 0, 10000, 'W', false, null),
   ('GAIN_50K', 'Gains de trading', 31, 'Rentable', '50 000 W de gain net de trading', 0, 50000, 'W', false, null),
@@ -47,31 +48,31 @@ insert into achievements (code, cat, ord, name, descr, points, goal, unit, secre
   ('AGRONOME', 'Données réelles', 50, 'Agronome', '5 trades valides gagnants sur Granterre', 0, 5, 'gagnants', false, null),
   ('ELECTRICIEN', 'Données réelles', 51, 'Électricien', '5 trades valides gagnants sur Helvane', 0, 5, 'gagnants', false, null),
   ('FLANEUR', 'Données réelles', 52, 'Flâneur', '5 trades valides gagnants sur Lumirue', 0, 5, 'gagnants', false, null),
-  ('FERIE', 'Données réelles', 53, 'Jour férié', 'Trade valide gagnant sur Lumirue, clôturé un jour férié', 1, null, null, false, null),
+  ('FERIE', 'Données réelles', 53, 'Jour férié', 'Trade valide gagnant sur Lumirue, clôturé un jour férié', 0, null, null, false, null),
   ('INDICIEL', 'Indice et marché', 60, 'Indiciel', 'Trade valide gagnant dans le même sens que l''AUR-12 pendant la position', 0, null, null, false, null),
-  ('TOUS_SECTEURS', 'Indice et marché', 61, 'Tour de la cote', 'Un trade valide gagnant sur chacune des 13 sociétés permanentes', 2, 13, 'sociétés', false, null),
+  ('TOUS_SECTEURS', 'Indice et marché', 61, 'Tour de la cote', 'Un trade valide gagnant sur chacune des 13 sociétés permanentes', 0, 13, 'sociétés', false, null),
   ('BIEN_INFORME', 'Information', 70, 'Bien informé', 'Gain sur une position ouverte moins de 10 min après une rumeur sur la même société', 0, null, null, false, null),
   ('SURPRISES', 'Information', 71, 'Lecteur de surprises', 'Gain sur 5 résultats « surprise » (position ouverte avant, clôturée après)', 1, 5, 'surprises', false, null),
-  ('RENAISSANCE', 'Risque', 80, 'Renaissance', 'Après une liquidation, dépasser ton patrimoine d''avant', 1, null, null, false, null),
+  ('RENAISSANCE', 'Risque', 80, 'Renaissance', 'Après une liquidation, dépasser ton patrimoine d''avant', 0, null, null, false, null),
   ('SURVIVANT', 'Risque', 81, 'Sang-froid', 'Traverser toute une Nervosité avec une position ouverte, et la clôturer en gain', 0, null, null, false, null),
-  ('ZERO_LIQ', 'Risque', 82, 'Gestion du risque', '100 trades valides sans aucune liquidation au milieu', 2, 100, 'trades sans liquidation', false, null),
-  ('PARRAIN', 'Social', 90, 'Parrain', 'Un filleul validé', 1, 1, 'filleul', false, null),
+  ('ZERO_LIQ', 'Risque', 82, 'Gestion du risque', '100 trades valides sans aucune liquidation au milieu', 0, 100, 'trades sans liquidation', false, null),
+  ('PARRAIN', 'Social', 90, 'Parrain', 'Un filleul validé', 0, 1, 'filleul', false, null),
   ('MENTOR', 'Social', 91, 'Mentor', '4 filleuls validés', 1, 4, 'filleuls', false, null),
   ('BANQUIER', 'Social', 92, 'Banquier', 'Garder 5 000 W ou plus à la banque du QG pendant 7 jours', 0, 7, 'jours', false, null),
-  ('GUILDE_TOP3', 'Social', 93, 'Guilde d''élite', 'Ta guilde finit dans le top 3 d''une semaine', 1, null, null, false, null),
+  ('GUILDE_TOP3', 'Social', 93, 'Guilde d''élite', 'Ta guilde finit dans le top 3 d''une semaine', 0, null, null, false, null),
   ('TOP_100', 'Classements de la semaine', 100, 'Dans la course', 'Top 100 des gains de la semaine', 0, null, null, false, null),
   ('TOP_10', 'Classements de la semaine', 101, 'Élite', 'Top 10 des gains de la semaine', 1, null, null, false, null),
   ('CHAMPION', 'Classements de la semaine', 102, 'Champion de la semaine', 'Premier des gains de la semaine', 2, null, null, false, null),
   ('SPECIALISTE', 'Collection', 110, 'Spécialiste', 'Débloquer un talent ultime', 0, null, null, false, null),
   ('POLYVALENT', 'Collection', 111, 'Polyvalent', 'Au moins 5 points dans chacune des 4 branches de talents', 0, 5, 'points dans ta plus petite branche', false, null),
-  ('COLLECTIONNEUR', 'Collection', 112, 'Collectionneur', '25 succès débloqués', 1, 25, 'succès', false, null),
+  ('COLLECTIONNEUR', 'Collection', 112, 'Collectionneur', '25 succès débloqués', 0, 25, 'succès', false, null),
   ('LEGENDE', 'Collection', 113, 'Légende', '45 succès débloqués', 2, 45, 'succès', false, null),
   ('NOCTAMBULE', 'Secrets', 120, 'Noctambule', 'Ouvrir un trade valide entre 2 h et 5 h du matin (heure de Paris)', 0, null, null, true, 'Les marchés ne dorment jamais'),
   ('FIDELE', 'Secrets', 121, 'Fidèle au poste', 'Venir 7 jours d''affilée', 0, 7, 'jours d''affilée', true, 'Toujours là');
 
--- Plafond de 36 points via les succès (20261027200000_talents.sql).
+-- Plafond de 21 points via les succès (20261027200000_talents.sql).
 create or replace function talent_points(p_user uuid) returns int language sql stable set search_path = public as $$
-  select talent_level(tal_hwm) + least(36, coalesce((select sum(a.points) from aur_achievements u join achievements a on a.code = u.code where u.user_id = p_user), 0))::int
+  select talent_level(tal_hwm) + least(21, coalesce((select sum(a.points) from aur_achievements u join achievements a on a.code = u.code where u.user_id = p_user), 0))::int
          - coalesce((select sum(rank) from talents where user_id = p_user), 0)::int
   from profiles where id = p_user
 $$;
@@ -79,7 +80,7 @@ create or replace function my_talents() returns jsonb language sql stable securi
   select jsonb_build_object(
     'level', talent_level(p.tal_hwm), 'hwm', p.tal_hwm, 'cum', p.tal_cum,
     'from', talent_threshold(talent_level(p.tal_hwm)), 'next', talent_threshold(talent_level(p.tal_hwm) + 1),
-    'ach', least(36, coalesce((select sum(a.points) from aur_achievements u join achievements a on a.code = u.code where u.user_id = p.id), 0)),
+    'ach', least(21, coalesce((select sum(a.points) from aur_achievements u join achievements a on a.code = u.code where u.user_id = p.id), 0)),
     'spent', coalesce((select sum(rank) from talents where user_id = p.id), 0),
     'ranks', coalesce((select jsonb_object_agg(code, rank) from talents where user_id = p.id), '{}'),
     'resets', p.tal_resets, 'reset_cost', case when p.tal_resets = 0 then 0 else 5000 end,
@@ -454,8 +455,8 @@ end $$;
 create function my_achievements() returns jsonb language sql stable security definer set search_path = public as $$
   with s as (select ach_stats(auth.uid()) as s, p.ach_streak, p.ach_zl, p.tal_hwm, patrimoine(p.id) as pat, p.bank, p.bank_since
              from profiles p where p.id = auth.uid())
-  select jsonb_build_object('total', (select count(*) from achievements), 'max_points', 36,
-    'points', least(36, coalesce((select sum(a.points) from aur_achievements u join achievements a on a.code = u.code where u.user_id = auth.uid()), 0)),
+  select jsonb_build_object('total', (select count(*) from achievements), 'max_points', 21,
+    'points', least(21, coalesce((select sum(a.points) from aur_achievements u join achievements a on a.code = u.code where u.user_id = auth.uid()), 0)),
     'list', coalesce(jsonb_agg(jsonb_build_object('code', a.code, 'cat', a.cat, 'points', a.points, 'goal', a.goal, 'unit', a.unit,
       'name', case when a.secret and u.code is null then '???' else a.name end,
       'descr', case when a.secret and u.code is null then null else a.descr end,

@@ -175,12 +175,12 @@ export function Talents({ api, tal, setTal, say }) {
   );
 }
 
-// Succès : 2e source de points de talent (36 au plus). Tout est décidé par le serveur (my_achievements) ; les secrets
+// Succès : 2e source de points de talent (21 au plus). Tout est décidé par le serveur (my_achievements) ; les secrets
 // restent « ??? » avec leur indice jusqu'au déblocage.
 const amount = (v, unit) => unit === "W" ? W(v) : `${Math.floor(v)}${unit ? " " + unit : ""}`;
 function Achievements({ api, onBack }) {
   const [data, setData] = useState(null);
-  useEffect(() => { api.myAchievements?.().then(setData).catch(() => setData({ list: [], total: 0, points: 0, max_points: 36 })) }, [api]);
+  useEffect(() => { api.myAchievements?.().then(setData).catch(() => setData({ list: [], total: 0, points: 0, max_points: 21 })) }, [api]);
   if (!data) return <p className="muted pad">Chargement…</p>;
   const got = data.list.filter(a => a.at).length, cats = [...new Set(data.list.map(a => a.cat))];
   return (
