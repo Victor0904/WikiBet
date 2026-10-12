@@ -33,7 +33,7 @@ test("aurelys : un gros ordre pèse plus qu'un petit, et plus sur une petite val
   near(slip(S, "SLM", 40000) / slip(S, "SLM", 10000), 2, "4 fois plus gros = 2 fois plus d'impact");
   assert.ok(slip(S, "SLM", 50000) > slip(S, "LMR", 50000), "Solarmine (peu liquide) bouge plus que Lumirue");
   const s25 = slip(S, "SLM", 25000) * 2; // mouvement provoqué (le prix moyen payé en subit la moitié)
-  assert.ok(s25 > .005 && s25 < .02, `25 000 W sur Solarmine font bouger le cours de façon visible : ${(s25 * 100).toFixed(2)} %`);
+  assert.ok(s25 > .002 && s25 < .01, `25 000 W sur Solarmine font bouger le cours de façon visible : ${(s25 * 100).toFixed(2)} %`);
   const cal = calendar(EPOCH_S + 100, 6);
   assert.equal(cal.length, 6); assert.ok(cal.every((e, i) => !i || e.at >= cal[i - 1].at), "calendrier trié");
 });

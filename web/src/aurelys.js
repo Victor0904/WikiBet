@@ -1,7 +1,7 @@
 // Bourse d'Aurelys côté écran : cours de chaque seconde jusqu'à maintenant (jamais au-delà), bougies d'une minute,
 // actualités publiées. La simulation tourne sur le serveur ; ici on ne fait que lire et afficher.
 import { useEffect, useRef, useState } from "react";
-import { STOCKS, BY, INDEX, DAY, EPOCH_S, SPM } from "../supabase/functions/_shared/aurelys.js";
+import { STOCKS, BY, INDEX, DAY, EPOCH_S, SPM, FEE } from "../supabase/functions/_shared/aurelys.js";
 
 const KEEP_S = 1800; // secondes réelles de cours gardées (un cours par seconde), pour les graphiques fins et les positions récentes
 const HOUR_S = 60 * SPM; // une heure d'Aurelys en secondes réelles
@@ -14,7 +14,7 @@ function toCandle(cs, t, p, v) {
 }
 
 export function useAurelys(api, active) {
-  const [, render] = useState(0), data = useRef({ ticks: {}, candles: {}, quotes: {}, x: null, since: null, ok: false, news: [], young: [], rounds: [] });
+  const [, render] = useState(0), data = useRef({ ticks: {}, candles: {}, quotes: {}, feeRate: FEE, x: null, since: null, ok: false, news: [], young: [], rounds: [] });
   // Historique : bougies des 3 dernières heures réelles (36 h d'Aurelys), au démarrage et après une longue absence.
   const loadHistory = async () => {
     const h = await api.aurHistory(null, 180), d = data.current;
@@ -48,8 +48,9 @@ export function useAurelys(api, active) {
   // Jeunes pousses (créées par le moteur) : inscrites dans le registre BY pour que tout l'écran les connaisse.
   useEffect(() => {
     let alive = true;
-    const load = () => Promise.all([api.aurStocks(), api.aurRounds().catch(() => [])]).then(([rows, st]) => {
+    const load = () => Promise.all([api.aurStocks(), api.aurRounds().catch(() => []), api.aurFeeRate().catch(() => null)]).then(([rows, st, fr]) => {
       if (!alive) return;
+      if (fr != null) data.current.feeRate = +fr; // salle des marchés de la guilde : frais réduits
       data.current.roundStats = Object.fromEntries(st.map(r => [r.tk, { investors: +r.investors, total: +r.total }]));
       for (const r of rows) if (r.meta && r.status !== "core") BY[r.tk] = { ...r.meta, status: r.status, roundEnds: r.round_ends && Date.parse(r.round_ends), ipoPrice: r.ipo_price };
       Object.assign(data.current, { young: rows.filter(r => r.status === "listed").map(r => BY[r.tk]), rounds: rows.filter(r => r.status === "round").map(r => BY[r.tk]) });

@@ -3,7 +3,7 @@ import { liqPrice, BK_LIMIT, CAP0, EPOCH, CYCLE_MS } from "./engine.js";
 import { nf0, nf2, W, sW, clock, cls, HOME_NAMES, THEMES, DEFAULT_ACCENT, PERKS, AUTO_LV, TRIGGER_LV } from "./format.js";
 import { useAurelys } from "./aurelys.js";
 import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
-import { BY as AUR, slipEstimate, FEE, gameClock } from "../supabase/functions/_shared/aurelys.js";
+import { BY as AUR, slip, FEE, gameClock } from "../supabase/functions/_shared/aurelys.js";
 import { Dock, Segmented, SubHeader, Logo } from "./nav.jsx";
 import { Profile, HowTo, Account, Legal, PushPanel, Bank } from "./pages.jsx";
 import { Ranking, Friends, Guilds, LoginPanel, BotTag } from "./social.jsx";
@@ -101,15 +101,15 @@ export default function Game({ api, onNoProfile }) {
   const accent = THEMES[equipped("theme")?.id] ?? DEFAULT_ACCENT, myTitle = equipped("title")?.name, effect = equipped("effect")?.id;
   useEffect(() => { document.documentElement.style.setProperty("--accent", accent) }, [accent]);
   // Positions ouvertes à leur valeur actuelle (frais de clôture déduits), comme le patrimoine en SQL (open_value).
-  const openStake = open.reduce((a, b) => a + (b.kind === "aurelys" ? aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).value : b.stake), 0);
+  const openStake = open.reduce((a, b) => a + (b.kind === "aurelys" ? aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur], aur.feeRate).value : b.stake), 0);
   const objectsValue = catalog.filter(i => i.kind !== "bonus" && (inv[i.id]?.qty ?? 0) > 0).reduce((a, i) => a + Math.floor(i.price * .6), 0);
   const positions = open.filter(b => b.kind === "aurelys");
-  const pnl = positions.length ? Math.round(positions.reduce((a, b) => a + aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).net, 0)) : null;
+  const pnl = positions.length ? Math.round(positions.reduce((a, b) => a + aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur], aur.feeRate).net, 0)) : null;
   // Le QG vit avec la partie : une position par écran, l'ambiance du jour, l'heure et l'humeur d'Aurelys, la une du Courrier.
   const midnight = new Date().setHours(0, 0, 0, 0);
   const dayNet = bets.filter(b => b.status !== "open" && Date.parse(b.closed_at) >= midnight).reduce((a, b) => a + b.payout - b.stake - (b.fee_open ?? 0), 0) + (pnl ?? 0);
   const qgLive = {
-    positions: positions.map(b => ({ label: AUR[b.aur]?.name ?? b.aur, pnl: aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).net })),
+    positions: positions.map(b => ({ label: AUR[b.aur]?.name ?? b.aur, pnl: aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur], aur.feeRate).net })),
     mood: Math.abs(dayNet) < 1 ? 0 : Math.sign(dayNet), hour: gameClock(now / 1000).hour, reg: aur.x?.reg ?? "calme",
     une: aur.news.find(n => n.cat !== "secteur" && Math.abs(n.sent) >= .3)?.title ?? aur.news[0]?.title ?? "",
   };
@@ -123,7 +123,7 @@ export default function Game({ api, onNoProfile }) {
   if (me === null) return null;
 
   const go = t => { setTab(t); if (t !== "more") setMore(null); window.scrollTo({ top: 0 }) };
-  const feeOpen = r => r.kind === "aurelys" ? r.stake * r.lev * FEE : 0; // frais d'ouverture, en plus de la mise
+  const feeOpen = r => r.kind === "aurelys" ? r.fee_open ?? r.stake * r.lev * FEE : 0; // frais d'ouverture, en plus de la mise
   const onAuto = (id, sl, tp) => run(() => api.aurSetAuto(id, sl, tp), () => sl == null && tp == null ? "Ordres retirés." : "Ordres enregistrés."), canStop = homeLevel >= AUTO_LV; // objectif pour tous, stop dès le loft
   const cancelTrigger = id => run(() => api.aurTriggerCancel(id), () => "Ordre annulé.");
   const closeTrade = b => run(() => b.kind === "aurelys" ? api.aurOrder({ action: "close", id: b.id }) : api.closeTrade(b.id),
@@ -213,7 +213,7 @@ export default function Game({ api, onNoProfile }) {
 function MiniTicker({ aur, bets, onOpen }) {
   if (!bets.length) return null;
   const chip = b => {
-    if (b.kind === "aurelys") { const net = aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur]).net; return [b.aur, sW(net), cls(net)] }
+    if (b.kind === "aurelys") { const net = aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur], aur.feeRate).net; return [b.aur, sW(net), cls(net)] }
     return [b.kind, W(b.stake), "flat"];
   };
   return (
@@ -307,7 +307,7 @@ function History({ bets }) {
         if (b.kind === "aurelys") return (
           <div key={b.id} className="hrow">
             <span><b>{AUR[b.aur]?.name ?? b.aur} {b.dir === "up" ? "▲" : "▼"} ×{b.lev} · Aurelys</b><small>{clock(Date.parse(b.created_at))} → {b.exit_at ? clock(Date.parse(b.exit_at)) : "—"} · {aurPx(b.entry)} → {b.exit != null ? aurPx(b.exit) : "—"} · frais {W(b.fees)}{b.payout === 0 ? " · liquidée" : ""}{b.insured ? " · assurée" : ""}</small></span>
-            <span className="r mono"><b className={cls(net - b.stake * b.lev * FEE)}>{sW(net - b.stake * b.lev * FEE)}</b><small>mise {W(b.stake)}</small></span>
+            <span className="r mono"><b className={cls(net - feeOpen(b))}>{sW(net - feeOpen(b))}</b><small>mise {W(b.stake)}</small></span>
           </div>
         );
         if (b.kind === "question") return (
@@ -341,7 +341,7 @@ function InvestSheet({ api, tk, mode, qty: q0, aur, me, hold, onClose, onDone })
   const [patrimoine, setWealth] = useState(0);
   useEffect(() => { if (round) api.myWealth().then(w => setWealth(+w)).catch(() => {}) }, [api, round]);
   const p = round ? d?.roundPrice : aur.quotes[tk]?.p ?? 0, qty = sell ? (q0 ?? 0) * share : 0;
-  const notional = sell ? qty * p : amount, sl = round ? 0 : slipEstimate(tk, notional, Date.now() / 1000, aur.x?.reg), fee = round ? 0 : notional * FEE;
+  const notional = sell ? qty * p : amount, sl = round ? 0 : slip(null, tk, notional), fee = round ? 0 : Math.max(1, notional * aur.feeRate);
   const exec = p * (1 + (sell ? -sl : sl)), maxRound = Math.max(0, Math.floor(.2 * patrimoine - (hold?.cost ?? 0)));
   const gate = round && patrimoine < 50000, ok = !busy && !gate && (sell ? qty > 0 : amount > 0 && amount + fee <= me.cash && (!round || amount <= maxRound));
   const title = round ? `Souscrire à ${d?.name}` : sell ? `Vendre des actions ${d?.name}` : `Investir dans ${d?.name}`;
@@ -416,7 +416,7 @@ function Ticket({ api, aur, now, me, ticket, level, openCount, pref, setPref, on
   const [lev0, setMaxLev] = useState(15), young = aur.young.some(s => s.tk === ticket.tk), maxLev = young ? Math.min(5, lev0) : lev0;
   useEffect(() => { api.aurMaxLev().then(n => setMaxLev(+n)).catch(() => {}) }, [api]);
   useEffect(() => { if (pref.lev > maxLev) setPref(x => ({ ...x, lev: maxLev })) }, [maxLev, pref.lev, setPref]);
-  const fee = stake * pref.lev * FEE;
+  const fee = Math.max(1, stake * pref.lev * aur.feeRate);
   const aq = aur.quotes[ticket.tk], overCap = stake * pref.lev > aurCap(ticket.tk);
   const open = !!aq && !aq.halt && !overCap;
   const ok = stake > 0 && stake + fee <= me.cash && !full && (trigPx == null ? open : trigPx > 0 && !overCap);
@@ -424,7 +424,7 @@ function Ticket({ api, aur, now, me, ticket, level, openCount, pref, setPref, on
   const maxStake = Math.min(Math.floor(me.cash / (1 + pref.lev * FEE)), Math.floor(aurCap(ticket.tk) / pref.lev));
   let body, title, cta;
   {
-    const p = aq?.p ?? 0, sl = slipEstimate(ticket.tk, stake * pref.lev, now / 1000, aur.x?.reg), entry = p * (1 + (dir === "up" ? sl : -sl)), b = { entry, lev: pref.lev, dir, stake };
+    const p = aq?.p ?? 0, sl = slip(null, ticket.tk, stake * pref.lev), entry = p * (1 + (dir === "up" ? sl : -sl)), b = { entry, lev: pref.lev, dir, stake };
     title = AUR[ticket.tk].name;
     cta = `${trigPx ? "Placer l'ordre · " : ""}${dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×${pref.lev} · ${W(stake)}`;
     body = <>

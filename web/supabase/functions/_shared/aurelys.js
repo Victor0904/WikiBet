@@ -22,8 +22,7 @@ const VOLX = 2.5; // 1,5 puis 2,5 : Victor veut un marché qui bouge franchement
 // Volatilité propre à l'entreprise : la volatilité totale moins la part du marché et du secteur.
 const siOf = (sig, beta) => Math.sqrt(Math.max((0.3 * sig) ** 2, sig * sig - (0.006 * beta) ** 2 - 0.005 ** 2));
 const LIQ = { haute: 60000, moyenne: 20000, faible: 6000 }; // W échangés par minute de jeu, en journée
-// Profondeur du carnet face à l'ordre d'un joueur (W) : un ordre de cette taille fait bouger le cours d'environ 0,43 σ jour.
-// Volontairement faible, pour que « plus on achète, plus ça monte » se voie : 25 000 W sur Solarmine ≈ 1 % de hausse.
+// Profondeur du carnet face à l'ordre d'un joueur (W), voir playerImpact : 25 000 W sur Solarmine ≈ 0,35 % de hausse.
 const DEPTH = { haute: 600000, moyenne: 200000, faible: 60000 };
 
 export const SECTORS = {
@@ -134,7 +133,7 @@ const botsOf = s => BOTS[s.i] ?? (BOTS_X[s.tk] ??= makeBots(s));
 // puis cotation très volatile. Sous 15 % du prix d'introduction, c'est la faillite : l'action est radiée.
 // Leur « qualité » cachée (q) décide du premier cours et de la croissance à long terme : là est le pari.
 export const IPO = { roundDays: 3, maxYoung: 5, delist: .15, minWealth: 50000, maxShare: .2 };
-const defOf = (S, tk) => BY[tk] ?? S.extra?.[tk];
+const defOf = (S, tk) => BY[tk] ?? S?.extra?.[tk];
 const listed = S => S.extra ? STOCKS.concat(Object.values(S.extra).filter(d => d.status === "listed")) : STOCKS;
 const NAME_A = ["Lumi", "Verd", "Nova", "Aqua", "Célest", "Terra", "Opti", "Bio", "Néo", "Flux", "Orbi", "Sola", "Voxa", "Hélio", "Mari", "Crista", "Alti", "Zéna", "Pyro", "Sylva"];
 const NAME_B = ["gen", "tek", "lys", "sys", "ra", "vel", "dyne", "line", "nis", "ora", "lab", "nova"];
@@ -365,16 +364,19 @@ const addSent = (S, key, s, t, hl) => (S.sent[key] ??= []).push([s, t, hl]);
 // et liquidité de l'heure.
 const impactOf = (s, q, act, gh, reg, pre) => Math.sign(q) * Y * (s.si / Math.sqrt(DAY)) * gh * REGIMES[reg].vol ** .7 * pre * Math.sqrt(Math.abs(q) / (s.L * act));
 const impact = (S, s, q, act) => impactOf(s, q, act, S.st[s.tk].gh, S.reg, soonEvent(s, S.t) ? 1.5 : 1);
-// Ordres des joueurs : même loi, mais face à la profondeur du carnet (DEPTH) et à la volatilité journalière.
-// PIMP : l'impact des joueurs ne suit pas la hausse de volatilité de la cote (il reste « 25 000 W sur Solarmine ≈ 1,4 % »).
-const PIMP = .53;
-const playerImpactOf = (s, q, gh, reg) => Math.sign(q) * Y * PIMP * s.sig * gh * REGIMES[reg].vol ** .7 * Math.sqrt(Math.abs(q) / s.depth);
-const playerImpact = (S, s, q) => playerImpactOf(s, q, S.st[s.tk].gh, S.reg);
-// Écart de prix subi par un joueur pour un ordre de `notional` W : ce qu'il paie en plus à l'achat, en moins à la vente.
-// Prix moyen d'exécution : la moitié du mouvement qu'il provoque.
-export const slip = (S, tk, notional) => playerImpact(S, defOf(S, tk), notional) * 0.5;
-// Estimation pour l'écran, qui ne connaît pas la volatilité du moment (gardée par le serveur).
-export const slipEstimate = (tk, notional, sec, reg = "calme") => playerImpactOf(BY[tk], notional, 1, reg) * 0.5;
+// Ordres des joueurs : même loi racine carrée, face à la profondeur du carnet (DEPTH) seulement. Ni GARCH ni régime
+// (choix de Victor, octobre 2026) : l'écran connaît donc l'impact exact. Avant : 0,53 × σ × GARCH × régime, jusqu'à 7 %
+// par sens en krach. Recalibré : 100 000 W sur Pixelfold ≈ 0,35 % par sens, sur une grosse valeur ≈ 0,11 %.
+const PK = 0.0054;
+const playerImpact = (s, q) => Math.sign(q) * PK * Math.sqrt(Math.abs(q) / s.depth);
+// Écart de prix subi par un joueur pour un ordre de `notional` W : ce qu'il paie en plus à l'achat, en moins à la vente.
+// Prix moyen d'exécution : la moitié du mouvement qu'il provoque. `S` ne sert qu'aux jeunes pousses absentes de BY (serveur).
+export const slip = (S, tk, notional) => Math.min(.2, Math.abs(playerImpact(defOf(S, tk), notional)) * 0.5);
+// Ce que rapporterait la clôture d'une position Aurelys au cours `p` : même calcul que aur_close (impact, frais, plancher 0).
+export const closeQuote = (b, p, feeRate = FEE) => {
+  const n = b.stake * b.lev, sens = b.dir === "up" ? 1 : -1, sl = slip(null, b.aur, n), px = p * (1 - sens * sl), fee = Math.max(1, n * feeRate);
+  return { px, sl, fee, value: Math.max(0, Math.max(0, b.stake * (1 + b.lev * sens * (px / b.entry - 1))) - fee) };
+};
 
 // Avance la simulation jusqu'à `untilSec` (seconde réelle). `orders` : ordres des joueurs [{ tk, q }] (q en W, + achat), joués au premier tick.
 // `signals` : chiffres réels du moment { tk: { z, txt } } (z = écart à la normale, +0,1 = 10 % au-dessus), voir LINKS.
@@ -740,7 +742,7 @@ function tick(S, R, out, pending) {
       q *= 1 - Math.max(.1, .35 * reg.mm);
       const wq = whaleFlow(S, R, out, s, Lt), pq = pending[s.tk] ?? 0;
       q += wq + pq; v += Math.abs(wq) + Math.abs(pq);
-      const qb = q - pq, imp = (qb ? impact(S, s, qb, act) : 0) + (pq ? playerImpact(S, s, pq) : 0);
+      const qb = q - pq, imp = (qb ? impact(S, s, qb, act) : 0) + (pq ? playerImpact(s, pq) : 0);
       x.lp += PERM * imp + f + fd; x.tmp = x.tmp * Math.exp(-1 / TAU) + (1 - PERM) * imp;
     }
     const p = priceOf(x), last = x.h[x.h.length - 1];

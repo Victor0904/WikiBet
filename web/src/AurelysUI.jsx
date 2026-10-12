@@ -1,10 +1,10 @@
 // Bourse d'Aurelys : tableau de bord, liste des actions, actualités, carte thermique, fiche entreprise, carte de position.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { STOCKS, BY, SECTORS, REGIMES, CHARACTERS, INDEX, FEE, CAP_MULT, LINKS, IPO, SPM, DAY, EPOCH_S, gameClock, gameMin, calendar, sma, bollinger, rsi } from "../supabase/functions/_shared/aurelys.js";
+import { STOCKS, BY, SECTORS, REGIMES, CHARACTERS, INDEX, FEE, CAP_MULT, LINKS, IPO, SPM, DAY, EPOCH_S, gameClock, gameMin, calendar, sma, bollinger, rsi, closeQuote } from "../supabase/functions/_shared/aurelys.js";
 import { dayOpen } from "./aurelys.js";
 import { STORIES } from "../supabase/functions/_shared/aurelys-stories.js";
 import { W, sW, nf0, nf2, pct, cls, clock } from "./format.js";
-import { tradeValue, liqPrice } from "./engine.js";
+import { liqPrice } from "./engine.js";
 import { Spark, PositionChart } from "./charts.jsx";
 
 export const px = v => v == null || isNaN(v) ? "—" : nf2.format(v);
@@ -510,13 +510,33 @@ function realizedVol(cs) {
 }
 
 /* ===== Position ===== */
-// Valeur en direct (frais de clôture déduits, hors impact de l'ordre de clôture) et seuil de liquidation.
-export const aurLive = (b, q, ticks) => {
+// Valeur en direct : ce que rapporterait la clôture maintenant (closeQuote : impact de l'ordre et frais de clôture
+// compris, même calcul que aur_close), et seuil de liquidation.
+export const aurLive = (b, q, ticks, feeRate = FEE) => {
   const t0 = Date.parse(b.created_at) / 1000, lq = liqPrice(b);
   const hit = (ticks ?? []).some(([t, p]) => t > t0 && (b.dir === "up" ? p <= lq : p >= lq));
-  const p = q?.p ?? b.entry, closeFee = b.stake * b.lev * FEE, value = hit ? 0 : Math.max(0, tradeValue(b, p) - closeFee);
-  return { px: p, value, net: value - b.stake - b.fees, closeFee, lq, hit, halt: q?.halt };
+  const p = q?.p ?? b.entry, c = closeQuote(b, p, feeRate), value = hit ? 0 : c.value;
+  return { px: p, value, net: value - b.stake - b.fees, closeFee: c.fee, exitPx: c.px, sl: c.sl, lq, hit, halt: q?.halt };
 };
+
+// Détail avant de clôturer, recalculé à chaque cours : le montant final suit le cours au moment où le serveur exécute.
+function CloseSheet({ b, x, busy, onConfirm, onCancel }) {
+  useEffect(() => { const k = e => e.key === "Escape" && onCancel(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onCancel]);
+  const n = b.stake * b.lev;
+  return (
+    <div className="scrim" onClick={e => e.target === e.currentTarget && onCancel()}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label="Clôturer la position">
+        <div className="sheet-h"><b>Clôturer {BY[b.aur]?.name ?? b.aur} {b.dir === "up" ? "▲" : "▼"} ×{b.lev}</b><button type="button" className="x" onClick={onCancel} aria-label="Fermer">×</button></div>
+        <div className="row"><span>Cours</span><b className="mono">{px(x.px)}</b></div>
+        <div className="row"><span>Impact de ton ordre ({pct(-x.sl)})</span><b className="mono">{px(x.exitPx)} · −{W(n * x.sl)}</b></div>
+        <div className="row"><span>Frais de clôture</span><b className="mono">−{W(x.closeFee)}</b></div>
+        <div className="row"><span>Tu recevras (environ)</span><b className={"mono " + cls(x.net)}>{W(x.value)} ({sW(x.net)})</b></div>
+        <p className="muted small">Le montant suit le cours jusqu'à l'exécution par le serveur.</p>
+        <button type="button" className="btn primary big" disabled={busy || x.halt} onClick={onConfirm}>Clôturer · {W(x.value)}</button>
+      </div>
+    </div>
+  );
+}
 
 // Objectif (pour tous) et stop (loft) d'une position : un cours vide retire l'ordre. Vérifiés par le serveur (aur_set_auto).
 function AutoForm({ b, onAuto, canStop, onDone }) {
@@ -533,7 +553,7 @@ function AutoForm({ b, onAuto, canStop, onDone }) {
 }
 
 export function AurelysCard({ b, aur, now, onClose, onAuto, canStop, onDetail, Facts }) {
-  const q = aur.quotes[b.aur], ticks = aur.ticks[b.aur], x = aurLive(b, q, ticks), t0 = Date.parse(b.created_at), [busy, setBusy] = useState(false), [auto, setAuto] = useState(false);
+  const q = aur.quotes[b.aur], ticks = aur.ticks[b.aur], x = aurLive(b, q, ticks, aur.feeRate), t0 = Date.parse(b.created_at), [busy, setBusy] = useState(false), [auto, setAuto] = useState(false), [ask, setAsk] = useState(false);
   // Cours minute par minute tant qu'on les a (dernière heure réelle), sinon bougies d'une heure d'Aurelys.
   const cs = (aur.candles[b.aur] ?? []).filter(k => k[0] * 1000 > t0 - 300000), recent = (ticks ?? []).filter(k => k[0] * 1000 > t0);
   const pts = [[t0, b.entry], ...((ticks?.[0]?.[0] ?? Infinity) * 1000 <= t0 ? recent.map(k => [k[0] * 1000, k[1]]) : cs.map(k => [Math.min(now, (k[0] + 60 * SPM) * 1000), k[4]])), [now, x.px]];
@@ -550,11 +570,12 @@ export function AurelysCard({ b, aur, now, onClose, onAuto, canStop, onDetail, F
       </div>
       <Facts items={[
         ["Mise", `${W(b.stake)} · ×${b.lev}`],
-        ["Valeur (frais déduits)", W(x.value), cls(x.net)],
+        ["Valeur à la clôture", W(x.value), cls(x.net)],
         ["Entrée", `${px(b.entry)} · ${gwhen(t0, now)}`],
         ["Cours", `${px(x.px)} (${pct(x.px / b.entry - 1)})`, cls((x.px / b.entry - 1) * (b.dir === "up" ? 1 : -1))],
         ["Liquidation", `${px(x.lq)} (${pct(d)})`, Math.abs(d) < .03 ? "down warn" : ""],
         ["Frais", `${W(b.fees)} payés + ${W(x.closeFee)}`],
+        ["Impact à la clôture", `${pct(-x.sl)} · −${W(b.stake * b.lev * x.sl)}`],
         ["Ouverte depuis", `${gdur(now - t0)} d'Aurelys`],
         b.sl != null && ["Stop", px(b.sl), "down"],
         b.tp != null && ["Objectif", px(b.tp), "up"],
@@ -564,7 +585,8 @@ export function AurelysCard({ b, aur, now, onClose, onAuto, canStop, onDetail, F
         : <button type="button" className="link" onClick={() => setAuto(true)}>{b.sl != null || b.tp != null ? (canStop ? "Modifier le stop et l'objectif" : "Modifier l'objectif") : canStop ? "Ajouter un stop ou un objectif" : "Ajouter un objectif (take profit)"}</button>)}
       {x.hit
         ? <p className="muted small">Seuil de liquidation touché, règlement en cours…</p>
-        : <button type="button" className="btn primary" disabled={busy || x.halt} onClick={async () => { setBusy(true); await onClose(b); setBusy(false) }}>Clôturer · {W(x.value)}</button>}
+        : <button type="button" className="btn primary" disabled={busy || x.halt} onClick={() => setAsk(true)}>Clôturer · {W(x.value)}</button>}
+      {ask && !x.hit && <CloseSheet b={b} x={x} busy={busy} onCancel={() => setAsk(false)} onConfirm={async () => { setBusy(true); await onClose(b); setBusy(false); setAsk(false) }} />}
     </article>
   );
 }
