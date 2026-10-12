@@ -473,17 +473,51 @@ button:active:not(:disabled) { transform: scale(.96) }
 .chip-dot { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle }
 .chip-select { flex: none; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 13px; color: var(--muted) }
 .rtags { display: flex; flex-wrap: wrap; gap: 4px }
-/* Talents */
-.talents { display: flex; flex-direction: column; gap: 10px }
-.tal-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center }
-.tal-lv { display: flex; flex-direction: column; align-items: center } .tal-lv b { font-size: 24px }
-.tal-prog { display: flex; flex-direction: column; gap: 6px }
-.tal-prog .bar { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden } .tal-prog .bar i { display: block; height: 100%; background: var(--accent) }
-.tal-tree { display: grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px }
-.tal-col { display: flex; flex-direction: column; gap: 8px; scroll-snap-align: start } .tal-col h2 { font-size: 15px; margin: 0 }
-.tal { display: flex; flex-direction: column; gap: 3px; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; color: var(--ink) }
-.tal.on { border-color: var(--accent) } .tal.ult { border-style: dashed } .tal:disabled { opacity: .75 }
-.tal-h { display: flex; justify-content: space-between; gap: 6px }
+/* Talents : mobile d'abord, aucun débordement horizontal (enfants de grid/flex en min-width: 0, libellés coupés). */
+.talents { display: flex; flex-direction: column; gap: 10px; min-width: 0 }
+.talents * { min-width: 0 }
+.talents p, .talents b, .talents small, .talents span { overflow-wrap: anywhere }
+.tal-head { position: sticky; top: 54px; z-index: 5; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: var(--panel) }
+.tal-head-row { display: flex; align-items: center; gap: 12px }
+.tal-lv { display: flex; flex-direction: column; align-items: center; line-height: 1.1 } .tal-lv b { font-size: 24px }
+.tal-pts { flex: 1; font-size: 14px; color: var(--muted) }
+.tal-pts b { display: inline-block; min-width: 26px; padding: 1px 8px; margin-right: 4px; border-radius: 99px; background: var(--panel2); color: var(--ink); text-align: center }
+.tal-pts.on { color: var(--ink) } .tal-pts.on b { background: var(--accent); color: var(--accent-ink) }
+.tal-more { position: relative }
+.tal-dots { width: 44px; height: 44px; border: 0; border-radius: 8px; background: none; color: var(--muted); font-size: 22px; line-height: 1 }
+.tal-menu { position: absolute; right: 0; top: 46px; z-index: 6; width: min(280px, calc(100vw - 32px)); background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 4px; box-shadow: 0 8px 24px rgba(0, 0, 0, .5) }
+.tal-menu button { width: 100%; min-height: 44px; text-align: left; border: 0; background: none; padding: 8px 10px; font-size: 14px; color: var(--ink); border-radius: 8px }
+.tal-head .bar, .tal-gauge .bar { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden }
+.tal-head .bar i, .tal-gauge .bar i { display: block; height: 100%; background: var(--accent) }
+.tal-ach { display: flex; justify-content: space-between; gap: 10px; width: 100%; min-height: 44px; align-items: center; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); font-size: 14px; text-align: left }
+.accent-txt { color: var(--accent); font-weight: 600; white-space: nowrap }
+.tal-tabs { grid-auto-columns: minmax(0, 1fr); margin-bottom: 0 }
+.tal-tabs button { padding: 7px 2px; min-height: 52px }
+.tal-tab { display: flex; flex-direction: column; align-items: center; gap: 2px } .tal-tab small { font-size: 12px; line-height: 1.1 }
+.tal-tab .tal-ico { width: 15px; height: 15px; vertical-align: -2px }
+.tal-ico { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round }
+.tal-list { display: flex; flex-direction: column; gap: 10px; touch-action: pan-y }
+.tal-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: start }
+.tal-col { display: flex; flex-direction: column; gap: 10px }
+.tal-col h2 { font-size: 15px } .tal-col h2 span { display: flex; align-items: center; gap: 6px }
+.tal-card { display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px }
+.tal-card p { margin: 0; font-size: 14px; line-height: 1.35 }
+.tal-card.on { border-color: rgba(245, 184, 61, .45) }
+.tal-card.ult { border: 2px solid var(--accent); background: linear-gradient(180deg, rgba(245, 184, 61, .08), var(--panel) 60%) }
+.tal-card-h { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px } .tal-card-h b { flex: 1 1 auto; font: 700 16px/1.2 var(--f-cond); overflow-wrap: break-word }
+.tal-card-h .pips { margin-left: auto } .tal-card-h .tal-ico { color: var(--accent) }
+.tal-ult-tag { color: var(--accent); font-size: 12px !important; font-weight: 700; letter-spacing: .06em; text-transform: uppercase }
+.pips { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end }
+.pips i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--muted); box-sizing: border-box }
+.pips i.full { background: var(--accent); border-color: var(--accent) }
+.tal-gauge { display: flex; flex-direction: column; gap: 4px }
+.tal-plus { width: 100%; min-height: 44px; margin-top: 2px }
+.tal-plus:disabled { opacity: 1; background: var(--panel2); color: var(--muted); border-color: var(--line) }
+.tal-sheet h2 { font-size: 20px }
+.tal-recap { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--panel2); border-radius: 10px }
+.tal-recap div { display: flex; flex-direction: column; gap: 2px }
+.sheet-acts { display: flex; flex-direction: column; gap: 2px }
+@media (min-width: 900px) { .tal-card p { font-size: 13px } }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 13px }
 .btn.fresh { width: 100%; margin-bottom: 8px }
 .heat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px }

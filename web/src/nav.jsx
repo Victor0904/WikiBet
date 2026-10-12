@@ -24,9 +24,9 @@ export function Dock({ tab, setTab, badge }) {
   );
 }
 
-export function Segmented({ value, onChange, options, label }) {
+export function Segmented({ value, onChange, options, label, className = "" }) {
   return (
-    <div className="seg top-seg" role="tablist" aria-label={label} style={{ "--n": options.length }}>
+    <div className={"seg top-seg " + className} role="tablist" aria-label={label} style={{ "--n": options.length }}>
       <span className="lens" style={{ "--i": Math.max(0, options.findIndex(([k]) => k === value)) }} aria-hidden="true" />
       {options.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={value === k} aria-pressed={value === k} onClick={() => onChange(k)}>{l}</button>)}
     </div>

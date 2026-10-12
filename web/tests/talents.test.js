@@ -4,7 +4,7 @@ import { freshDb, login, cash } from "./db.js";
 
 const A = "00000000-0000-0000-0000-00000000000a", B = "00000000-0000-0000-0000-00000000000b";
 const near = (a, b, msg, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${msg} : ${a} ≠ ${b}`);
-const tick = (db, p, ago = 1) => db.query("insert into aur_ticks (tk, t, p) values ('SLM', clock_timestamp() - make_interval(secs => $1), $2)", [ago, p]);
+const tick = (db, p, ago = 1) => db.query("insert into aur_ticks (tk, t, p) values ('SLM', clock_timestamp() - make_interval(secs => $1), $2) on conflict (tk, t) do update set p = excluded.p", [ago, p]); // deux cours dans la même milliseconde : le dernier compte
 const open = async (db, dir, lev, stake, slip = 0, u = A) => (await db.query("select * from aur_open($1, 'SLM', $2, $3, $4, $5)", [u, dir, lev, stake, slip])).rows[0];
 const close = async (db, id, slip = 0, u = A) => (await db.query("select * from aur_close($1, $2, $3)", [u, id, slip])).rows[0];
 const give = (db, code, rank, u = A) => db.query("insert into talents values ($1, $2, $3) on conflict (user_id, code) do update set rank = $3", [u, code, rank]);
