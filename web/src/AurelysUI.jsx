@@ -82,25 +82,78 @@ const MAJOR = new Set(["resultats", "essai", "scandale", "produit", "taux", "cri
 const isMajor = n => MAJOR.has(n.cat) || Math.abs(n.sent) >= .7;
 
 // La liste des actions a son propre onglet (stocks) ; le Marché garde tableau de bord, journal et carte.
-const VIEWS = [["board", "Tableau de bord"], ["news", "Journal"], ["heat", "Carte"]];
-export function AurelysMarket({ aur, now, bets, onPick, onDetail, onSubscribe, stocks, onList }) {
+const VIEWS = [["board", "Tableau de bord"], ["news", "Journal"], ["heat", "Carte"], ["rumors", "Rumeurs"]];
+export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscribe, stocks, onList }) {
   const [v, setView] = useState("board"), [read, setRead] = useState(null), view = stocks ? "list" : v;
   const live = aur.live;
+  // Rumeurs : relues toutes les 10 s (pastille sur l'onglet quand une nouvelle arrive, dernière vue gardée dans le navigateur).
+  const [rum, setRum] = useState(null), [seen, setSeen] = useState(() => { try { return +localStorage.getItem("wb-rumeurs") || 0 } catch { return 0 } });
+  useEffect(() => {
+    if (!api) return; let on = true;
+    const load = () => api.aurRumors().then(d => on && setRum(d)).catch(() => {});
+    load(); const id = setInterval(load, 10000); return () => { on = false; clearInterval(id) };
+  }, [api]);
+  const top = rum?.list[0]?.id ?? 0;
+  useEffect(() => { if (view === "rumors" && top > seen) { setSeen(top); try { localStorage.setItem("wb-rumeurs", String(top)) } catch { } } }, [view, top, seen]);
   return (
     <section>
       <div className="feed-info"><i className={"pulse" + (live ? "" : " off")} aria-hidden="true" />{live ? "Bourse fictive, simulée en continu par des bots et les joueurs" : "Connexion au marché…"} · un jour d'Aurelys = 1 h réelle</div>
       <AurBar aur={aur} now={now} />
       <Flash aur={aur} now={now} onDetail={onDetail} />
       {!stocks && <div className="chips" role="group" aria-label="Vue">
-        {VIEWS.map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}
+        {VIEWS.map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}{k === "rumors" && top > seen && <i className="chip-dot" role="img" aria-label="nouvelle rumeur" />}</button>)}
       </div>}
       {view === "board" ? <Board aur={aur} now={now} onDetail={onDetail} onNews={() => setView("news")} onRead={setRead} onList={onList} />
         : view === "list" ? <List aur={aur} now={now} bets={bets} onPick={onPick} onDetail={onDetail} onSubscribe={onSubscribe} onRead={setRead} />
         : view === "news" ? <News aur={aur} now={now} onDetail={onDetail} onRead={setRead} />
+        : view === "rumors" ? <Rumors data={rum} now={now} onDetail={onDetail} />
         : <Heat aur={aur} now={now} onDetail={onDetail} />}
       {read && <Article n={read} now={now} onClose={() => setRead(null)} onDetail={tk => { setRead(null); onDetail(tk) }} />}
       <p className="fine">Marché entièrement fictif : entreprises, personnages, cours et actualités sont simulés. Les prix naissent des ordres de bots (fondamentalistes, suiveurs de tendance, contrariens, chartistes, petits porteurs), de baleines et des joueurs : un gros ordre fait bouger le cours. Frais de 0,1 % du montant engagé à l'ouverture et à la clôture.</p>
     </section>
+  );
+}
+
+// Rumeurs des 7 derniers jours (aur_rumor_list) : l'issue n'arrive du serveur qu'une fois la résolution publiée.
+const RUMOR_ST = { open: ["En cours", "flat"], ok: ["Confirmée", "up"], no: ["Démentie", "down"] };
+function Rumors({ data, now, onDetail }) {
+  const [st, setSt] = useState("all"), [sector, setSector] = useState("");
+  if (!data) return <p className="muted small">Chargement…</p>;
+  const list = data.list.filter(r => (st === "all" || (st === "open") === (r.status === "open")) && (!sector || BY[r.tk]?.sector === sector)), s = data.stats;
+  return (
+    <div>
+      <div className="chips" role="group" aria-label="Filtrer les rumeurs">
+        {[["open", "En cours"], ["done", "Résolues"], ["all", "Toutes"]].map(([k, l]) => <button key={k} type="button" aria-pressed={st === k} onClick={() => setSt(k)}>{l}</button>)}
+        <select className="chip-select" value={sector} onChange={e => setSector(e.target.value)} aria-label="Secteur">
+          <option value="">Tous les secteurs</option>
+          {Object.entries(SECTORS).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
+        </select>
+      </div>
+      {list.map(r => {
+        const [label, tone] = RUMOR_ST[r.status];
+        return (
+          <button key={r.id} type="button" className="rumor" onClick={() => onDetail(r.tk, r.t)} aria-label={`${r.title}, ${label}. Voir ${BY[r.tk]?.name ?? r.tk}`}>
+            <TkIcon tk={r.tk} size={30} />
+            <span className="rumor-b">
+              <small className="muted">{BY[r.tk]?.name ?? r.tk} · {r.tk} · {gwhen(r.t * 1000, now)}</small>
+              <b>{r.title}</b>
+              <span className={"rtag " + tone}>{label}{r.res_t ? ` · ${gwhen(r.res_t * 1000, now)}` : ""}</span>
+            </span>
+            <span className={"mono " + (r.chg == null ? "muted" : cls(r.chg))}>{r.chg == null ? "—" : pct(r.chg)}</span>
+          </button>
+        );
+      })}
+      {!list.length && <p className="muted small">Aucune rumeur ici pour l'instant.</p>}
+      <div className="panel">
+        <h2>Sur 7 jours</h2>
+        {s?.n ? <>
+          <div className="row"><span>Rumeurs résolues</span><b className="mono">{s.n}</b></div>
+          <div className="row"><span>Confirmées</span><b className="mono">{nf0.format(100 * s.ok / s.n)} %</b></div>
+          <div className="row"><span>Réaction moyenne du cours, dans le sens de la rumeur</span><b className={"mono " + cls(s.chg ?? 0)}>{s.chg == null ? "—" : pct(s.chg)}</b></div>
+        </> : <p className="muted small">Pas encore de rumeur résolue.</p>}
+        <p className="muted small">Réaction : du cours à la sortie de la rumeur jusqu'à sa résolution (ou jusqu'à maintenant si elle est en cours).</p>
+      </div>
+    </div>
   );
 }
 
@@ -357,7 +410,7 @@ function group(rows, g, isTick) {
 }
 
 const gLabel = (t, g) => { const c = gameClock(t); return g >= 60 ? `j${c.day} ${c.hm}` : c.hm };
-function AurChart({ cs, g, last, ind, marks, onMark }) {
+function AurChart({ cs, g, last, ind, marks, onMark, hl }) {
   const [hover, setHover] = useState(null), box = useRef(null);
   if (!cs.length) return <div className="candles empty"><p className="muted small">Chargement du graphique…</p></div>;
   const closes = cs.map(k => k.c), m20 = sma(closes, 20), m50 = sma(closes, 50), bb = bollinger(closes, 20);
@@ -387,6 +440,7 @@ function AurChart({ cs, g, last, ind, marks, onMark }) {
           {ind.mm50 && <path d={line(m50)} fill="none" stroke="#3987e5" strokeWidth="2" vectorEffect="non-scaling-stroke" />}
           {last != null && <line x1="0" x2="100" y1={Y(last)} y2={Y(last)} stroke="var(--accent)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
           {hk && <line x1={X(hover)} x2={X(hover)} y1="0" y2={H} stroke="var(--faint)" vectorEffect="non-scaling-stroke" />}
+          {hl >= t0 && hl < t1 && <line x1={(hl - t0) / (t1 - t0) * 100} x2={(hl - t0) / (t1 - t0) * 100} y1="0" y2={H} stroke="var(--accent)" strokeWidth="2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />}
         </svg>
         {marks.filter(n => sec(n.at) >= t0 && sec(n.at) < t1).map(n => (
           <button key={n.id} type="button" className={"nmark " + (n.sent > .15 ? "up" : n.sent < -.15 ? "down" : "flat")} style={{ left: `calc(10px + (100% - 80px) * ${(sec(n.at) - t0) / (t1 - t0)})` }} onClick={() => onMark(n)} aria-label={`Actualité : ${n.title}`} />
@@ -434,9 +488,9 @@ function Alerts({ tk, last, alerts, setAlerts, max }) {
   );
 }
 
-export function AurelysDetail({ tk, aur, api, now, onPick, onInvest, onClose, alerts = [], setAlerts, alertsMax = 1 }) {
+export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onClose, alerts = [], setAlerts, alertsMax = 1 }) {
   const s = BY[tk], q = aur.quotes[tk], c = chgOf(aur, tk, now);
-  const [g, setG] = useState(15), [ind, setInd] = useState({ mm20: true, mm50: false, boll: false, rsi: false }), [long, setLong] = useState([]), [mins, setMins] = useState([]), [mark, setMark] = useState(null);
+  const [g, setG] = useState(hl ? 60 : 15), [ind, setInd] = useState({ mm20: true, mm50: false, boll: false, rsi: false }), [long, setLong] = useState([]), [mins, setMins] = useState([]), [mark, setMark] = useState(null);
   // Assez d'historique pour 80 bougies et une MM 50 : bougies d'une heure d'Aurelys, ou cours des 2 dernières heures réelles.
   useEffect(() => {
     let on = true;
@@ -463,7 +517,8 @@ export function AurelysDetail({ tk, aur, api, now, onPick, onInvest, onClose, al
         <div className="chips legend" role="group" aria-label="Indicateurs">
           {MM.map(([k, l, col]) => <button key={k} type="button" aria-pressed={ind[k]} onClick={() => setInd(x => ({ ...x, [k]: !x[k] }))}><i style={{ background: col }} aria-hidden="true" />{l}</button>)}
         </div>
-        <AurChart cs={cs} g={g} last={q?.p} ind={ind} marks={aur.news.filter(n => n.tk === tk)} onMark={setMark} />
+        <AurChart cs={cs} g={g} last={q?.p} ind={ind} marks={aur.news.filter(n => n.tk === tk)} onMark={setMark} hl={hl} />
+        {hl && <p className="muted small">Trait ambre : la rumeur, {gwhen(hl * 1000, now)}.</p>}
         {mark && <Article n={mark} now={now} onClose={() => setMark(null)} onDetail={() => setMark(null)} />}
         <div className="qbtns">
           <button type="button" className="buy" disabled={!q || q.halt} onClick={() => onPick(tk, "up")}><span>▲ Hausse</span></button>

@@ -431,8 +431,9 @@ function companyNews(S, R, out, s, cat, signed) {
   if (cat === "pdg") { n.sent = Math.max(-1, Math.min(1, sent * 1.5 + gauss(R) * .3)); n.mag = mag * .4 } // très bruitée : beaucoup d'émotion, peu de fond
   if (cat === "resultats" && R() < .2) n.sentEff = -n.sent * .6; // « vendre la nouvelle »
   if (cat === "resultats") S.st[s.tk].eps *= 1 + mag;
-  publish(S, out, n);
-  if (cat === "rumeur") S.follow.push({ t: S.t + 60 + Math.floor(R() * 300), tk: s.tk, mag, ok: R() < .5 });
+  const item = publish(S, out, n);
+  // Rumeur : issue tirée dès maintenant. `rok` ne va qu'à la table cachée aur_rumors (aur_store), jamais dans aur_news.
+  if (cat === "rumeur") { const ok = R() < .5; item.rok = ok; S.follow.push({ t: S.t + 60 + Math.floor(R() * 300), tk: s.tk, mag, ok, rid: item.id }) }
 }
 
 // Résultats trimestriels : croissance du chiffre d'affaires sur un an, en points de %. Le consensus des analystes est public ;
@@ -687,9 +688,10 @@ function tick(S, R, out, pending) {
   if (bcaAt(Math.floor(m / DAY)) === m) rateDecision(S, R, out);
   for (const f of S.follow.filter(f => f.t <= t)) {
     const s = defOf(S, f.tk); if (!S.st[f.tk]) continue;
-    publish(S, out, f.ok
+    const item = publish(S, out, f.ok
       ? { tk: f.tk, cat: "rumeur", title: `${s.name} confirme : la rumeur était fondée`, mag: f.mag * .7, sent: Math.sign(f.mag) * .6, hl: 240 }
       : { tk: f.tk, cat: "rumeur", title: `${s.name} dément formellement les rumeurs`, mag: -f.mag * .3, sent: -Math.sign(f.mag) * .4, hl: 180 });
+    if (f.rid != null) item.rid = f.rid; // résolution de la rumeur n° rid (aur_rumors)
   }
   S.follow = S.follow.filter(f => f.t > t);
 

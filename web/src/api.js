@@ -96,6 +96,7 @@ export async function connect() {
     aurTicks: (tk, minutes) => rpc("aur_ticks_of", { p_tk: tk, p_minutes: minutes }),
     aurMaxLev: () => rpc("my_max_lev"),
     aurFeeRate: () => rpc("my_fee_rate"),
+    aurRumors: () => rpc("aur_rumor_list"),
     aurStocks: () => rows(sb.from("aur_stocks").select("*").order("status").order("tk")),
     aurSubscribe: (tk, amount) => rpc("aur_subscribe", { p_tk: tk, p_amount: amount }),
     myHoldings: () => rpc("my_holdings"),

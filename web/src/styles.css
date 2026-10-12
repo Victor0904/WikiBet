@@ -464,6 +464,14 @@ button:active:not(:disabled) { transform: scale(.96) }
 .nmeta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 4px 0 0; font-size: 11.5px; color: var(--faint) }
 .ntk { color: var(--accent); font-weight: 700; font-size: 11.5px }
 .warn-tag { color: var(--accent); font-weight: 600 }
+/* Rumeurs (onglet du Marché) */
+.rumor { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 10px 12px; background: var(--panel); border: 0; border-top: 1px solid var(--line); color: var(--ink) }
+.rumor-b { display: flex; flex-direction: column; gap: 3px; min-width: 0 }
+.rumor-b b { font-weight: 600; font-size: 14px; line-height: 1.3 }
+.rtag { align-self: flex-start; font-size: 12px; border-radius: 4px; padding: 1px 6px; background: var(--panel2); color: var(--muted) }
+.rtag.up { background: var(--up-soft); color: var(--up) } .rtag.down { background: var(--down-soft); color: var(--down) }
+.chip-dot { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle }
+.chip-select { flex: none; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 13px; color: var(--muted) }
 .btn.fresh { width: 100%; margin-bottom: 8px }
 .heat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px }
 .hcell { border: 0; border-radius: 8px; padding: 12px 8px; min-height: 84px; display: flex; flex-direction: column; justify-content: space-between; text-align: left; color: var(--ink) }

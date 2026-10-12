@@ -38,7 +38,7 @@ export default function Game({ api, onNoProfile }) {
 
   const [me, setMe] = useState(undefined), [bets, setBets] = useState([]), [board, setBoard] = useState([]);
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
-  const [aurDetail, setAurDetail] = useState(null), [posView, setPosView] = useState("open"), [qgView, setQgView] = useState("qg"), [more, setMore] = useState(null);
+  const [aurDetail, setAurDetail] = useState(null), [aurHl, setAurHl] = useState(null), [posView, setPosView] = useState("open"), [qgView, setQgView] = useState("qg"), [more, setMore] = useState(null);
   // « Comment jouer » s'ouvre tout seul à la première visite.
   const [firstVisit, setFirstVisit] = useState(() => { try { return !localStorage.getItem("wb-howto") } catch { return false } });
   const [pref, setPref] = useState({ lev: 5, shorizon: "15", stake: 500 });
@@ -152,7 +152,7 @@ export default function Game({ api, onNoProfile }) {
           {showHowto ? <HowTo first={firstVisit} onBack={firstVisit ? howtoDone : () => setMore(null)} /> : <>
           {(tab === "market" || tab === "actions") && <MiniTicker aur={aur} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
 
-          {(tab === "market" || tab === "actions") && <AurelysMarket stocks={tab === "actions"} onList={() => go("actions")} aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onDetail={setAurDetail} onSubscribe={tk => setInvest({ tk, mode: "round" })} />}
+          {(tab === "market" || tab === "actions") && <AurelysMarket api={api} stocks={tab === "actions"} onList={() => go("actions")} aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onSubscribe={tk => setInvest({ tk, mode: "round" })} onDetail={(tk, hl) => { setAurDetail(tk); setAurHl(hl ?? null) }} />}
 
           {tab === "positions" && <>
             <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` · ${open.length}` : ""}`], ["folio", "Portefeuille"], ["history", "Historique"]]} />
@@ -193,7 +193,7 @@ export default function Game({ api, onNoProfile }) {
 
       <Dock tab={showHowto && firstVisit ? null : tab} setTab={t => { if (firstVisit) howtoDone(); go(t) }} badge={open.length} />
 
-      {aurDetail && <AurelysDetail tk={aurDetail} aur={aur} api={api} now={now} alerts={alerts} setAlerts={setAlerts} alertsMax={perks.alerts} onClose={() => setAurDetail(null)} onPick={(tk, dir) => { setAurDetail(null); setTicket({ kind: "aurelys", tk, dir }) }}
+      {aurDetail && <AurelysDetail tk={aurDetail} hl={aurHl} aur={aur} api={api} now={now} alerts={alerts} setAlerts={setAlerts} alertsMax={perks.alerts} onClose={() => { setAurDetail(null); setAurHl(null) }} onPick={(tk, dir) => { setAurDetail(null); setTicket({ kind: "aurelys", tk, dir }) }}
         onInvest={tk => { setAurDetail(null); setInvest({ tk, mode: "buy" }) }} />}
       {invest && <InvestSheet {...invest} api={api} aur={aur} me={me} hold={holds.find(h => h.tk === invest.tk)} onClose={() => setInvest(null)}
         onDone={async (args, ok) => { const r = await run(() => args.mode === "round" ? api.aurSubscribe(args.tk, args.amount) : api.aurOrder(args.mode === "buy" ? { action: "buy", tk: args.tk, amount: args.amount } : { action: "sell", tk: args.tk, qty: args.qty }), () => ok); if (r) setInvest(null) }} />}

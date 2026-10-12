@@ -64,6 +64,7 @@ export async function demoApi() {
     aurTicks: async (tk, minutes) => (await all("select aur_ticks_of($1, $2) as k", [tk, minutes]))[0].k,
     aurMaxLev: async () => (await all("select my_max_lev() as n"))[0].n,
     aurFeeRate: async () => (await all("select my_fee_rate() as r"))[0].r,
+    aurRumors: async () => (await all("select aur_rumor_list() as r"))[0].r,
     aurStocks: () => all("select * from aur_stocks order by status, tk"),
     aurSubscribe: (tk, amount) => act("select * from aur_subscribe($1, $2)", [tk, amount]),
     myHoldings: () => all("select * from my_holdings()"),
