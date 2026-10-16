@@ -2,6 +2,7 @@
 import { LOCALE } from "./i18n.js";
 import { Loading } from "./nav.jsx";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { STOCKS, BY, SECTORS, REGIMES, CHARACTERS, INDEX, FEE, CAP_MULT, LINKS, IPO, SPM, DAY, EPOCH_S, gameClock, gameMin, calendar, sma, bollinger, rsi, closeQuote } from "../supabase/functions/_shared/aurelys.js";
 import { dayOpen } from "./aurelys.js";
 import { STORIES } from "../supabase/functions/_shared/aurelys-stories.js";
@@ -606,7 +607,8 @@ export const aurLive = (b, q, ticks, feeRate = FEE, cut = 1) => {
 function CloseSheet({ b, x, kraken, busy, onConfirm, onCancel }) {
   useEffect(() => { const k = e => e.key === "Escape" && onCancel(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onCancel]);
   const n = b.stake * b.lev;
-  return (
+  // Portail : la carte se soulève au survol (transform), ce qui ferait d'elle le repère du position: fixed (feuille qui clignote).
+  return createPortal(
     <div className="scrim" onClick={e => e.target === e.currentTarget && onCancel()}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label="Clôturer la position">
         <div className="sheet-h"><b>Clôturer {BY[b.aur]?.name ?? b.aur} {b.dir === "up" ? "▲" : "▼"} ×{b.lev}</b><button type="button" className="x" onClick={onCancel} aria-label="Fermer">×</button></div>
@@ -618,7 +620,8 @@ function CloseSheet({ b, x, kraken, busy, onConfirm, onCancel }) {
         <p className="muted small">Le montant suit le cours jusqu'à l'exécution par le serveur.</p>
         <button type="button" className="btn primary big" disabled={busy || x.halt} onClick={onConfirm}>Clôturer · {W(x.value)}</button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
