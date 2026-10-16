@@ -1,6 +1,7 @@
 // Arbre de talents : 4 branches, points gagnés par le gain net de trading (niveau) et les succès. Les règles et les effets
 // sont dans la base (migration 20261027200000_talents.sql) ; cet écran ne fait qu'afficher et demander.
 // Mobile d'abord : une branche à la fois (onglets, glisser à gauche ou à droite), une carte par talent. Dès 900 px : 4 colonnes.
+import { LOCALE } from "./i18n.js";
 import { useEffect, useRef, useState } from "react";
 import { W } from "./format.js";
 import { Segmented } from "./nav.jsx";
@@ -205,7 +206,7 @@ function Achievements({ api, onBack }) {
                     <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={a.goal} aria-valuenow={Math.min(a.cur, a.goal)} aria-label={`Progression : ${a.name}`}><i style={{ width: `${100 * Math.min(1, a.cur / a.goal)}%` }} /></div>
                     <small className="mono">{amount(Math.min(a.cur, a.goal), a.unit === "W" ? "W" : null)} / {amount(a.goal, a.unit)}</small>
                   </div>}
-                  {done && <small className="ach-date">Débloqué le {new Date(a.at).toLocaleDateString("fr-FR")}</small>}
+                  {done && <small className="ach-date">Débloqué le {new Date(a.at).toLocaleDateString(LOCALE)}</small>}
                 </div>
               </article>
             );

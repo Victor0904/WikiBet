@@ -1,3 +1,4 @@
+import { LOCALE } from "./i18n.js";
 import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
 import { liqPrice, BK_LIMIT, CAP0, EPOCH, CYCLE_MS } from "./engine.js";
 import { nf0, nf2, W, sW, clock, cls, HOME_NAMES, THEMES, DEFAULT_ACCENT, PERKS, AUTO_LV, TRIGGER_LV } from "./format.js";
@@ -5,16 +6,16 @@ import { useAurelys } from "./aurelys.js";
 import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
 import { Talents } from "./Talents.jsx";
 import { BY as AUR, slip, FEE, gameClock } from "../supabase/functions/_shared/aurelys.js";
-import { Dock, Segmented, SubHeader, Logo } from "./nav.jsx";
-import { Profile, HowTo, Account, Legal, PushPanel, Bank } from "./pages.jsx";
+import { Dock, Segmented, SubHeader, Logo, LangSwitch } from "./nav.jsx";
+import { Profile, HowTo, Account, Legal, Privacy, PushPanel, Bank } from "./pages.jsx";
 import { Ranking, Friends, Guilds, LoginPanel, BotTag } from "./social.jsx";
 import Portfolio from "./Portfolio.jsx";
 const QG = lazy(() => import("./QG.jsx")); // Three.js n'est chargé qu'à l'ouverture du QG
 
 /* ===== Formats ===== */
 // Une séance se nomme par son heure de début réelle (« séance de 14:32 »), plus parlante que son numéro.
-const sessName = k => { const d = new Date(EPOCH + k * CYCLE_MS), t = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-  return d.toDateString() === new Date().toDateString() ? `séance de ${t}` : `séance du ${d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} à ${t}` };
+const sessName = k => { const d = new Date(EPOCH + k * CYCLE_MS), t = d.toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" });
+  return d.toDateString() === new Date().toDateString() ? `séance de ${t}` : `séance du ${d.toLocaleDateString(LOCALE, { day: "numeric", month: "short" })} à ${t}` };
 
 const feeOpen = r => r.kind === "aurelys" ? r.fee_open ?? r.stake * r.lev * FEE : 0; // frais d'ouverture, en plus de la mise
 
@@ -165,6 +166,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
       <header className="top">
         <Logo />
         {api.mode === "demo" && <span className="tag">{trial ? "essai" : "démo"}</span>}
+        <LangSwitch />
         <button type="button" className="cash mono" onClick={() => { setTab("more"); setMore("account") }} aria-label="Mon compte">{W(me.cash)}</button>
       </header>
 
@@ -214,6 +216,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
             : more === "account" ? <Account account={api.account} push={api.push} me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"}
                 canRestart={me.cash + (me.bank ?? 0) + openStake + holdsValue + catalog.filter(i => i.kind !== "home").reduce((a, i) => a + Math.floor(i.price * .6) * (inv[i.id]?.qty ?? 0), 0) < BK_LIMIT} onRestart={() => run(() => api.restart(), p => `Nouveau départ : ${W(p?.cash ?? CAP0)} en caisse`)} onBack={() => setMore(null)} />
             : more === "legal" ? <Legal onBack={() => setMore(null)} />
+            : more === "privacy" ? <Privacy onBack={() => setMore(null)} />
             : more === "notifs" && api.push ? <><SubHeader title="Notifications" onBack={() => setMore(null)} /><PushPanel push={api.push} /></>
             : <Profile api={api} me={me} tal={tal} title={myTitle} home={HOME_NAMES[homeLevel]} board={board} patrimoine={patrimoine} refs={trial ? null : refs} trial={trial} accent={accent}
                 say={say} go={setMore} onTrophies={() => go("qg")} hasPush={!!api.push} />)}

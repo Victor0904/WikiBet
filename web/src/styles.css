@@ -753,7 +753,7 @@ a.btn.primary { color: var(--accent-ink) }
 .landing h1 { font: 700 clamp(30px, 6vw, 48px)/1.08 var(--f-cond); margin: 0 0 14px; letter-spacing: .005em }
 .landing h2 { font-size: 22px; margin: 0 0 14px; justify-content: flex-start; flex-wrap: wrap }
 .landing a:not(.btn) { color: var(--accent) }
-.land-top { display: flex; align-items: center; padding: 14px 0 }
+.land-top { display: flex; align-items: center; gap: 14px; padding: 14px 0 }
 .land-hero { display: grid; gap: 24px; padding: 18px 0 28px; align-items: center }
 .land-sub { font-size: 17px; color: var(--muted); margin: 0 0 20px; max-width: 52ch }
 .land-cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 10px }
@@ -806,3 +806,9 @@ a.btn.primary { color: var(--accent-ink) }
 .intro-slide p { font-size: 17px; color: var(--muted); margin: 0 }
 @keyframes intro-in { from { opacity: 0; transform: translateY(10px) } }
 @media (prefers-reduced-motion: reduce) { .intro-slide { animation: none } .intro-bars span.on::after { animation: none; transform: none } }
+
+/* Choix de la langue (LangSwitch dans nav.jsx) */
+.lang { display: inline-flex; gap: 4px; align-items: center }
+.lang button { border: 0; background: none; padding: 3px; border-radius: 4px; line-height: 0; opacity: .45 }
+.lang button[aria-pressed="true"] { opacity: 1; outline: 1px solid var(--line) }
+.lang svg { border-radius: 2px; display: block }

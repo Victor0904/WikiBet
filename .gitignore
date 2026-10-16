@@ -6,3 +6,4 @@ dist/
 graphify-out/
 .DS_Store
 Thumbs.db
+web/scripts/i18n-missing.json

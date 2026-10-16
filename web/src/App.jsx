@@ -1,7 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { CAP0 } from "./engine.js";
 import { W } from "./format.js";
-import { Logo } from "./nav.jsx";
+import { Logo, LangSwitch } from "./nav.jsx";
 // Accueil léger : le jeu, Supabase et les pages secondaires se chargent à part (premier affichage plus rapide).
 const Game = lazy(() => import("./Game.jsx"));
 const LoginPanel = lazy(() => import("./social.jsx").then(m => ({ default: m.LoginPanel })));
@@ -63,6 +63,7 @@ function Intro({ ready, onDone }) {
   return (
     <main className="center intro">
       <div className="intro-box">
+        <LangSwitch />
         <div className="intro-bars" aria-hidden="true">{SLIDES.map((_, k) => <span key={k} className={k < i ? "done" : k === i ? "on" : ""} />)}</div>
         <Logo big />
         <div key={i} className="intro-slide" aria-live="polite"><h1>{title}</h1><p>{text}</p></div>
@@ -89,6 +90,7 @@ function Onboarding({ api, onDone }) {
   return (
     <main className="center">
       <form className="onboard" onSubmit={submit}>
+        <LangSwitch />
         <Logo big />
         <p className="muted">Une bourse inventée, Aurelys, dont les cours naissent des ordres des joueurs et des bots. Tu démarres avec {W(CAP0)}.</p>
         <label htmlFor="pseudo">Ton pseudo</label>

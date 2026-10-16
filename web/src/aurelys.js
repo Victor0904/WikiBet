@@ -1,5 +1,6 @@
 // Bourse d'Aurelys côté écran : cours de chaque seconde jusqu'à maintenant (jamais au-delà), bougies d'une minute,
 // actualités publiées. La simulation tourne sur le serveur ; ici on ne fait que lire et afficher.
+import { addNames } from "./i18n.js";
 import { useEffect, useRef, useState } from "react";
 import { STOCKS, BY, INDEX, DAY, EPOCH_S, SPM, FEE } from "../supabase/functions/_shared/aurelys.js";
 
@@ -53,6 +54,7 @@ export function useAurelys(api, active) {
       if (tm) Object.assign(data.current, { feeRate: +tm.fee, cut: +tm.cut, kraken: !!tm.kraken }); // frais (salle des marchés, talent), impact (talents)
       data.current.roundStats = Object.fromEntries(st.map(r => [r.tk, { investors: +r.investors, total: +r.total }]));
       for (const r of rows) if (r.meta && r.status !== "core") BY[r.tk] = { ...r.meta, status: r.status, roundEnds: r.round_ends && Date.parse(r.round_ends), ipoPrice: r.ipo_price };
+      addNames(rows.map(r => r.name)); // jeunes pousses : leur nom reste tel quel en anglais
       Object.assign(data.current, { young: rows.filter(r => r.status === "listed").map(r => BY[r.tk]), rounds: rows.filter(r => r.status === "round").map(r => BY[r.tk]) });
       render(k => k + 1);
     }).catch(() => {});

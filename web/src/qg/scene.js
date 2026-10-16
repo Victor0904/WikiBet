@@ -1,5 +1,6 @@
 // Le QG en 3D : une pièce isométrique qui grandit avec le logement, meublée par les objets achetés.
 // Tout est construit en formes simples (pas de modèle externe), en low-poly, pour rester léger sur mobile.
+import { LOCALE } from "../i18n.js";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { place, F } from "./models.js";
@@ -78,7 +79,7 @@ function pnlTex() {
     if (pnl == null) { g.fillStyle = accent; g.font = "600 30px 'IBM Plex Mono', monospace"; g.fillText("Aurelys", 14, 96); return }
     const up = pnl >= 0; g.fillStyle = up ? "#1fcb8b" : "#f04b5c";
     g.font = "700 40px 'IBM Plex Mono', monospace";
-    g.fillText(`${up ? "+" : "−"}${Math.abs(Math.round(pnl)).toLocaleString("fr-FR")} W`, 14, 100);
+    g.fillText(`${up ? "+" : "−"}${Math.abs(Math.round(pnl)).toLocaleString(LOCALE)} W`, 14, 100);
     g.font = "600 22px 'IBM Plex Mono', monospace"; g.fillText(up ? "▲ en gain" : "▼ en perte", 14, 136);
   });
 }
@@ -103,7 +104,7 @@ function posTex(seed) {
     const up = pos.pnl >= 0, col = up ? "#1fcb8b" : "#f04b5c";
     g.fillStyle = col; g.fillRect(0, 0, 6, h);
     g.font = "700 26px 'IBM Plex Sans Condensed', sans-serif"; g.fillStyle = "#e9ecf2"; g.fillText(pos.label.slice(0, 14), 18, 40);
-    g.font = "700 40px 'IBM Plex Mono', monospace"; g.fillStyle = col; g.fillText(`${up ? "+" : "−"}${Math.abs(Math.round(pos.pnl)).toLocaleString("fr-FR")} W`, 18, 98);
+    g.font = "700 40px 'IBM Plex Mono', monospace"; g.fillStyle = col; g.fillText(`${up ? "+" : "−"}${Math.abs(Math.round(pos.pnl)).toLocaleString(LOCALE)} W`, 18, 98);
     g.font = "600 22px 'IBM Plex Mono', monospace"; g.fillText(up ? "▲ en gain" : "▼ en perte", 18, 136);
   });
   return t;
@@ -311,7 +312,7 @@ function souvenirFrames(sv) {
     const b = sv.best, v = (b.series ?? []).map(Number), lo = Math.min(...v, b.entry, b.exit), hi = Math.max(...v, b.entry, b.exit), r = (hi - lo) || 1;
     g.fillStyle = "#14161f"; g.fillRect(0, 0, w, h);
     g.fillStyle = "#e8c547"; g.font = "700 22px 'IBM Plex Sans Condensed', sans-serif"; g.fillText(`Mon meilleur trade · ${b.name}`, 14, 30);
-    g.fillStyle = "#1fcb8b"; g.font = "700 30px 'IBM Plex Mono', monospace"; g.fillText(`+${Math.round(b.gain).toLocaleString("fr-FR")} W`, 14, 66);
+    g.fillStyle = "#1fcb8b"; g.font = "700 30px 'IBM Plex Mono', monospace"; g.fillText(`+${Math.round(b.gain).toLocaleString(LOCALE)} W`, 14, 66);
     const X = i => 14 + i / Math.max(1, v.length - 1) * (w - 28), Y = p => h - 16 - (p - lo) / r * (h - 96);
     if (v.length > 1) { g.strokeStyle = "#1fcb8b"; g.lineWidth = 3; g.beginPath(); v.forEach((p, i) => i ? g.lineTo(X(i), Y(p)) : g.moveTo(X(i), Y(p))); g.stroke() }
     for (const [p, col, x] of [[b.entry, "#f5b83d", 14 + (w - 28) * .1], [b.exit, "#ffffff", w - 14 - (w - 28) * .1]]) { g.fillStyle = col; g.beginPath(); g.arc(x, Y(p), 6, 0, 7); g.fill() }

@@ -1,4 +1,6 @@
 // Pages du menu « Plus » : profil, Comment jouer, Mon compte, Sources des données.
+import { PrivacyText } from "./privacy.jsx";
+import { t } from "./i18n.js";
 import { W, CAP0_TXT } from "./format.js";
 import { SubHeader } from "./nav.jsx";
 import { AccountLink } from "./social.jsx";
@@ -50,7 +52,7 @@ export function Profile({ api, me, tal, title, home, board, patrimoine, refs, tr
   const slots = [...mine.filter(r => r.status === "validé"), ...mine.filter(r => r.status !== "validé")].slice(0, 4);
   const link = refs?.code ? `${location.origin}/?ref=${refs.code}` : null;
   const share = async () => {
-    const text = `Rejoins-moi sur Aurelys, la bourse inventée où les joueurs font les cours. Mon code : ${refs.code}`;
+    const text = t("Rejoins-moi sur Aurelys, la bourse inventée où les joueurs font les cours. Mon code : {code}", { code: refs.code }); // partagé hors de la page : traduit ici
     if (navigator.share) { try { await navigator.share({ title: "Aurelys", text, url: link }); return } catch (e) { if (e?.name === "AbortError") return } }
     try { await navigator.clipboard.writeText(link); say("Lien copié : colle-le à tes amis.") } catch { say(`Ton lien : ${link}`) }
   };
@@ -113,7 +115,7 @@ export function Profile({ api, me, tal, title, home, board, patrimoine, refs, tr
       </div>
 
       <nav className="menu discreet" aria-label="Autres pages">
-        {[["howto", "Comment jouer"], ...(hasPush ? [["notifs", "Notifications"]] : []), ["account", "Mon compte"], ["legal", "Sources des données"]].map(([k, t]) => (
+        {[["howto", "Comment jouer"], ...(hasPush ? [["notifs", "Notifications"]] : []), ["account", "Mon compte"], ["legal", "Sources des données"], ["privacy", "Confidentialité"]].map(([k, t]) => (
           <button key={k} type="button" className="menu-row" onClick={() => go(k)}><span><b>{t}</b></span><span className="chev" aria-hidden="true">›</span></button>
         ))}
       </nav>
@@ -191,6 +193,10 @@ export function Bank({ me, onBank }) {
       <div className="chips"><button type="button" onClick={() => setV(String(Math.floor(me.cash)))}>Tout le solde</button><button type="button" onClick={() => setV(String(Math.floor(bank)))}>Tout le dépôt</button></div>
     </div>
   );
+}
+
+export function Privacy({ onBack }) {
+  return <section className="legal"><SubHeader title="Confidentialité" onBack={onBack} /><div className="panel"><PrivacyText /></div></section>;
 }
 
 export function Legal({ onBack }) {

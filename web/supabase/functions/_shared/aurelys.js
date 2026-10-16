@@ -137,7 +137,7 @@ const defOf = (S, tk) => BY[tk] ?? S?.extra?.[tk];
 const listed = S => S.extra ? STOCKS.concat(Object.values(S.extra).filter(d => d.status === "listed")) : STOCKS;
 const NAME_A = ["Lumi", "Verd", "Nova", "Aqua", "Célest", "Terra", "Opti", "Bio", "Néo", "Flux", "Orbi", "Sola", "Voxa", "Hélio", "Mari", "Crista", "Alti", "Zéna", "Pyro", "Sylva"];
 const NAME_B = ["gen", "tek", "lys", "sys", "ra", "vel", "dyne", "line", "nis", "ora", "lab", "nova"];
-const IDEAS = {
+export const IDEAS = {
   tech: ["Cybersécurité pour les hôpitaux", "Traduction instantanée dans l'oreillette", "Puces pour lunettes connectées", "Ordinateurs quantiques de bureau"],
   sante: ["Thérapie génique contre la surdité", "Pansements qui détectent les infections", "Diagnostic des maladies par la voix", "Vaccins sans aiguille"],
   energie: ["Hydrogène vert pour les camions", "Batteries au sel", "Petites centrales marémotrices", "Panneaux solaires souples"],
@@ -221,7 +221,7 @@ function lifecycle(S, R, out) {
 
 /* ===== Articles du journal ===== */
 // Chaque nouvelle d'entreprise devient un article : le fait, le contexte de la société, l'avis d'un analyste, le cours.
-const ANALYSTS = ["Sofia Delmar, de Castellane Research", "Marc Itier, gérant chez Aurel Capital", "Inès Varo, stratégiste à la Banque du Nord", "Hugo Brenner, du cabinet Ferrel & Fils", "Nadia Cassel, analyste indépendante"];
+export const ANALYSTS = ["Sofia Delmar, de Castellane Research", "Marc Itier, gérant chez Aurel Capital", "Inès Varo, stratégiste à la Banque du Nord", "Hugo Brenner, du cabinet Ferrel & Fils", "Nadia Cassel, analyste indépendante"];
 const QUOTES = {
   up: ["« C'est exactement ce que le marché attendait »", "« Les fondamentaux sont solides, ce n'est pas un feu de paille »", "« Il y a encore de la marge à la hausse »"],
   down: ["« Le marché va devoir revoir ses attentes »", "« C'est un vrai coup dur, et il pourrait y en avoir d'autres »", "« La confiance mettra du temps à revenir »"],

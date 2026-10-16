@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { initState, advance, STOCKS, BY, INDEX, REGIMES, SPM } from "../supabase/functions/_shared/aurelys.js";
 import { TkIcon } from "./logos.jsx";
-import { Logo } from "./nav.jsx";
+import { PrivacyText } from "./privacy.jsx";
+import { Logo, LangSwitch } from "./nav.jsx";
 import { nf2, pct, cls } from "./format.js";
 
 const HERO = "PXF", BAND = ["NXR", "HLV", "SLM"], CANDLE = 10, SHOWN = 44; // bougies de 10 minutes d'Aurelys
@@ -51,7 +52,7 @@ export default function Landing() {
   const d = useSim(), chg = tk => d && d.open[tk] ? d.last[tk] / d.open[tk] - 1 : 0, reg = d && REGIMES[d.S.reg];
   return (
     <div className="landing">
-      <header className="land-top"><Logo /><a className="link" href="/jouer">Se connecter</a></header>
+      <header className="land-top"><Logo /><LangSwitch /><a className="link" href="/jouer">Se connecter</a></header>
 
       <section className="land-hero">
         <div>
@@ -123,6 +124,7 @@ export default function Landing() {
           <p>Éditeur : Aurelys, projet personnel non professionnel (identité communiquée à l'hébergeur, art. 6-III-2 de la LCEN).
             Hébergement : Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis. Données de jeu : Supabase.</p>
         </details>
+        <details><summary>Confidentialité</summary><PrivacyText /></details>
         <p><a href="https://github.com/Victor0904/WikiBet/issues" rel="noopener">Contact</a></p>
       </footer>
     </div>

@@ -28,7 +28,7 @@ test("écrans principaux : aucun débordement horizontal à 375 px", { skip: !ch
     await press("QG", ".dock"); await check("QG");
     for (const v of ["Banque", "Talents"]) { await press(v); await check(`QG · ${v}`) }
     await press("Plus", ".dock"); await check("Profil");
-    for (const v of ["Classement", "Mon compte", "Comment jouer", "Sources des données"]) {
+    for (const v of ["Classement", "Mon compte", "Comment jouer", "Sources des données", "Confidentialité"]) {
       await press("Plus", ".dock"); await press(v); await check(v);
     }
   } finally { await b.close(); await srv.close() }

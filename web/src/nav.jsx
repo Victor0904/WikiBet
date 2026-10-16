@@ -1,4 +1,5 @@
 // Navigation mobile : barre d'onglets flottante en verre (« liquid glass »), contrôle segmenté, en-tête de sous-page.
+import { LANG, setLang } from "./i18n.js";
 const ICONS = {
   market: <path d="M3 17l5-6 4 3 6-8 3 4" />,
   actions: <><path d="M6 4v16M12 7v13M18 3v14" /><rect x="4" y="8" width="4" height="7" rx="1" /><rect x="10" y="10" width="4" height="6" rx="1" /><rect x="16" y="6" width="4" height="6" rx="1" /></>,
@@ -49,3 +50,20 @@ export const SubHeader = ({ title, onBack }) => (
     <h2>{title}</h2>
   </div>
 );
+
+// Langue : deux petits drapeaux, français et anglais (le choix recharge la page, gardé dans le navigateur).
+const FLAGS = {
+  fr: <><rect width="10" height="20" fill="#0055A4" /><rect x="10" width="10" height="20" fill="#fff" /><rect x="20" width="10" height="20" fill="#EF4135" /></>,
+  en: <><rect width="30" height="20" fill="#012169" /><path d="M0 0l30 20M30 0L0 20" stroke="#fff" strokeWidth="4" /><path d="M0 0l30 20M30 0L0 20" stroke="#C8102E" strokeWidth="1.6" />
+    <path d="M15 0v20M0 10h30" stroke="#fff" strokeWidth="6" /><path d="M15 0v20M0 10h30" stroke="#C8102E" strokeWidth="3.4" /></>,
+};
+export function LangSwitch() {
+  return (
+    <span className="lang" role="group" aria-label="Langue / Language" translate="no">
+      {[["fr", "Français"], ["en", "English"]].map(([l, name]) => (
+        <button key={l} type="button" aria-pressed={LANG === l} aria-label={name} title={name} onClick={() => LANG !== l && setLang(l)}>
+          <svg viewBox="0 0 30 20" width="22" height="15" aria-hidden="true">{FLAGS[l]}</svg>
+        </button>))}
+    </span>
+  );
+}
