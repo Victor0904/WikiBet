@@ -29,7 +29,7 @@ export default function App() {
 }
 
 function Play() {
-  const [api, setApi] = useState(null), [err, setErr] = useState(null);
+  const [api, setApi] = useState(null), [err, setErr] = useState(null), [intro, setIntro] = useState(TRIAL);
   // Profil : false = accueil, true = jeu, undefined = on ne sait pas encore.
   const [profile, setProfile] = useState(() => ONLINE && !TRIAL && !hasSession() ? false : undefined);
   useEffect(() => {
@@ -41,9 +41,36 @@ function Play() {
     import("./Game.jsx").catch(() => {}); // préchargé pendant l'accueil
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (err) return <main className="center"><p className="error">{err}</p></main>;
+  if (intro) return <Intro ready={!!api && profile !== undefined} onDone={() => setIntro(false)} />;
   if (profile === false) return <Onboarding api={api} onDone={() => setProfile(true)} />;
   if (!api || profile === undefined) return <Wait />;
   return <Suspense fallback={<Wait />}><Game api={api} trial={TRIAL} onNoProfile={() => setProfile(false)} /></Suspense>;
+}
+
+// Essai : présentation du jeu pendant que la base locale s'installe (environ 14 s), puis le jeu s'ouvre seul.
+const SLIDES = [
+  ["Bienvenue à Aurelys", "Un pays inventé, une bourse de 13 sociétés fictives. Tu démarres avec 10 000 W, une monnaie fictive."],
+  ["Les cours naissent des ordres", "Joueurs, bots et baleines achètent et vendent. Ton propre ordre fait bouger le prix."],
+  ["Hausse ou baisse, avec levier", "À ×5, une hausse de 1 % rapporte 5 % de ta mise. Mais si le cours part dans l'autre sens, ta position peut tomber à 0."],
+  ["Suis les nouvelles", "Rumeurs, résultats, banque centrale, et de vrais chiffres : la pluie en Beauce, l'électricité en France, les jours fériés."],
+];
+const SLIDE_MS = 3500;
+function Intro({ ready, onDone }) {
+  const [i, setI] = useState(0), last = i >= SLIDES.length - 1;
+  useEffect(() => { if (!last) { const id = setTimeout(() => setI(i + 1), SLIDE_MS); return () => clearTimeout(id) } }, [i, last]);
+  useEffect(() => { if (last && ready) { const id = setTimeout(onDone, SLIDE_MS); return () => clearTimeout(id) } }, [last, ready, onDone]);
+  const [title, text] = SLIDES[i];
+  return (
+    <main className="center intro">
+      <div className="intro-box">
+        <div className="intro-bars" aria-hidden="true">{SLIDES.map((_, k) => <span key={k} className={k < i ? "done" : k === i ? "on" : ""} />)}</div>
+        <Logo big />
+        <div key={i} className="intro-slide" aria-live="polite"><h1>{title}</h1><p>{text}</p></div>
+        <p className="muted small">{ready ? "Le marché est prêt." : "Préparation du marché d'essai, dans ton navigateur…"}</p>
+        <button type="button" className="btn primary" disabled={!ready} onClick={onDone}>{ready ? "Passer" : "Chargement…"}</button>
+      </div>
+    </main>
+  );
 }
 
 function Onboarding({ api, onDone }) {

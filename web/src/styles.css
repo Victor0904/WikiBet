@@ -793,3 +793,16 @@ a.btn.primary { color: var(--accent-ink) }
 .coach p { margin: 0; flex: 1; font-size: 14px }
 .coach .mono { color: var(--accent); font-size: 12px }
 .locked b { display: block }
+
+/* Présentation pendant la préparation de l'essai (Intro dans App.jsx) */
+.intro-box { width: min(440px, 100%); display: grid; gap: 18px; justify-items: start }
+.intro-bars { display: flex; gap: 6px; width: 100% }
+.intro-bars span { flex: 1; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; position: relative }
+.intro-bars span.done { background: var(--accent) }
+.intro-bars span.on::after { content: ""; position: absolute; inset: 0; background: var(--accent); transform-origin: left; animation: intro-fill 3.5s linear forwards }
+@keyframes intro-fill { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+.intro-slide { min-height: 150px; animation: intro-in .45s var(--ease-out, ease-out) backwards }
+.intro-slide h1 { font: 700 30px/1.1 var(--f-cond); margin: 0 0 10px }
+.intro-slide p { font-size: 17px; color: var(--muted); margin: 0 }
+@keyframes intro-in { from { opacity: 0; transform: translateY(10px) } }
+@media (prefers-reduced-motion: reduce) { .intro-slide { animation: none } .intro-bars span.on::after { animation: none; transform: none } }

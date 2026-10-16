@@ -22,7 +22,11 @@ test("accueil, parrainage et essai sans compte", { skip: !chromePath() && !proce
     await b.waitFor("!!document.querySelector('#ref')");
     assert.equal(await b.evaluate("document.querySelector('#ref').value"), "ABCD-123");
 
-    await b.goto(srv.url + "jouer?demo=1"); // essai : joueur local créé d'office, sans formulaire
+    await b.goto(srv.url + "jouer?demo=1"); // essai : présentation pendant la préparation, joueur local créé d'office
+    await b.waitFor("!!document.querySelector('.intro-slide h1')", 20000);
+    assert.match(await text(), /Bienvenue à Aurelys/);
+    await sleep(5000); assert.match(await text(), /Les cours naissent des ordres/, "les diapositives défilent");
+    { const o = await overflow(b); assert.ok(o.scroll <= o.client, `présentation : ${o.scroll}/${o.client} px`) }
     await b.waitFor("!!document.querySelector('.dock') && !!document.querySelector('.trial-bar')", 120000);
     assert.ok(await b.evaluate("!!document.querySelector('.coach')"), "bulles du tutoriel");
     assert.equal(await b.evaluate("localStorage.getItem('wb-ref')"), "ABCD-123", "l'essai garde le code pour la vraie inscription");
