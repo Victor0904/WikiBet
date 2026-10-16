@@ -36,11 +36,14 @@ export function Segmented({ value, onChange, options, label, className = "" }) {
 }
 
 // Logo d'Aurelys : un A dont la barre est une courbe qui monte (même dessin que l'icône du site, public/favicon.svg).
-// Logo animé pendant un chargement : un trait parcourt le A puis la courbe, en boucle ; quand c'est prêt (loading faux ou
-// isComplete), le tracé se referme et le logo apparaît. Couleurs : currentColor pour le A, --logo-curve pour la courbe.
+// Logo animé pendant un chargement : un trait (et sa traîne) fait l'aller-retour sur le A, la courbe se dessine puis
+// s'efface comme un cours qui monte ; la boucle ne saute jamais (le parcours du A revient à son départ, la courbe est
+// invisible au début et à la fin du cycle). Quand c'est prêt (loading faux ou isComplete), le A et la courbe se
+// dessinent en entier et le logo apparaît. Couleurs : currentColor pour le A, --logo-curve pour la courbe.
 const LOGO_A = "M14 50 32 13 50 50", LOGO_CURVE = "M20 39 27 34 33 37 44 28", LOGO_TRACE = LOGO_A + LOGO_CURVE;
+const LOGO_LOOP = "M14 50 32 13 50 50 32 13 14 50"; // aller-retour : la fin rejoint le début
 const reducedMotion = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches } catch { return false } };
-export function LogoLoader({ loading = true, isComplete = false, size = 64, strokeWidth = 5, loopDurationSeconds = 1.6, fillFadeSeconds = .45, className = "", ariaLabel = "Chargement…", onDone }) {
+export function LogoLoader({ loading = true, isComplete = false, size = 64, strokeWidth = 5, loopDurationSeconds = 2.4, fillFadeSeconds = .45, className = "", ariaLabel = "Chargement…", onDone }) {
   const [phase, setPhase] = useState(() => reducedMotion() ? "done" : "loop"); // loop → closingOutline → fadingFill → done
   const ready = !loading || isComplete, called = useRef(false), CLOSE = 500;
   useEffect(() => {
@@ -54,10 +57,21 @@ export function LogoLoader({ loading = true, isComplete = false, size = 64, stro
   return (
     <svg role="status" aria-label={ariaLabel} viewBox="8 7 48 48" width={size} height={size} className={"logo-loader " + className}>
       <path d={LOGO_TRACE} {...line} stroke="currentColor" strokeWidth={Math.max(1, strokeWidth / 2)} opacity=".18" />
-      {phase === "loop" && <path d={LOGO_TRACE} {...line} stroke="currentColor" strokeWidth={strokeWidth} pathLength={1} strokeDasharray="0.16 0.84"
-        style={{ animation: `logo-trace-loop ${loopDurationSeconds}s linear infinite` }} />}
-      {phase === "closingOutline" && <path d={LOGO_TRACE} {...line} stroke="currentColor" strokeWidth={strokeWidth} pathLength={1} strokeDasharray="1 1"
-        style={{ animation: `logo-trace-close ${CLOSE}ms ease-out forwards` }} />}
+      {phase === "loop" && <>
+        {/* traîne pâle puis tête du trait, qui finissent au même point */}
+        <path d={LOGO_LOOP} {...line} stroke="currentColor" strokeWidth={strokeWidth} pathLength={1} strokeDasharray="0.26 0.74" opacity=".35"
+          style={{ animation: `logo-trace-trail ${loopDurationSeconds}s linear infinite` }} />
+        <path d={LOGO_LOOP} {...line} stroke="currentColor" strokeWidth={strokeWidth} pathLength={1} strokeDasharray="0.12 0.88"
+          style={{ animation: `logo-trace-loop ${loopDurationSeconds}s linear infinite` }} />
+        <path d={LOGO_CURVE} {...line} stroke="var(--logo-curve, currentColor)" strokeWidth={strokeWidth * .7} pathLength={1} strokeDasharray="1 1.2"
+          style={{ animation: `logo-curve-pulse ${loopDurationSeconds}s ease-in-out infinite` }} />
+      </>}
+      {phase === "closingOutline" && <>
+        <path d={LOGO_A} {...line} stroke="currentColor" strokeWidth={strokeWidth} pathLength={1} strokeDasharray="1 1"
+          style={{ animation: `logo-trace-close ${CLOSE}ms ease-out forwards` }} />
+        <path d={LOGO_CURVE} {...line} stroke="var(--logo-curve, currentColor)" strokeWidth={strokeWidth * .7} pathLength={1} strokeDasharray="1 1"
+          style={{ animation: `logo-trace-close ${CLOSE}ms ease-out ${CLOSE / 3}ms backwards` }} />
+      </>}
       {(phase === "fadingFill" || phase === "done") && <g style={phase === "fadingFill" ? { animation: `logo-trace-fill ${fillFadeSeconds}s ease-out backwards` } : null}>
         <path d={LOGO_A} {...line} stroke="currentColor" strokeWidth="6.5" />
         <path d={LOGO_CURVE} {...line} stroke="var(--logo-curve, currentColor)" strokeWidth="4" />

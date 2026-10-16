@@ -816,6 +816,10 @@ a.btn.primary { color: var(--accent-ink) }
 /* Logo animé des chargements (LogoLoader dans nav.jsx) */
 .logo-loader { color: var(--accent); --logo-curve: var(--up); display: block; flex: none }
 .loading-box { display: grid; place-items: center; padding: 28px 0 }
-@keyframes logo-trace-loop { to { stroke-dashoffset: -1 } }
+@keyframes logo-trace-loop { from { stroke-dashoffset: 0 } to { stroke-dashoffset: -1 } }
+@keyframes logo-trace-trail { from { stroke-dashoffset: .14 } to { stroke-dashoffset: -.86 } } /* traîne : finit sur la tête du trait */
+/* Courbe : cachée, se dessine de gauche à droite, reste un instant, s'efface par la gauche (cachée de nouveau : pas de saut).
+   Bornes à ±1,1 : sinon le bout arrondi du trait laisse un point. */
+@keyframes logo-curve-pulse { 0%, 8% { stroke-dashoffset: 1.1 } 48%, 62% { stroke-dashoffset: 0 } 100% { stroke-dashoffset: -1.1 } }
 @keyframes logo-trace-close { from { stroke-dashoffset: 1 } to { stroke-dashoffset: 0 } }
 @keyframes logo-trace-fill { from { opacity: 0 } }
