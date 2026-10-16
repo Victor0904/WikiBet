@@ -740,3 +740,56 @@ button:active:not(:disabled) { transform: scale(.96) }
 .menu.discreet .menu-row { min-height: 50px; padding: 12px 16px }
 .menu.discreet .menu-row b { font-weight: 500; font-size: 14.5px; color: var(--muted) }
 .menu.discreet .chev { color: var(--muted) }
+
+/* ===== Page d'accueil (Landing.jsx) et essai sans compte ===== */
+a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; color: inherit }
+a.btn.primary { color: var(--accent-ink) }
+.landing { max-width: 1120px; margin: 0 auto; padding: 0 16px 40px; background: var(--bg); color: var(--ink); min-height: 100vh }
+@media (prefers-color-scheme: light) {
+  html:has(.landing), html:has(.landing) body { background: #F6F7F9 }
+  .landing { --bg: #F6F7F9; --panel: #FFFFFF; --panel2: #EEF0F4; --line: #DDE1E8; --ink: #12141A; --muted: #586072; --faint: #6B7385;
+    --up: #0E8F5F; --down: #C9283A; --accent-ink: #1A1200; color-scheme: light }
+}
+.landing h1 { font: 700 clamp(30px, 6vw, 48px)/1.08 var(--f-cond); margin: 0 0 14px; letter-spacing: .005em }
+.landing h2 { font-size: 22px; margin: 0 0 14px; justify-content: flex-start; flex-wrap: wrap }
+.landing a:not(.btn) { color: var(--accent) }
+.land-top { display: flex; align-items: center; padding: 14px 0 }
+.land-hero { display: grid; gap: 24px; padding: 18px 0 28px; align-items: center }
+.land-sub { font-size: 17px; color: var(--muted); margin: 0 0 20px; max-width: 52ch }
+.land-cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 10px }
+.land-cta .btn.big { width: auto; flex: 1 1 auto; margin: 0; white-space: nowrap }
+.land-fig { margin: 0; padding: 14px }
+.land-fig figcaption { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px }
+.land-fig .fine { margin: 6px 0 0 }
+.land-chart { display: block; width: 100%; height: auto; aspect-ratio: 640 / 280 }
+.land-band { padding: 16px; margin: 0 0 32px }
+.land-quotes { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin: 0 0 12px }
+.land-quotes > div { display: grid; gap: 2px; min-width: 0 }
+.land-quotes small { color: var(--muted); display: flex; gap: 6px; align-items: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.land-quotes b { font-size: 18px }
+.land-sec { margin: 0 0 36px }
+.land-steps { list-style: none; counter-reset: s; padding: 0; margin: 0; display: grid; gap: 12px }
+.land-steps li { counter-increment: s; display: grid; grid-template-columns: 36px 1fr; column-gap: 12px; align-items: start }
+.land-steps li::before { content: counter(s); grid-row: span 2; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font: 700 17px var(--f-mono) }
+.land-steps span, .land-cards p { color: var(--muted) }
+.land-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px }
+.land-cards article { padding: 16px }
+.land-cards p { margin: 6px 0 0 }
+.land-shots { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px }
+.land-shots figure { margin: 0; scroll-snap-align: start }
+.land-shots img { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); background: var(--panel) }
+.land-cos { list-style: none; padding: 0; margin: 0 0 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px }
+.land-cos li { display: flex; gap: 10px; align-items: center; min-width: 0 }
+.land-cos span { display: grid; min-width: 0 }
+.land-foot { border-top: 1px solid var(--line); padding-top: 18px; font-size: 13px; color: var(--muted) }
+.land-foot p { margin: 0 0 8px }
+.land-foot summary { cursor: pointer; margin-bottom: 8px }
+@media (min-width: 900px) { .land-hero { grid-template-columns: 1.05fr 1fr; padding: 40px 0 44px } }
+
+.trial-bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: 13px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin: 0 0 10px }
+.trial-bar a { color: var(--accent) }
+.coach { position: fixed; z-index: 30; left: 50%; transform: translateX(-50%); bottom: calc(92px + env(safe-area-inset-bottom, 0px)); width: min(420px, calc(100% - 32px));
+  display: flex; gap: 10px; align-items: center; background: var(--panel2); border: 1px solid var(--accent); border-radius: 12px; padding: 10px 12px; box-shadow: 0 8px 30px rgba(0, 0, 0, .45) }
+.coach p { margin: 0; flex: 1; font-size: 14px }
+.coach .mono { color: var(--accent); font-size: 12px }
+.locked b { display: block }

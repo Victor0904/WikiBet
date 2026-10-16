@@ -5,26 +5,45 @@ import { Logo } from "./nav.jsx";
 // Accueil léger : le jeu, Supabase et les pages secondaires se chargent à part (premier affichage plus rapide).
 const Game = lazy(() => import("./Game.jsx"));
 const LoginPanel = lazy(() => import("./social.jsx").then(m => ({ default: m.LoginPanel })));
+const Landing = lazy(() => import("./Landing.jsx"));
 const ONLINE = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
 // Session Supabase gardée dans ce navigateur ? Sinon, c'est une première visite : l'accueil s'affiche tout de suite.
 const hasSession = () => { try { return Object.keys(localStorage).some(k => /^sb-.+-auth-token$/.test(k)) } catch { return true } };
-let apiP; const getApi = () => apiP ??= import("./api.js").then(m => m.connect());
+// Routes : « / » la page d'accueil, « /jouer » le jeu, « /jouer?demo=1 » l'essai sans compte (base locale, rien sur le serveur).
+const PATH = location.pathname.replace(/\/+$/, "") || "/";
+export const TRIAL = PATH === "/jouer" && new URLSearchParams(location.search).get("demo") === "1";
 // Lien de parrainage (?ref=CODE) : le code est gardé dans ce navigateur jusqu'à l'inscription, l'adresse est nettoyée.
-try { const r = new URLSearchParams(location.search).get("ref"); if (r) { localStorage.setItem("wb-ref", r.slice(0, 40)); history.replaceState(null, "", location.pathname) } } catch { }
-const Wait = () => <main className="center"><p className="muted">Connexion au marché…</p></main>;
+try {
+  const q = new URLSearchParams(location.search), r = q.get("ref");
+  if (r) { localStorage.setItem("wb-ref", r.slice(0, 40)); q.delete("ref"); history.replaceState(null, "", location.pathname + (q.size ? "?" + q : "")) }
+} catch { }
+// Déjà connecté : « / » mène droit au jeu.
+const LANDING = PATH === "/" && !(ONLINE && hasSession());
+if (PATH === "/" && !LANDING) history.replaceState(null, "", "/jouer");
+let apiP; const getApi = () => apiP ??= TRIAL ? import("./demo.js").then(m => m.demoApi()) : import("./api.js").then(m => m.connect());
+const Wait = () => <main className="center"><p className="muted">{TRIAL ? "Préparation du marché d'essai, dans ton navigateur…" : "Connexion au marché…"}</p></main>;
 
 export default function App() {
+  if (LANDING) return <Suspense fallback={null}><Landing /></Suspense>;
+  return <Play />;
+}
+
+function Play() {
   const [api, setApi] = useState(null), [err, setErr] = useState(null);
   // Profil : false = accueil, true = jeu, undefined = on ne sait pas encore.
-  const [profile, setProfile] = useState(() => ONLINE && !hasSession() ? false : undefined);
+  const [profile, setProfile] = useState(() => ONLINE && !TRIAL && !hasSession() ? false : undefined);
   useEffect(() => {
-    getApi().then(async a => { setApi(a); if (profile === undefined) setProfile(!!(await a.me())) }).catch(e => setErr(e.message));
+    getApi().then(async a => {
+      // Essai : un joueur local créé d'office, sans toucher au code de parrainage gardé pour la vraie inscription.
+      if (TRIAL && !(await a.me())) await a.createProfile("Invité");
+      setApi(a); if (profile === undefined) setProfile(!!(await a.me()))
+    }).catch(e => setErr(e.message));
     import("./Game.jsx").catch(() => {}); // préchargé pendant l'accueil
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (err) return <main className="center"><p className="error">{err}</p></main>;
   if (profile === false) return <Onboarding api={api} onDone={() => setProfile(true)} />;
   if (!api || profile === undefined) return <Wait />;
-  return <Suspense fallback={<Wait />}><Game api={api} onNoProfile={() => setProfile(false)} /></Suspense>;
+  return <Suspense fallback={<Wait />}><Game api={api} trial={TRIAL} onNoProfile={() => setProfile(false)} /></Suspense>;
 }
 
 function Onboarding({ api, onDone }) {

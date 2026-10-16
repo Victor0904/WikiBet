@@ -57,6 +57,8 @@ export async function demoApi() {
 
   return {
     mode: "demo", uid: UID,
+    // « Recommencer » (essai) : base locale effacée, la page se recharge sur une base neuve.
+    reset: async () => { await db.close().catch(() => {}); for (const d of await indexedDB.databases()) if (d.name?.includes(name)) await new Promise(r => { const q = indexedDB.deleteDatabase(d.name); q.onsuccess = q.onerror = q.onblocked = r }) },
     now: () => Date.now(),
     me: async () => (await all("select * from profiles where id = $1", [UID]))[0] ?? null,
     createProfile: (p, ref) => act("select * from create_profile($1, $2)", [p, ref || null]),

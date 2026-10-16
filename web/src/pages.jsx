@@ -35,7 +35,7 @@ export const Avatar = ({ pseudo, size = 56, accent }) => (
   <span className="avatar" style={{ width: size, height: size, fontSize: size * .38, background: accent }} aria-hidden="true">{initials(pseudo)}</span>
 );
 
-export function Profile({ api, me, tal, title, home, board, patrimoine, refs, accent, say, go, onTrophies, hasPush }) {
+export function Profile({ api, me, tal, title, home, board, patrimoine, refs, trial, accent, say, go, onTrophies, hasPush }) {
   const [guild, setGuild] = useState(undefined), [friends, setFriends] = useState(null), [troph, setTroph] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -74,6 +74,11 @@ export function Profile({ api, me, tal, title, home, board, patrimoine, refs, ac
           {delta !== 0 && <span className={delta > 0 ? "up" : "down"}> {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}<span className="sr"> place{Math.abs(delta) > 1 ? "s" : ""} depuis hier</span></span>}</b></div>
       </div>
 
+      {trial && <section className="invite panel">
+        <div className="invite-h"><h2><span aria-hidden="true">🔒 </span>Parrainage</h2></div>
+        <p className="muted small">Le parrainage demande un compte : +10 000 W pour toi à chaque ami validé.</p>
+        <a className="btn primary" href="/jouer">Créer mon compte</a>
+      </section>}
       {link && <section className="invite panel">
         <div className="invite-h"><h2>Invite tes amis</h2><span className="mono">{rewarded}/4</span></div>
         <p className="muted small">+10 000 W pour toi et +2 000 W pour ton ami quand il a clôturé 5 positions (100 W ou plus, sur 2 jours) et acheté son premier logement.</p>

@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://aurelys-trade.vercel.app/sitemap.xml

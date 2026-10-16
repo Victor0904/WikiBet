@@ -33,7 +33,7 @@ function StakeChips({ value, set, cash, max }) {
 } // leviers d'Aurelys (×20 et ×25 se débloquent)
 
 // Le jeu, chargé à part : l'accueil (App.jsx) s'affiche sans lui.
-export default function Game({ api, onNoProfile }) {
+export default function Game({ api, trial = false, onNoProfile }) {
   const [now, setNow] = useState(api.now());
   // Horloge de l'écran : une fois par seconde, calée sur le changement de seconde (même affichage, 4 fois moins de rendus).
   useEffect(() => { let id; const tick = () => { const t = api.now(); setNow(t); id = setTimeout(tick, 1000 - t % 1000 + 5) }; tick(); return () => clearTimeout(id) }, [api]);
@@ -43,7 +43,7 @@ export default function Game({ api, onNoProfile }) {
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
   const [aurDetail, setAurDetail] = useState(null), [aurHl, setAurHl] = useState(null), [posView, setPosView] = useState("open"), [qgView, setQgView] = useState("qg"), [more, setMore] = useState(null);
   // « Comment jouer » s'ouvre tout seul à la première visite.
-  const [firstVisit, setFirstVisit] = useState(() => { try { return !localStorage.getItem("wb-howto") } catch { return false } });
+  const [firstVisit, setFirstVisit] = useState(() => { if (trial) return false; try { return !localStorage.getItem("wb-howto") } catch { return false } }); // l'essai a ses bulles
   const [pref, setPref] = useState({ lev: 5, shorizon: "15", stake: 500 });
   const say = useCallback((text, tone) => { setToast({ text, tone, at: Date.now() }) }, []);
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), toast.long ? 7000 : 2600); return () => clearTimeout(id) }, [toast]);
@@ -164,10 +164,11 @@ export default function Game({ api, onNoProfile }) {
     <div className="app">
       <header className="top">
         <Logo />
-        {api.mode === "demo" && <span className="tag">démo</span>}
+        {api.mode === "demo" && <span className="tag">{trial ? "essai" : "démo"}</span>}
         <button type="button" className="cash mono" onClick={() => { setTab("more"); setMore("account") }} aria-label="Mon compte">{W(me.cash)}</button>
       </header>
 
+      {trial && <TrialBar api={api} />}
       <div className="layout">
         <aside className="rail">
           <Triggers list={triggers} onCancel={cancelTrigger} />
@@ -194,7 +195,7 @@ export default function Game({ api, onNoProfile }) {
           </>}
 
           {tab === "qg" && !visit && <Segmented label="QG" value={qgView} onChange={setQgView} options={[["qg", "QG"], ["bank", "Banque"], ["talents", "Talents"]]} />}
-          {tab === "qg" && !visit && qgView === "talents" ? <Talents api={api} tal={tal} setTal={setTal} say={say} />
+          {tab === "qg" && !visit && qgView === "talents" ? (trial ? <Locked what="Les talents" /> : <Talents api={api} tal={tal} setTal={setTal} say={say} />)
           : tab === "qg" && !visit && qgView === "bank" ? <Bank me={me} onBank={amt => run(() => api.bankMove(amt), () => amt > 0 ? `${W(amt)} déposés à la banque.` : `${W(-amt)} retirés de la banque.`)} />
           : tab === "qg" && <Suspense fallback={<p className="muted pad">Chargement du QG…</p>}>
             {visit
@@ -205,15 +206,16 @@ export default function Game({ api, onNoProfile }) {
           </Suspense>}
 
           {tab === "more" && (
-            more === "talents" ? <><SubHeader title="Talents" onBack={() => setMore(null)} /><Talents api={api} tal={tal} setTal={setTal} say={say} /></>
+            more === "talents" ? <><SubHeader title="Talents" onBack={() => setMore(null)} />{trial ? <Locked what="Les talents" /> : <Talents api={api} tal={tal} setTal={setTal} say={say} />}</>
             : more === "board" ? <><SubHeader title="Classement" onBack={() => setMore(null)} /><Ranking api={api} me={me} onVisit={visitQG} wealth={<Board board={board} me={me} onVisit={visitQG} />} /></>
+            : trial && (more === "friends" || more === "guilds") ? <><SubHeader title={more === "guilds" ? "Ma guilde" : "Amis"} onBack={() => setMore(null)} /><Locked what={more === "guilds" ? "Les guildes" : "Les amis"} /></>
             : more === "friends" ? <Friends api={api} say={say} onVisit={visitQG} onBack={() => setMore(null)} />
             : more === "guilds" ? <Guilds api={api} me={me} say={say} onVisit={visitQG} onBack={() => setMore(null)} accent={accent} />
             : more === "account" ? <Account account={api.account} push={api.push} me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"}
                 canRestart={me.cash + (me.bank ?? 0) + openStake + holdsValue + catalog.filter(i => i.kind !== "home").reduce((a, i) => a + Math.floor(i.price * .6) * (inv[i.id]?.qty ?? 0), 0) < BK_LIMIT} onRestart={() => run(() => api.restart(), p => `Nouveau départ : ${W(p?.cash ?? CAP0)} en caisse`)} onBack={() => setMore(null)} />
             : more === "legal" ? <Legal onBack={() => setMore(null)} />
             : more === "notifs" && api.push ? <><SubHeader title="Notifications" onBack={() => setMore(null)} /><PushPanel push={api.push} /></>
-            : <Profile api={api} me={me} tal={tal} title={myTitle} home={HOME_NAMES[homeLevel]} board={board} patrimoine={patrimoine} refs={refs} accent={accent}
+            : <Profile api={api} me={me} tal={tal} title={myTitle} home={HOME_NAMES[homeLevel]} board={board} patrimoine={patrimoine} refs={trial ? null : refs} trial={trial} accent={accent}
                 say={say} go={setMore} onTrophies={() => go("qg")} hasPush={!!api.push} />)}
           </>}
           </div>
@@ -235,6 +237,53 @@ export default function Game({ api, onNoProfile }) {
       {toast && <div className={"toast " + (toast.tone || "")} role="status" onClick={() => setToast(null)}>{toast.text}
         {toast.action && <button type="button" className="toast-act" onClick={e => { e.stopPropagation(); setToast(null); toast.action.go() }}>{toast.action.label}</button>}</div>}
       {effect && <Rain kind={effect} at={rain} />}
+      {trial && <Coach picked={!!(aurDetail || ticket)} open={open.length} bets={bets} />}
+    </div>
+  );
+}
+
+/* ===== Essai sans compte : tout reste dans ce navigateur ===== */
+const Locked = ({ what }) => (
+  <div className="empty-state locked"><b><span aria-hidden="true">🔒 </span>{what} demandent un compte</b>
+    <p className="muted">Crée ton compte en 20 secondes : pseudo et mot de passe, sans e-mail. Ta partie d'essai ne sera pas reprise.</p>
+    <div className="empty-acts"><a className="btn primary" href="/jouer">Créer mon compte</a></div></div>
+);
+
+function TrialBar({ api }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="trial-bar" role="note">
+      <span>Mode essai : ta progression n'est pas sauvegardée. <a href="/jouer">Crée un compte</a> pour la garder.</span>
+      <button type="button" className="link" disabled={busy} onClick={async () => { setBusy(true); await api.reset?.(); location.reload() }}>Recommencer</button>
+    </div>
+  );
+}
+
+// Trois bulles, puis, après un premier gain ou 3 minutes, l'invitation à créer un compte (sans bloquer le jeu).
+const COACH = ["Choisis une société : touche une ligne du marché.", "Passe un ordre : ▲ hausse ou ▼ baisse, avec ou sans levier.", "Regarde ton gain ou ta perte bouger en direct, puis clôture quand tu veux."];
+function Coach({ picked, open, bets }) {
+  const [step, setStep] = useState(0), [done, setDone] = useState(false), [late, setLate] = useState(false), [nudge, setNudge] = useState(null);
+  useEffect(() => { if (step === 0 && picked) setStep(1); if (step <= 1 && open) setStep(2) }, [step, picked, open]);
+  useEffect(() => { const id = setTimeout(() => setLate(true), 180000); return () => clearTimeout(id) }, []);
+  const won = bets.some(b => b.kind === "aurelys" && b.status !== "open" && b.payout - b.stake - feeOpen(b) > 0);
+  useEffect(() => { if ((won || late) && nudge === null) setNudge(true) }, [won, late, nudge]);
+  if (nudge) return (
+    <div className="scrim" onClick={e => e.target === e.currentTarget && setNudge(false)}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label="Garde ta progression">
+        <div className="sheet-h"><b>{won ? "Premier gain !" : "Ça te plaît ?"}</b><button type="button" className="x" onClick={() => setNudge(false)} aria-label="Fermer">×</button></div>
+        <p>Garde ta progression : crée ton compte. Avec le code de parrainage d'un ami, tu reçois 2 000 W de plus.</p>
+        <p className="muted small">Ta partie d'essai reste dans ce navigateur : un compte repart à 10 000 W, comme tout le monde.</p>
+        <a className="btn big primary" href="/jouer">Créer mon compte</a>
+        <button type="button" className="btn ghost" onClick={() => setNudge(false)}>Continuer l'essai</button>
+      </div>
+    </div>
+  );
+  if (done) return null;
+  return (
+    <div className="coach" role="status">
+      <span className="mono">{step + 1}/3</span><p>{COACH[step]}</p>
+      {step === 2 && <button type="button" className="btn" onClick={() => setDone(true)}>OK</button>}
+      {step < 2 && <button type="button" className="link" onClick={() => setDone(true)}>Passer</button>}
     </div>
   );
 }

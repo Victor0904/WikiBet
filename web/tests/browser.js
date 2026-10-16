@@ -52,9 +52,9 @@ export async function launch() {
     click: (text, scope = "body") => evaluate(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(scope)} + " button")].find(b => b.textContent.trim().startsWith(${JSON.stringify(text)}));
       if (!b) throw new Error("bouton introuvable : " + ${JSON.stringify(text)}); b.click(); return true })()`),
     // Page entière, ou seulement ce qui est à l'écran (full = false : feuilles et éléments fixes à leur place).
-    shot: async (path, full = true) => {
+    shot: async (path, full = true, format = "png") => {
       const { width, height } = (await send("Page.getLayoutMetrics")).cssContentSize;
-      const r = await send("Page.captureScreenshot", full ? { format: "png", captureBeyondViewport: true, clip: { x: 0, y: 0, width, height, scale: 1 } } : { format: "png" });
+      const r = await send("Page.captureScreenshot", full ? { format, captureBeyondViewport: true, clip: { x: 0, y: 0, width, height, scale: 1 } } : { format, quality: 82 });
       writeFileSync(path, Buffer.from(r.data, "base64"));
     },
     close: async () => { ws.close(); proc.kill(); await sleep(500); try { rmSync(dir, { recursive: true, force: true }) } catch { } },
@@ -63,7 +63,7 @@ export async function launch() {
 
 // Joueur de démo connecté (première visite : la démo installe sa base), sur le Marché.
 export async function openApp(b, url) {
-  await b.goto(url);
+  await b.goto(url + "jouer"); // « / » est la page d'accueil
   await b.waitFor("document.readyState === 'complete' && !!document.querySelector('input')");
   await b.evaluate(`localStorage.setItem("wb-howto", "1"); (() => { const i = document.querySelector("input"), set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
     set.call(i, "Testeur"); i.dispatchEvent(new Event("input", { bubbles: true })); return true })()`);
@@ -77,7 +77,7 @@ export const sticking = b => b.evaluate(`(() => { const W = document.documentEle
     .slice(0, 6).map(e => e.tagName.toLowerCase() + "." + String(e.className).replace(/ /g, ".") + " → " + Math.round(e.getBoundingClientRect().right)) })()`);
 // Joueur de démo connecté, sur l'écran Talents.
 export async function openTalents(b, url) {
-  await b.goto(url);
+  await b.goto(url + "jouer");
   await b.waitFor("document.readyState === 'complete' && !!document.querySelector('input')");
   await b.evaluate(`localStorage.setItem("wb-howto", "1"); (() => { const i = document.querySelector("input"), set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
     set.call(i, "Testeur"); i.dispatchEvent(new Event("input", { bubbles: true })); return true })()`);
