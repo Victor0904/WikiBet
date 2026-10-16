@@ -812,3 +812,10 @@ a.btn.primary { color: var(--accent-ink) }
 .lang button { border: 0; background: none; padding: 3px; border-radius: 4px; line-height: 0; opacity: .45 }
 .lang button[aria-pressed="true"] { opacity: 1; outline: 1px solid var(--line) }
 .lang svg { border-radius: 2px; display: block }
+
+/* Logo animé des chargements (LogoLoader dans nav.jsx) */
+.logo-loader { color: var(--accent); --logo-curve: var(--up); display: block; flex: none }
+.loading-box { display: grid; place-items: center; padding: 28px 0 }
+@keyframes logo-trace-loop { to { stroke-dashoffset: -1 } }
+@keyframes logo-trace-close { from { stroke-dashoffset: 1 } to { stroke-dashoffset: 0 } }
+@keyframes logo-trace-fill { from { opacity: 0 } }

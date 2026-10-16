@@ -1,4 +1,5 @@
 // Navigation mobile : barre d'onglets flottante en verre (« liquid glass »), contrôle segmenté, en-tête de sous-page.
+import { useEffect, useRef, useState } from "react";
 import { LANG, setLang } from "./i18n.js";
 const ICONS = {
   market: <path d="M3 17l5-6 4 3 6-8 3 4" />,
@@ -35,6 +36,38 @@ export function Segmented({ value, onChange, options, label, className = "" }) {
 }
 
 // Logo d'Aurelys : un A dont la barre est une courbe qui monte (même dessin que l'icône du site, public/favicon.svg).
+// Logo animé pendant un chargement : un trait parcourt le A puis la courbe, en boucle ; quand c'est prêt (loading faux ou
+// isComplete), le tracé se referme et le logo apparaît. Couleurs : currentColor pour le A, --logo-curve pour la courbe.
+const LOGO_A = "M14 50 32 13 50 50", LOGO_CURVE = "M20 39 27 34 33 37 44 28", LOGO_TRACE = LOGO_A + LOGO_CURVE;
+const reducedMotion = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches } catch { return false } };
+export function LogoLoader({ loading = true, isComplete = false, size = 64, strokeWidth = 5, loopDurationSeconds = 1.6, fillFadeSeconds = .45, className = "", ariaLabel = "Chargement…", onDone }) {
+  const [phase, setPhase] = useState(() => reducedMotion() ? "done" : "loop"); // loop → closingOutline → fadingFill → done
+  const ready = !loading || isComplete, called = useRef(false), CLOSE = 500;
+  useEffect(() => {
+    if (phase === "loop" && ready) setPhase("closingOutline");
+    // Minuteries plutôt que les événements d'animation SVG (pas toujours émis).
+    if (phase === "closingOutline") { const id = setTimeout(() => setPhase("fadingFill"), CLOSE); return () => clearTimeout(id) }
+    if (phase === "fadingFill") { const id = setTimeout(() => setPhase("done"), fillFadeSeconds * 1000); return () => clearTimeout(id) }
+    if (phase === "done" && ready && !called.current) { called.current = true; onDone?.() }
+  }, [phase, ready, fillFadeSeconds, onDone]);
+  const line = { fill: "none", strokeLinecap: "round", strokeLinejoin: "round" };
+  return (
+    <svg role="status" aria-label={ariaLabel} viewBox="8 7 48 48" width={size} height={size} className={"logo-loader " + className}>
+      <path d={LOGO_TRACE} {...line} stroke="currentColor" strokeWidth={Math.max(1, strokeWidth / 2)} opacity=".18" />
+      {phase === "loop" && <path d={LOGO_TRACE} {...line} stroke="currentColor" strokeWidth={strokeWidth} pathLength={1} strokeDasharray="0.16 0.84"
+        style={{ animation: `logo-trace-loop ${loopDurationSeconds}s linear infinite` }} />}
+      {phase === "closingOutline" && <path d={LOGO_TRACE} {...line} stroke="currentColor" strokeWidth={strokeWidth} pathLength={1} strokeDasharray="1 1"
+        style={{ animation: `logo-trace-close ${CLOSE}ms ease-out forwards` }} />}
+      {(phase === "fadingFill" || phase === "done") && <g style={phase === "fadingFill" ? { animation: `logo-trace-fill ${fillFadeSeconds}s ease-out backwards` } : null}>
+        <path d={LOGO_A} {...line} stroke="currentColor" strokeWidth="6.5" />
+        <path d={LOGO_CURVE} {...line} stroke="var(--logo-curve, currentColor)" strokeWidth="4" />
+      </g>}
+    </svg>
+  );
+}
+// Chargement d'un écran ou d'un bloc : le logo animé, centré.
+export const Loading = ({ label = "Chargement…", size = 56 }) => <div className="loading-box"><LogoLoader size={size} ariaLabel={label} /></div>;
+
 export const Logo = ({ big }) => (
   <span className={"logo" + (big ? " big" : "")}>
     <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0F1117" />

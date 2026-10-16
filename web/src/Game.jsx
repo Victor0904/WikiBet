@@ -6,7 +6,7 @@ import { useAurelys } from "./aurelys.js";
 import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
 import { Talents } from "./Talents.jsx";
 import { BY as AUR, slip, FEE, gameClock } from "../supabase/functions/_shared/aurelys.js";
-import { Dock, Segmented, SubHeader, Logo, LangSwitch } from "./nav.jsx";
+import { Dock, Segmented, SubHeader, Logo, LangSwitch, LogoLoader, Loading } from "./nav.jsx";
 import { Profile, HowTo, Account, Legal, Privacy, PushPanel, Bank } from "./pages.jsx";
 import { Ranking, Friends, Guilds, LoginPanel, BotTag } from "./social.jsx";
 import Portfolio from "./Portfolio.jsx";
@@ -145,7 +145,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
     try { const rows = await api.inventoryOf(row.id); setVisit({ row, inv: Object.fromEntries(rows.map(r => [r.item_id, r])) }); setTab("qg") } catch (e) { say(e.message, "down") }
   };
 
-  if (me === undefined) return <main className="center"><p className="muted">Chargement…</p></main>;
+  if (me === undefined) return <main className="center"><LogoLoader size={72} /></main>;
   if (me === null) return null;
 
   // Talent Négociateur : la boutique affiche le prix payé ; la revente reste à 60 % du prix catalogue (list).
@@ -199,7 +199,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
           {tab === "qg" && !visit && <Segmented label="QG" value={qgView} onChange={setQgView} options={[["qg", "QG"], ["bank", "Banque"], ["talents", "Talents"]]} />}
           {tab === "qg" && !visit && qgView === "talents" ? (trial ? <Locked what="Les talents" /> : <Talents api={api} tal={tal} setTal={setTal} say={say} />)
           : tab === "qg" && !visit && qgView === "bank" ? <Bank me={me} onBank={amt => run(() => api.bankMove(amt), () => amt > 0 ? `${W(amt)} déposés à la banque.` : `${W(-amt)} retirés de la banque.`)} />
-          : tab === "qg" && <Suspense fallback={<p className="muted pad">Chargement du QG…</p>}>
+          : tab === "qg" && <Suspense fallback={<Loading label="Chargement du QG…" />}>
             {visit
               ? <QG api={api} catalog={catalog} inv={visit.inv} owner={visit.row} self={false} patrimoine={visit.row.patrimoine} pnl={null}
                   accent={THEMES[catalog.find(i => i.category === "theme" && visit.inv[i.id]?.equipped)?.id] ?? DEFAULT_ACCENT} onBack={() => setVisit(null)} />

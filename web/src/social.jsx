@@ -2,7 +2,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 const City = lazy(() => import("./City.jsx")); // Three.js n'est chargé qu'à l'ouverture d'une ville
 import { W, sW, cls, BOTS } from "./format.js";
-import { Segmented, SubHeader } from "./nav.jsx";
+import { Segmented, SubHeader, Loading } from "./nav.jsx";
 
 // ===== Comptes =====
 // Petit formulaire : un état « en cours », un message de réussite ou d'erreur.
@@ -101,7 +101,7 @@ export function Ranking({ api, me, wealth, onVisit }) {
         <div className="chips">
           {[["all", "Tous"], ["friends", "Amis"], ["guild", "Ma guilde"]].map(([k, l]) => <button key={k} type="button" aria-pressed={scope === k} onClick={() => setScope(k)}>{l}</button>)}
         </div>
-        {rows === null ? <p className="muted">Chargement…</p> : !rows.length ? <p className="muted">{period === "today" ? "Aucun pari clôturé aujourd'hui pour l'instant." : "Aucun pari clôturé."}</p> : (
+        {rows === null ? <Loading size={48} /> : !rows.length ? <p className="muted">{period === "today" ? "Aucun pari clôturé aujourd'hui pour l'instant." : "Aucun pari clôturé."}</p> : (
           <div className="board">
             {rows.map((p, i) => (
               <button type="button" key={p.id} className={"brow" + (p.id === me.id ? " me" : "")} onClick={() => onVisit(p)} aria-label={`Voir le QG de ${p.pseudo}`}>
@@ -139,7 +139,7 @@ export function Friends({ api, say, onVisit, onBack }) {
         <input placeholder="Pseudo d'un joueur" value={pseudo} onChange={e => setPseudo(e.target.value)} minLength={2} maxLength={20} required aria-label="Pseudo à ajouter" />
         <button className="btn primary" type="submit">Ajouter</button>
       </form>
-      {rows === null ? <p className="muted">Chargement…</p> : <>
+      {rows === null ? <Loading size={48} /> : <>
         {part("recu").length > 0 && <><h3 className="sec">Demandes reçues</h3><div className="board">{part("recu").map(f => row(f, <>
           <button type="button" className="btn primary" onClick={() => run(() => api.friendAdd(f.pseudo), () => `${f.pseudo} est ton ami.`)}>Accepter</button>
           <button type="button" className="btn ghost" onClick={() => run(() => api.friendRemove(f.id))}>Refuser</button></>))}</div></>}
@@ -167,7 +167,7 @@ export function Guilds({ api, me, say, onVisit, onBack, accent }) {
       {shown ? <>
           <GuildView api={api} me={me} g={shown} mine={shown.id === mine?.id} canJoin={!mine} run={run} onVisit={onVisit} />
           <h3 className="sec">La ville de {shown.name}</h3>
-          <Suspense fallback={<p className="muted small">Chargement de la ville…</p>}>
+          <Suspense fallback={<Loading label="Chargement de la ville…" />}>
             <City key={shown.id} api={api} guildId={shown.id} me={me} mine={shown.id === mine?.id} say={say} onVisit={onVisit} accent={accent} />
           </Suspense>
         </>
@@ -176,7 +176,7 @@ export function Guilds({ api, me, say, onVisit, onBack, accent }) {
             <button type="button" className="btn primary" onClick={() => setCreate(true)}>Fonder une guilde</button></div>}
       <h3 className="sec">Classement des guildes</h3>
       <Segmented label="Période" value={period} onChange={setPeriod} options={[["today", "Aujourd'hui"], ["total", "Total"]]} />
-      {list === null ? <p className="muted">Chargement…</p> : !list.length ? <p className="muted">Aucune guilde pour l'instant. Fonde la première.</p> : (
+      {list === null ? <Loading size={48} /> : !list.length ? <p className="muted">Aucune guilde pour l'instant. Fonde la première.</p> : (
         <div className="board">
           {list.map((g, i) => (
             <button type="button" key={g.id} className={"brow" + (g.mine ? " me" : "")} onClick={() => { setSel(g); window.scrollTo({ top: 0 }) }}>

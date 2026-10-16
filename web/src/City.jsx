@@ -1,5 +1,6 @@
 // Ville de guilde : la 3D (chargée à la demande), le Trésor, le fonds d'investissement et les bâtiments publics.
 import { useEffect, useRef, useState } from "react";
+import { Loading } from "./nav.jsx";
 import { sharePhoto } from "./QG.jsx";
 import { createCity } from "./qg/city.js";
 import { W, nf0 } from "./format.js";
@@ -41,7 +42,7 @@ export default function City({ api, guildId, me, mine, say, onVisit, accent }) {
   const load = () => api.cityView(guildId).then(setV).catch(e => say(e.message, "down"));
   useEffect(() => { load(); api.cityCatalog().then(setCat).catch(() => {}) }, [guildId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(id) }, []);
-  if (!v) return <p className="muted small">Chargement de la ville…</p>;
+  if (!v) return <Loading label="Chargement de la ville…" />;
   const boss = v.owner === me.id, lv = id => v.buildings.find(b => b.id === id), mairie = lv("mairie")?.level ?? 0;
   const run = async (fn, ok) => { try { await fn(); say(ok, "up"); setAmt(""); load() } catch (e) { say(e.message, "down") } };
   const amount = Math.floor(Number(amt)), above = Math.max(0, v.fund - v.hwm);

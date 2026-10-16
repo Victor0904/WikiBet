@@ -4,7 +4,7 @@
 import { LOCALE } from "./i18n.js";
 import { useEffect, useRef, useState } from "react";
 import { W } from "./format.js";
-import { Segmented } from "./nav.jsx";
+import { Segmented, Loading } from "./nav.jsx";
 
 const RENTE = [10, 20, 30, 50, 70, 100];
 const ULT_MIN = 10; // points dans la branche pour son talent ultime (talent_buy)
@@ -90,7 +90,7 @@ export function Talents({ api, tal, setTal, say }) {
   const [branch, setBranch] = useState(() => { try { return TREE.some(b => b.key === localStorage.getItem(KEY)) ? localStorage.getItem(KEY) : "prudence" } catch { return "prudence" } });
   const [ask, setAsk] = useState(null), [busy, setBusy] = useState(false), [menu, setMenu] = useState(false), [view, setView] = useState("tree"), touch = useRef(null);
   useEffect(() => { api.myTalents?.().then(setTal).catch(() => {}) }, [api, setTal]); // à jour à chaque ouverture
-  if (!tal) return <p className="muted pad">Chargement…</p>;
+  if (!tal) return <Loading />;
   if (tal.bot) return <p className="muted pad">Les joueurs fictifs n'ont pas de talents.</p>;
   if (view === "succes") return <Achievements api={api} onBack={() => setView("tree")} />;
 
@@ -182,7 +182,7 @@ const amount = (v, unit) => unit === "W" ? W(v) : `${Math.floor(v)}${unit ? " " 
 function Achievements({ api, onBack }) {
   const [data, setData] = useState(null);
   useEffect(() => { api.myAchievements?.().then(setData).catch(() => setData({ list: [], total: 0, points: 0, max_points: 21 })) }, [api]);
-  if (!data) return <p className="muted pad">Chargement…</p>;
+  if (!data) return <Loading />;
   const got = data.list.filter(a => a.at).length, cats = [...new Set(data.list.map(a => a.cat))];
   return (
     <section className="talents">

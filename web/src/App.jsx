@@ -1,7 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { CAP0 } from "./engine.js";
 import { W } from "./format.js";
-import { Logo, LangSwitch } from "./nav.jsx";
+import { Logo, LangSwitch, LogoLoader } from "./nav.jsx";
 // Accueil léger : le jeu, Supabase et les pages secondaires se chargent à part (premier affichage plus rapide).
 const Game = lazy(() => import("./Game.jsx"));
 const LoginPanel = lazy(() => import("./social.jsx").then(m => ({ default: m.LoginPanel })));
@@ -21,10 +21,10 @@ try {
 const LANDING = PATH === "/" && !(ONLINE && hasSession());
 if (PATH === "/" && !LANDING) history.replaceState(null, "", "/jouer");
 let apiP; const getApi = () => apiP ??= TRIAL ? import("./demo.js").then(m => m.demoApi()) : import("./api.js").then(m => m.connect());
-const Wait = () => <main className="center"><p className="muted">{TRIAL ? "Préparation du marché d'essai, dans ton navigateur…" : "Connexion au marché…"}</p></main>;
+const Wait = () => <main className="center"><LogoLoader size={72} ariaLabel={TRIAL ? "Préparation du marché d'essai, dans ton navigateur…" : "Connexion au marché…"} /></main>;
 
 export default function App() {
-  if (LANDING) return <Suspense fallback={null}><Landing /></Suspense>;
+  if (LANDING) return <Suspense fallback={<main className="center"><LogoLoader size={72} /></main>}><Landing /></Suspense>;
   return <Play />;
 }
 
@@ -65,7 +65,7 @@ function Intro({ ready, onDone }) {
       <div className="intro-box">
         <LangSwitch />
         <div className="intro-bars" aria-hidden="true">{SLIDES.map((_, k) => <span key={k} className={k < i ? "done" : k === i ? "on" : ""} />)}</div>
-        <Logo big />
+        <span className="logo big"><LogoLoader size={44} loading={!ready} ariaLabel={ready ? "Le marché est prêt." : "Chargement…"} />Aurelys</span>
         <div key={i} className="intro-slide" aria-live="polite"><h1>{title}</h1><p>{text}</p></div>
         <p className="muted small">{ready ? "Le marché est prêt." : "Préparation du marché d'essai, dans ton navigateur…"}</p>
         <button type="button" className="btn primary" disabled={!ready} onClick={onDone}>{ready ? "Passer" : "Chargement…"}</button>
@@ -105,7 +105,7 @@ function Onboarding({ api, onDone }) {
         <button className="btn primary" type="submit">Entrer sur le marché</button>
       </form>
       {online && <div className="onboard">
-        {login ? (api ? <Suspense fallback={null}><LoginPanel account={api.account} /></Suspense> : <p className="muted">Connexion au marché…</p>) : <button type="button" className="link" onClick={() => setLogin(true)}>Déjà un compte ? Se connecter</button>}
+        {login ? (api ? <Suspense fallback={null}><LoginPanel account={api.account} /></Suspense> : <LogoLoader size={40} ariaLabel="Connexion au marché…" />) : <button type="button" className="link" onClick={() => setLogin(true)}>Déjà un compte ? Se connecter</button>}
       </div>}
     </main>
   );

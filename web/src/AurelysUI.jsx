@@ -1,5 +1,6 @@
 // Bourse d'Aurelys : tableau de bord, liste des actions, actualités, carte thermique, fiche entreprise, carte de position.
 import { LOCALE } from "./i18n.js";
+import { Loading } from "./nav.jsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { STOCKS, BY, SECTORS, REGIMES, CHARACTERS, INDEX, FEE, CAP_MULT, LINKS, IPO, SPM, DAY, EPOCH_S, gameClock, gameMin, calendar, sma, bollinger, rsi, closeQuote } from "../supabase/functions/_shared/aurelys.js";
 import { dayOpen } from "./aurelys.js";
@@ -100,7 +101,7 @@ export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscri
 const RUMOR_ST = { open: ["En cours", "flat"], ok: ["Confirmée", "up"], no: ["Démentie", "down"], void: ["Sans suite (société radiée)", "flat"] };
 function Rumors({ data, now, onDetail }) {
   const [st, setSt] = useState("all"), [sector, setSector] = useState("");
-  if (!data) return <p className="muted small">Chargement…</p>;
+  if (!data) return <Loading size={40} />;
   const list = data.list.filter(r => (st === "all" || (st === "open") === (r.status === "open")) && (!sector || BY[r.tk]?.sector === sector)), s = data.stats;
   return (
     <div>
@@ -164,7 +165,7 @@ function Board({ aur, now, insider, onDetail, onNews, onRead, onList }) {
     <div className="aur-board">
       <div className="panel">
         <h2>AUR-12 <span className="muted">36 dernières heures d'Aurelys</span></h2>
-        {idx.length > 1 ? <Spark path={idx} t={idx.length - 1} h={80} /> : <p className="muted small">Chargement…</p>}
+        {idx.length > 1 ? <Spark path={idx} t={idx.length - 1} h={80} /> : <Loading size={40} />}
         <p className="muted small">Moyenne des 13 sociétés, pondérée par leur capitalisation (1 000 au lancement).</p>
       </div>
       {insider && <div className="panel">
@@ -401,7 +402,7 @@ function group(rows, g, isTick) {
 const gLabel = (t, g) => { const c = gameClock(t); return g >= 60 ? `j${c.day} ${c.hm}` : c.hm };
 function AurChart({ cs, g, last, ind, marks, onMark, hl }) {
   const [hover, setHover] = useState(null), box = useRef(null);
-  if (!cs.length) return <div className="candles empty"><p className="muted small">Chargement du graphique…</p></div>;
+  if (!cs.length) return <div className="candles empty"><Loading size={48} label="Chargement du graphique…" /></div>;
   const closes = cs.map(k => k.c), m20 = sma(closes, 20), m50 = sma(closes, 50), bb = bollinger(closes, 20);
   const band = bb.map((b, i) => b && [i, b[0], b[1]]).filter(Boolean);
   const lo0 = Math.min(...cs.map(k => k.l), ...(ind.boll ? bb.filter(Boolean).map(b => b[0]) : [])), hi0 = Math.max(...cs.map(k => k.h), ...(ind.boll ? bb.filter(Boolean).map(b => b[1]) : []));
