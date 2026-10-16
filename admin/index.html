@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Cité d'Aurelys · admin</title>
+<meta name="robots" content="noindex">
+<style>
+  :root { --bg: #08090D; --panel: #0F1117; --panel2: #161922; --line: #222634; --text: #E6E8EF; --muted: #8A90A2;
+          --up: #1FCB8B; --down: #F04B5C; --amber: #F5B83D; font: 13px/1.4 system-ui, sans-serif; color: var(--text) }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden }
+  canvas { display: block }
+  .num { font-family: ui-monospace, Consolas, monospace }
+  .up { color: var(--up) } .down { color: var(--down) } .muted { color: var(--muted) }
+  .panel { position: absolute; background: rgba(15, 17, 23, .92); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; max-height: calc(100vh - 40px); overflow: auto }
+  #kpi { top: 16px; left: 16px; width: 260px }
+  #health { top: 16px; right: 16px; width: 300px }
+  #alerts { bottom: 16px; left: 16px; width: 420px; max-height: 30vh }
+  #card { bottom: 16px; right: 16px; width: 340px; max-height: 60vh; display: none }
+  h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px }
+  h3 { margin: 0 0 6px; font-size: 16px }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0 }
+  .alert { padding: 4px 0; border-top: 1px solid var(--line) }
+  .alert b { color: var(--amber) }
+  .bad { color: var(--down) }
+  #login { position: absolute; inset: 0; display: grid; place-items: center }
+  #login form { display: grid; gap: 8px; width: 260px }
+  input, button { font: inherit; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--text) }
+  button { background: var(--amber); color: #111; border: 0; font-weight: 600; cursor: pointer }
+  #close { float: right; background: none; color: var(--muted); padding: 0 4px }
+</style>
+</head>
+<body>
+<div id="login"><form>
+  <h3>Cité d'Aurelys</h3>
+  <input name="pseudo" placeholder="Pseudo" autocomplete="username" required>
+  <input name="password" type="password" placeholder="Mot de passe" autocomplete="current-password" required>
+  <button>Entrer</button><div class="bad" id="err"></div>
+</form></div>
+<div class="panel" id="kpi" hidden></div>
+<div class="panel" id="health" hidden></div>
+<div class="panel" id="alerts" hidden></div>
+<div class="panel" id="card"></div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -60,3 +60,16 @@ test("souvenirs : certificat d'actionnaire fondateur numéroté, meilleur trade 
   assert.equal(s.best.tk, "NXR"); assert.ok(s.best.series.length >= 4, "le vrai graphique du trade");
   assert.equal(s.best.une, "Nexora pulvérise les attentes");
 });
+
+test("radiation avec une position à levier ouverte : soldée au dernier cours (plantait : record → bets)", async () => {
+  const db = await freshDb(); await login(db, A, "alice");
+  const neo = { tk: "NEO", name: "Néogen", sector: "sante", L: 3000, roundPrice: 10, roundEnd: 0, ipoPrice: 8, ipoAt: Date.now() / 1000 - 600 };
+  await db.query("select aur_listing($1)", [JSON.stringify([{ ...neo, status: "listed" }])]);
+  await db.query("insert into bets (user_id, session, day, kind, stake, aur, dir, lev, entry, status, created_at) values ($1, 0, 0, 'aurelys', 100, 'NEO', 'down', 5, 8, 'open', now() - interval '10 minutes')", [A]);
+  const c0 = await cash(db, A);
+  await db.query("select aur_listing($1)", [JSON.stringify([{ ...neo, status: "delisted", lastPrice: 7.2 }])]);
+  const { rows: [b] } = await db.query("select status, payout, exit from bets where kind = 'aurelys'");
+  assert.equal(b.status, "lost"); near(b.payout, 100 * (1 + 5 * .1), "▼ ×5 sur −10 %"); near(b.exit, 7.2, "au dernier cours");
+  near(await cash(db, A), c0 + 150, "paiement versé");
+  assert.equal((await db.query("select status from aur_stocks where tk = 'NEO'")).rows[0].status, "delisted");
+});

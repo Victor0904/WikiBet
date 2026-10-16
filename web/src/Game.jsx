@@ -16,6 +16,8 @@ const QG = lazy(() => import("./QG.jsx")); // Three.js n'est chargé qu'à l'ouv
 const sessName = k => { const d = new Date(EPOCH + k * CYCLE_MS), t = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   return d.toDateString() === new Date().toDateString() ? `séance de ${t}` : `séance du ${d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} à ${t}` };
 
+const feeOpen = r => r.kind === "aurelys" ? r.fee_open ?? r.stake * r.lev * FEE : 0; // frais d'ouverture, en plus de la mise
+
 const AUR_LEVS = [1, 5, 10, 15, 20, 25];
 // Montants cumulables : le premier appui remplace la mise affichée, les suivants s'ajoutent (10, 20, 30…).
 // 10 000 n'apparaît qu'au-delà de 10 000 W de solde.
@@ -149,7 +151,6 @@ export default function Game({ api, onNoProfile }) {
   const shop = ranks.negociateur ? catalog.map(i => ({ ...i, list: i.price, price: Math.round(i.price * (1 - .03 * ranks.negociateur)) })) : catalog;
   // Un appui sur l'onglet déjà ouvert ramène à sa racine (Plus : retour au Profil depuis Classement, Mon compte…).
   const go = t => { if (t !== "more" || t === tab) setMore(null); setTab(t); window.scrollTo({ top: 0 }) };
-  const feeOpen = r => r.kind === "aurelys" ? r.fee_open ?? r.stake * r.lev * FEE : 0; // frais d'ouverture, en plus de la mise
   const onAuto = (id, sl, tp) => run(() => api.aurSetAuto(id, sl, tp), () => sl == null && tp == null ? "Ordres retirés." : "Ordres enregistrés."), canStop = homeLevel >= AUTO_LV || !!ranks.filet; // objectif pour tous, stop dès le loft (ou talent Filet)
   const cancelTrigger = id => run(() => api.aurTriggerCancel(id), () => "Ordre annulé.");
   const closeTrade = b => run(() => b.kind === "aurelys" ? api.aurOrder({ action: "close", id: b.id }).finally(() => { aur.kraken = false; loadTal(); setTimeout(() => unlockCheck.current?.(), 1500) }) : api.closeTrade(b.id),
