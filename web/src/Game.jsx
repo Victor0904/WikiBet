@@ -111,6 +111,16 @@ export default function Game({ api, trial = false, onNoProfile }) {
     check(); const id = setInterval(check, 30000);
     return () => { alive = false; clearInterval(id) };
   }, [api]); // eslint-disable-line
+  // Messages du serveur (notices), lus une fois : pseudo renommé d'office…
+  useEffect(() => {
+    api.myNotices?.().then(list => {
+      for (const n of list ?? []) {
+        if (n.kind === "pseudo") setToast({ text: `Ton pseudo ressemblait à une adresse e-mail, visible de tous. Il devient ${n.body.pseudo} : tu peux en choisir un autre dans Mon compte.`,
+          tone: "up", long: true, at: Date.now(), action: { label: "Choisir mon pseudo", go: () => { setTab("more"); setMore("account") } } });
+        api.noticeRead(n.id).catch(() => {});
+      }
+    }).catch(() => {});
+  }, [api]);
   const aur = useAurelys(api, tab === "market" || tab === "actions" || !!aurDetail || alerts.length > 0 || bets.some(b => b.status === "open" && b.kind === "aurelys"));
   aur.ranks = ranks;
   const beat = Math.floor(now / 2500);
@@ -214,7 +224,8 @@ export default function Game({ api, trial = false, onNoProfile }) {
             : more === "friends" ? <Friends api={api} say={say} onVisit={visitQG} onBack={() => setMore(null)} />
             : more === "guilds" ? <Guilds api={api} me={me} say={say} onVisit={visitQG} onBack={() => setMore(null)} accent={accent} />
             : more === "account" ? <Account account={api.account} push={api.push} me={me} title={myTitle} patrimoine={patrimoine} openStake={openStake} objects={objectsValue} demo={api.mode === "demo"}
-                canRestart={me.cash + (me.bank ?? 0) + openStake + holdsValue + catalog.filter(i => i.kind !== "home").reduce((a, i) => a + Math.floor(i.price * .6) * (inv[i.id]?.qty ?? 0), 0) < BK_LIMIT} onRestart={() => run(() => api.restart(), p => `Nouveau départ : ${W(p?.cash ?? CAP0)} en caisse`)} onBack={() => setMore(null)} />
+                canRestart={me.cash + (me.bank ?? 0) + openStake + holdsValue + catalog.filter(i => i.kind !== "home").reduce((a, i) => a + Math.floor(i.price * .6) * (inv[i.id]?.qty ?? 0), 0) < BK_LIMIT} onRestart={() => run(() => api.restart(), p => `Nouveau départ : ${W(p?.cash ?? CAP0)} en caisse`)}
+                onPseudo={p => run(() => api.pseudoChange(p), r => `Ton pseudo est maintenant ${r.pseudo}.`)} onBack={() => setMore(null)} />
             : more === "legal" ? <Legal onBack={() => setMore(null)} />
             : more === "privacy" ? <Privacy onBack={() => setMore(null)} />
             : more === "notifs" && api.push ? <><SubHeader title="Notifications" onBack={() => setMore(null)} /><PushPanel push={api.push} /></>

@@ -1479,4 +1479,12 @@ export default {
   "{0} · demain {1}": "{0} · tomorrow {1}",
   "{0} · jour {1} {2}": "{0} · day {1} {2}",
   "Météo-{0} prévoit une semaine décisive.": "Météo-{0} forecasts a decisive week.",
+  "Ton pseudo ressemblait à une adresse e-mail, visible de tous. Il devient {w0} : tu peux en choisir un autre dans Mon compte.": "Your username looked like an email address, visible to everyone. It is now {w0}: you can choose another one in My account.",
+  "Ton pseudo est maintenant {w0}.": "Your username is now {w0}.",
+  "Choisir mon pseudo": "Choose my username",
+  "Choisis ton pseudo (une fois). Il est visible de tous : pas d'adresse e-mail.": "Choose your username (once). Everyone can see it: no email address.",
+  "Changer de pseudo": "Change username",
+  "Ton pseudo est visible de tous : pas d'adresse e-mail.": "Your username is visible to everyone: no email address.",
+  "Pseudo de {0} à {1} caractères.": "Username of {0} to {1} characters.",
+  "Changement de pseudo indisponible pour l'instant.": "Username change unavailable for now.",
 };

@@ -87,6 +87,9 @@ export async function connect() {
     me: async () => (await rows(sb.from("profiles").select("*").eq("id", uid).maybeSingle())) ?? null,
     createProfile: (pseudo, ref) => rpc("create_profile", { p_pseudo: pseudo, p_ref: ref || null }),
     myReferrals: () => rpc("my_referrals"),
+    myNotices: () => rpc("my_notices"),
+    noticeRead: id => rpc("notice_read", { p_id: id }),
+    pseudoChange: pseudo => rpc("pseudo_change", { p_pseudo: pseudo }),
     openTrade: ({ tk, dir, lev, stake }) => rpc("open_trade", { p_tk: tk, p_dir: dir, p_lev: lev, p_stake: stake, p_horizon: "close" }), // ouverte jusqu'à la fin de séance
     closeTrade: id => rpc("close_trade", { p_id: id }),
     betDuel: ({ duel, side, stake }) => rpc("bet_duel", { p_duel: duel, p_side: side, p_stake: stake }),

@@ -147,7 +147,7 @@ export function HowTo({ onBack, first }) {
   );
 }
 
-export function Account({ account, push, me, title, patrimoine, openStake, objects, canRestart, onRestart, demo, onBack }) {
+export function Account({ account, push, me, title, patrimoine, openStake, objects, canRestart, onRestart, onPseudo, demo, onBack }) {
   return (
     <section className="account">
       <SubHeader title="Mon compte" onBack={onBack} />
@@ -162,6 +162,7 @@ export function Account({ account, push, me, title, patrimoine, openStake, objec
           <div className="row"><span>Faillites</span><b>{me.bankruptcies}</b></div>
         </div>
       </div>
+      {me.pseudo_free && <PseudoForm onPseudo={onPseudo} />}
       {account && <AccountLink account={account} pseudo={me.pseudo} />}
       {push && <PushPanel push={push} />}
       <div className="panel bk">
@@ -170,6 +171,18 @@ export function Account({ account, push, me, title, patrimoine, openStake, objec
       </div>
       {demo && <p className="fine">Mode démo locale : ta partie est enregistrée dans ce navigateur uniquement, sans compte.</p>}
     </section>
+  );
+}
+
+// Pseudo renommé d'office (il ressemblait à une adresse e-mail) : un changement offert, vérifié par le serveur.
+function PseudoForm({ onPseudo }) {
+  const [v, setV] = useState(""), [busy, setBusy] = useState(false);
+  return (
+    <form className="panel auth" onSubmit={async e => { e.preventDefault(); setBusy(true); await onPseudo(v); setBusy(false) }}>
+      <label className="muted small" htmlFor="new-pseudo">Choisis ton pseudo (une fois). Il est visible de tous : pas d'adresse e-mail.</label>
+      <input id="new-pseudo" autoComplete="off" value={v} onChange={e => setV(e.target.value)} minLength={2} maxLength={20} required />
+      <button className="btn primary" type="submit" disabled={busy}>Changer de pseudo</button>
+    </form>
   );
 }
 
