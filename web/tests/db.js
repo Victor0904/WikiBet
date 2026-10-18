@@ -10,8 +10,8 @@ export const engine = createEngine(data);
 
 // `until` : s'arrêter avant cette migration (préparer des données d'avant), puis finir avec migrateFrom(db, until).
 const MIGRATIONS = readdirSync(new URL("../supabase/migrations/", import.meta.url)).sort();
-export async function migrateFrom(db, from) {
-  for (const f of MIGRATIONS.filter(f => f >= from)) await db.exec(read("../supabase/migrations/" + f));
+export async function migrateFrom(db, from, until) {
+  for (const f of MIGRATIONS.filter(f => f >= from && (!until || f < until))) await db.exec(read("../supabase/migrations/" + f));
 }
 export async function freshDb({ until } = {}) {
   const db = new PGlite();
@@ -31,10 +31,12 @@ export async function setClock(db, k, t) {
   await db.query("update game_config set epoch = to_timestamp($1 / 1000.0)", [Number(now) - k * CYCLE_MS - off]);
 }
 
-// Joueur connecté : crée l'utilisateur et le profil, puis agit sous son identité.
-export async function login(db, id, pseudo) {
+// Joueur connecté : crée l'utilisateur et le profil, puis agit sous son identité. `level` : son niveau de trader (XP de la
+// courbe), pour les tests qui ont besoin d'un levier ou d'une guilde (×10 au niveau 12, guilde au niveau 8).
+export async function login(db, id, pseudo, level) {
   await db.query("insert into auth.users values ($1) on conflict do nothing", [id]);
   await db.query("select set_config('app.uid', $1, false)", [id]);
   if (pseudo) await db.query("select create_profile($1)", [pseudo]);
+  if (level) await db.query("update profiles set xp = (select xp from xp_curve where level = $2) where id = $1", [id, level]);
 }
 export const cash = async (db, id) => (await db.query("select cash from profiles where id = $1", [id])).rows[0].cash;

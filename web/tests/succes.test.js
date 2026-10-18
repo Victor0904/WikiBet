@@ -14,7 +14,7 @@ async function trade(db, { tk = "SLM", dir = "up", lev = 1, stake = 100, held = 
   return (await db.query("select * from aur_close($1, $2, 0)", [u, b.id])).rows[0];
 }
 const has = async (db, code, u = A) => (await db.query("select count(*)::int n from aur_achievements where user_id = $1 and code = $2", [u, code])).rows[0].n;
-const player = async (db, u = A, pseudo = "alice") => { await login(db, u, pseudo); await db.query("update profiles set cash = 1e6 where id = $1", [u]) };
+const player = async (db, u = A, pseudo = "alice") => { await login(db, u, pseudo, 12); await db.query("update profiles set cash = 1e6 where id = $1", [u]) };
 
 test("succès : série cassée par une perte (même un trade non valide), trade de moins de 150 s ignoré", async () => {
   const db = await freshDb(); await player(db);

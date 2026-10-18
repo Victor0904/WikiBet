@@ -38,8 +38,9 @@ test("anglais : les écrans principaux n'affichent plus de français", { skip: !
     await b.evaluate(`document.querySelector("main .as-link")?.click(), true`); await sleep(1200);
     await press("▲ Up", ".sheet.detail"); await sleep(800); await check("Ticket");
     await press("▲ Up ×", ".sheet"); await sleep(2500); await check("Ordre passé");
-    await b.evaluate(`window.__wbDemo.query("select guild_create('Les Baleines', 'BAL', null)").then(() => true)`);
-    await press("Stocks", ".dock"); await check("Stocks");
+    await b.evaluate(`window.__wbDemo.query("update profiles set xp = 9999 where not bot").then(() => window.__wbDemo.query("select guild_create('Les Baleines', 'BAL', null)")).then(() => true)`);
+    await press("Market", ".dock"); await press("Stocks"); await check("Stocks");
+    await press("Quests", ".dock"); await sleep(2500); await check("Quests");
     await press("Positions", ".dock"); await check("Positions");
     for (const v of ["Portfolio", "History"]) { await press(v); await check(`Positions · ${v}`) }
     await press("Guild", ".dock"); await sleep(1500); await check("Guild");

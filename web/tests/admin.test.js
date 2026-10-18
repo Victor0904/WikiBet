@@ -10,7 +10,7 @@ const snap = async db => (await db.query("select admin_snapshot() as s")).rows[0
 
 test("admin : instantané réservé à l'id de admin_config, alertes concentration et miroir", async () => {
   const db = await freshDb();
-  await login(db, A, "victor"); await login(db, B, "bea"); await login(db, C, "cyril");
+  await login(db, A, "victor", 12); await login(db, B, "bea", 12); await login(db, C, "cyril", 12);
   await assert.rejects(snap(db), /Accès réservé/, "sans configuration, personne");
   await db.query("insert into admin_config values (1, $1)", [A]);
   await assert.rejects(snap(db), /Accès réservé/, "un autre joueur");

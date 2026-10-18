@@ -45,7 +45,7 @@ test("H1 : banque, objets et Trésors rendus ou détruits, W conservés à l'uni
     + (select sum(case when s.kind = 'bonus' then s.price else floor(s.price * .6) end * i.qty) from inventory i join shop_items s on s.id = i.item_id where i.qty > 0) t`)).t;
   const hwm0 = (await db.query("select id, tal_hwm, tal_cum from profiles order by id")).rows;
   const gains0 = (await db.query("select id, gain from gains_board('total', 'all') order by id")).rows;
-  await migrateFrom(db, H1);
+  await migrateFrom(db, H1, "20261028400000"); // état de H1, avant les niveaux (H3)
 
   const r = (await db.query("select user_id, guild_id, kind, item, amount from h1_refunds order by id")).rows;
   const sum = (f) => r.filter(f).reduce((a, x) => a + x.amount, 0);
@@ -82,7 +82,7 @@ test("H1 : banque, objets et Trésors rendus ou détruits, W conservés à l'uni
 test("H1 : règles d'un joueur sans talent, niveau de départ, ordres à déclenchement gardés, parrainage en attente", async () => {
   const { db } = await before();
   await db.query("insert into talents values ($1, 'frais', 5), ($1, 'discretion', 4), ($1, 'calibre', 3)", [A]);
-  await migrateFrom(db, H1);
+  await migrateFrom(db, H1, "20261028400000"); // état de H1, avant les niveaux (H3)
   for (const id of [A, B, D]) {
     assert.equal(+(await one(db, "select aur_fee_rate($1) f", [id])).f, 0.001);
     assert.equal((await one(db, "select aur_max_lev($1) n", [id])).n, 15);

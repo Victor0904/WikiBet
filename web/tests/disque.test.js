@@ -8,7 +8,7 @@ const open = async (db, user, tk, dir, lev, stake) => (await db.query("select * 
 const bet = async (db, id) => (await db.query("select status, payout, exit, exit_at, closed_by from bets where id = $1", [id])).rows[0];
 
 test("liquidation : au prix de liquidation même après un trou de cours, jamais de solde négatif", async () => {
-  const db = await freshDb(); await login(db, A, "alice");
+  const db = await freshDb(); await login(db, A, "alice", 12);
   await tick(db, "SLM", 5, 10);
   const all = Math.floor(10000 / 1.005); // presque tout le solde engagé à ×5 (frais 0,1 % de mise × levier)
   const b = await open(db, A, "SLM", "up", 5, all);
@@ -26,7 +26,7 @@ test("liquidation : au prix de liquidation même après un trou de cours, jamais
 });
 
 test("liquidation : un passage ne relit que les nouveaux cours, mais n'en manque aucun", async () => {
-  const db = await freshDb(); await login(db, A, "alice");
+  const db = await freshDb(); await login(db, A, "alice", 12);
   await tick(db, "SLM", 26, 10);
   const b = await open(db, A, "SLM", "down", 5, 1000); // seuil : 12
   await db.query("update bets set created_at = now() - interval '25 seconds'");
@@ -43,7 +43,7 @@ test("liquidation : un passage ne relit que les nouveaux cours, mais n'en manque
 });
 
 test("cours à la seconde perdus (redémarrage) : les actions gardent la valeur de la dernière bougie, les ordres attendent", async () => {
-  const db = await freshDb(); await login(db, A, "alice");
+  const db = await freshDb(); await login(db, A, "alice", 12);
   await tick(db, "HLV", 3, 20);
   await db.query("select aur_settle()"); // bougie de l'heure en cours : clôture 20
   await db.query("insert into aur_holdings (user_id, tk, qty, cost) values ($1, 'HLV', 100, 2000)", [A]);

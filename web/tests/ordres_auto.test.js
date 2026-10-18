@@ -10,16 +10,19 @@ const exec = async db => { for (const d of await due(db)) await db.query("select
 const bet = async (db, id) => (await db.query("select * from bets where id = $1", [id])).rows[0];
 
 // Jusqu'aux niveaux de trader (H3) : 12 positions ouvertes pour tous.
-test("ordres auto : 12 positions ouvertes au plus pour tous", async () => {
+test("ordres auto : positions ouvertes selon le niveau (5 au niveau 1, 10 au niveau 12)", async () => {
   const db = await freshDb(); await login(db, A, "alice");
   await db.query("update profiles set cash = 1e6 where id = $1", [A]);
   await tick(db, 2, 10);
-  for (let i = 0; i < 12; i++) await open(db, "up", 1, 10);
-  await assert.rejects(open(db, "up", 1, 10), /Au plus 12 positions/);
+  for (let i = 0; i < 5; i++) await open(db, "up", 1, 10);
+  await assert.rejects(open(db, "up", 1, 10), /Au plus 5 positions/);
+  await login(db, A, null, 12);
+  for (let i = 0; i < 5; i++) await open(db, "up", 1, 10);
+  await assert.rejects(open(db, "up", 1, 10), /Au plus 10 positions/);
 });
 
 test("ordres auto : stop et objectif pour tous, exécutés au cours du marché quand le seuil est touché", async () => {
-  const db = await freshDb(); await login(db, A, "alice");
+  const db = await freshDb(); await login(db, A, "alice", 12);
   await db.query("update profiles set cash = 1e6 where id = $1", [A]);
   await tick(db, 10, 10);
   const b = await open(db, "up", 5, 100); // liquidation à 8
@@ -40,12 +43,12 @@ test("ordres auto : stop et objectif pour tous, exécutés au cours du marché q
 });
 
 // Ordres à déclenchement : gardés par ceux qui avaient le penthouse (trig_ok), jusqu'aux niveaux de trader (H3).
-test("ordres auto : ordre à déclenchement si le droit a été gardé, annulé avec son motif s'il échoue", async () => {
-  const db = await freshDb(); await login(db, A, "alice");
+test("ordres auto : ordre à déclenchement dès le niveau 10, annulé avec son motif s'il échoue", async () => {
+  const db = await freshDb(); await login(db, A, "alice", 9);
   await db.query("update profiles set cash = 1e6 where id = $1", [A]);
   await tick(db, 10, 10);
-  await assert.rejects(db.query("select aur_trigger_add('SLM', 'up', 1, 100, 9)"), /niveaux de trader/);
-  await db.query("update profiles set trig_ok = true where id = $1", [A]);
+  await assert.rejects(db.query("select aur_trigger_add('SLM', 'up', 1, 100, 9)"), /niveau 10/);
+  await login(db, A, null, 10);
   const { rows: [g] } = await db.query("select * from aur_trigger_add('SLM', 'up', 1, 100, 9)");
   assert.equal(g.above, false, "achat sur repli");
   const { rows: [g2] } = await db.query("select * from aur_trigger_add('SLM', 'down', 1, 1e9, 11)");

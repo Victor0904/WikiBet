@@ -64,6 +64,10 @@ export async function demoApi() {
     createProfile: (p, ref) => act("select * from create_profile($1, $2)", [p, ref || null]),
     myReferrals: async () => (await all("select my_referrals() as r"))[0].r,
     myRefunds: () => all("select * from my_refunds()"),
+    myQuests: async () => (await all("select my_quests() as r"))[0].r, // écrit (quêtes réussies) sans relancer tout l'écran
+    myPari: async () => (await all("select my_pari() as r"))[0].r,
+    pariVote: async choice => (await act("select pari_vote($1) as r", [choice])).r,
+    tutoDone: step => all("select tuto_done($1)", [step]),
     myNotices: () => all("select * from my_notices()"),
     noticeRead: id => all("select notice_read($1)", [id]),
     pseudoChange: pseudo => act("select * from pseudo_change($1)", [pseudo]),

@@ -11,7 +11,7 @@ const bet = (db, user, stake, payout, kind = "trade", at = "now()", lev = 1) =>
 
 test("classement des gains : du jour (minuit à Paris) et total, frais d'ouverture comptés", async () => {
   const db = await freshDb();
-  await login(db, A, "alice"); await login(db, B, "bob");
+  await login(db, A, "alice", 12); await login(db, B, "bob", 12);
   await bet(db, A, 100, 300);                                  // +200 aujourd'hui
   await bet(db, A, 100, 0, "trade", "now() - interval '3 days'"); // -100 il y a 3 jours
   await bet(db, B, 1000, 1100, "crypto", "now()", 10);          // +100 - 10 de frais d'ouverture
@@ -24,7 +24,7 @@ test("classement des gains : du jour (minuit à Paris) et total, frais d'ouvertu
 
 test("amis : demande, acceptation croisée, retrait, classement entre amis", async () => {
   const db = await freshDb();
-  await login(db, A, "alice"); await login(db, B, "bob"); await login(db, C, "chloe");
+  await login(db, A, "alice", 12); await login(db, B, "bob", 12); await login(db, C, "chloe", 12);
   await bet(db, C, 100, 900);
   await as(db, A);
   assert.equal((await db.query("select friend_add('BOB') as s")).rows[0].s, "envoye");
@@ -45,7 +45,7 @@ test("amis : demande, acceptation croisée, retrait, classement entre amis", asy
 
 test("guildes : une seule à la fois, sigle unique, exclusion par le fondateur, succession, classement", async () => {
   const db = await freshDb();
-  await login(db, A, "alice"); await login(db, B, "bob"); await login(db, C, "chloe");
+  await login(db, A, "alice", 12); await login(db, B, "bob", 12); await login(db, C, "chloe", 12);
   await bet(db, B, 100, 600);
   await as(db, A);
   const { rows: [g] } = await db.query("select * from guild_create('Les Taureaux', 'tor', 'On monte.')");

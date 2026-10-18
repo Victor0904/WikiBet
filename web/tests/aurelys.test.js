@@ -39,7 +39,7 @@ test("aurelys : un gros ordre pèse plus qu'un petit, et plus sur une petite val
 });
 
 test("aurelys : les cours et les nouvelles à venir restent cachés", async () => {
-  const db = await freshDb(); await login(db, A, "alice");
+  const db = await freshDb(); await login(db, A, "alice", 12);
   await tick(db, 3, 12); await tick(db, -5, 99);
   await db.query("insert into aur_news (id, t, cat, title) values (1, now() - interval '1 second', 'x', 'passée'), (2, now() + interval '5 seconds', 'x', 'future')");
   const { rows: [{ f }] } = await db.query("select aur_feed(null) as f");
@@ -53,7 +53,7 @@ test("aurelys : les cours et les nouvelles à venir restent cachés", async () =
 });
 
 test("aurelys : ordre au dernier cours plus l'impact, frais, flux enregistré, clôture", async () => {
-  const db = await freshDb(); await login(db, A, "alice");
+  const db = await freshDb(); await login(db, A, "alice", 12);
   await tick(db, 2, 10);
   const b = await open(db, "up", 5, 1000, .01);
   near(b.entry, 10.1, "achat : le prix monte de l'impact"); near(b.fees, 5, "0,1 % de 5 000");
@@ -70,7 +70,7 @@ test("aurelys : ordre au dernier cours plus l'impact, frais, flux enregistré, c
 });
 
 test("aurelys : plafond par action, cotation suspendue, marché à l'arrêt", async () => {
-  const db = await freshDb(); await login(db, A, "alice"); await veteran(db);
+  const db = await freshDb(); await login(db, A, "alice", 12); await veteran(db);
   await tick(db, 2, 10);
   await open(db, "up", 10, 9000);                                 // 90 000 Ꜷ sur 120 000 permis
   await open(db, "down", 10, 400);                                // 94 000 : encore sous le plafond
@@ -83,7 +83,7 @@ test("aurelys : plafond par action, cotation suspendue, marché à l'arrêt", as
 });
 
 test("aurelys : liquidation sur le premier cours qui touche le seuil (plus d'assurance depuis H1)", async () => {
-  const db = await freshDb(); await login(db, A, "alice"); await veteran(db);
+  const db = await freshDb(); await login(db, A, "alice", 12); await veteran(db);
   await tick(db, 15, 10);
   const b = await open(db, "up", 10, 1000);                       // liquidée sous 9
   await db.query("update bets set created_at = now() - interval '12 seconds'");
@@ -127,13 +127,14 @@ test("aurelys : une entreprise branchée sur un chiffre réel suit son écart à
   assert.ok(hot.n.some(n => n.cat === "reel" && n.tk === "GTR"), "le changement est annoncé dans les actualités");
 });
 
-// Jusqu'aux niveaux de trader (H3) : ×15 au plus pour tous, comme un joueur sans logement avant H1.
-test("aurelys : ×15 au plus pour tous jusqu'aux niveaux de trader, ×20 et ×25 refusés", async () => {
-  const db = await freshDb(); await login(db, A, "alice");
+// Levier par paliers de niveau (H3, détail dans progression.test.js) : ×10 au niveau 12, ×15 et ×20 plus tard ; ×25 disparu.
+test("aurelys : leviers ×1 à ×20 par paliers, ×25 et les autres refusés", async () => {
+  const db = await freshDb(); await login(db, A, "alice", 12);
   await tick(db, 2, 10);
-  assert.equal((await open(db, "up", 15, 100)).lev, 15);
-  await assert.rejects(open(db, "up", 20, 100), /×15 au plus/);
-  await assert.rejects(open(db, "up", 25, 100), /×15 au plus/);
+  assert.equal((await open(db, "up", 10, 100)).lev, 10);
+  assert.equal((await open(db, "up", 2, 100)).lev, 2);
+  await assert.rejects(open(db, "up", 15, 100), /niveau 25/);
+  await assert.rejects(open(db, "up", 25, 100), /invalide/);
   await assert.rejects(open(db, "up", 30, 100), /invalide/);
 });
 

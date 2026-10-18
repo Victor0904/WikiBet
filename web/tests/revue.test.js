@@ -9,7 +9,7 @@ const tick = (db, tk, ago, p) => db.query("insert into aur_ticks (tk, t, p) valu
 const open = async (db, user, tk, dir, lev, stake) => (await db.query("select * from aur_open($1, $2, $3, $4, $5, 0)", [user, tk, dir, lev, stake])).rows[0];
 
 test("jeune pousse : levier ×5 au plus", async () => {
-  const db = await freshDb(); await login(db, A, "alice");
+  const db = await freshDb(); await login(db, A, "alice", 12);
   await db.query("select aur_listing($1)", [JSON.stringify([{ tk: "NEO", name: "Néogen", sector: "sante", L: 3000, status: "listed", ipoPrice: 10, ipoAt: Date.now() / 1000 }])]);
   await tick(db, "NEO", 2, 10);
   await assert.rejects(open(db, A, "NEO", "up", 10, 100), /×5 au plus/);
@@ -18,7 +18,7 @@ test("jeune pousse : levier ×5 au plus", async () => {
 });
 
 test("patrimoine et faillite : une position compte pour sa valeur actuelle, pas pour sa mise", async () => {
-  const db = await freshDb(); await login(db, A, "alice");
+  const db = await freshDb(); await login(db, A, "alice", 12);
   await tick(db, "SLM", 3, 10);
   const b = await open(db, A, "SLM", "up", 5, 1000); // frais 5 W
   await tick(db, "SLM", 1, 9); // −10 % × 5 : il reste 500 W, moins 5 W de frais de clôture
@@ -29,7 +29,7 @@ test("patrimoine et faillite : une position compte pour sa valeur actuelle, pas 
 });
 
 test("alerte avant liquidation : à 25 %, puis à 10 % de la mise, une fois chacune, pour les abonnés", async () => {
-  const db = await freshDb(); await login(db, A, "alice"); await login(db, B, "bob");
+  const db = await freshDb(); await login(db, A, "alice", 12); await login(db, B, "bob", 12);
   await tick(db, "SLM", 4, 10);
   const a = await open(db, A, "SLM", "up", 10, 100), b = await open(db, B, "SLM", "up", 10, 100);
   await db.query("insert into push_subs values ('https://push.exemple/a', $1)", [A]);
@@ -48,7 +48,7 @@ test("alerte avant liquidation : à 25 %, puis à 10 % de la mise, une fois chac
 });
 
 test("bots : un ordre au plus toutes les 2 minutes, exécuté par le serveur ; faillite = retour à 10 000 W", async () => {
-  const db = await freshDb(); await login(db, A, "robot1");
+  const db = await freshDb(); await login(db, A, "robot1", 12);
   await db.query("update profiles set bot = true where id = $1", [A]);
   await tick(db, "SLM", 200, 10); await tick(db, "SLM", 1, 10.2);
   for (const tk of ["NXR", "HLV", "BCS", "FRC", "VLS", "OMB", "PXF", "MRV", "GTR", "LMR", "KST", "OND"]) await tick(db, tk, 1, 20);
@@ -65,7 +65,7 @@ test("bots : un ordre au plus toutes les 2 minutes, exécuté par le serveur ; f
 });
 
 test("salaire : une couverture (hausse + baisse sur la même action) ne compte pas ; dégressif avec le patrimoine", async () => {
-  const db = await freshDb(); await setClock(db, 4, 100); await login(db, A, "alice"); await login(db, B, "bob");
+  const db = await freshDb(); await setClock(db, 4, 100); await login(db, A, "alice", 12); await login(db, B, "bob", 12);
   await tick(db, "HLV", 2, 20); await tick(db, "SLM", 2, 10);
   await open(db, A, "HLV", "up", 5, 2000); await open(db, A, "HLV", "down", 5, 2000); // couverture : 0
   await open(db, A, "SLM", "up", 1, 1000);                                           // 1 000 W : 100 W
@@ -81,12 +81,12 @@ test("salaire : une couverture (hausse + baisse sur la même action) ne compte p
 });
 
 test("guilde de bots : un joueur qui la rejoint prend la place d'un bot et la direction", async () => {
-  const db = await freshDb(); await login(db, A, "robot1"); await login(db, B, "robot2");
+  const db = await freshDb(); await login(db, A, "robot1", 12); await login(db, B, "robot2", 12);
   await db.query("update profiles set bot = true");
   await db.query("select set_config('app.uid', $1, false)", [A]);
   const { rows: [g] } = await db.query("select * from guild_create('Les Taureaux', 'TAU')");
   await db.query("insert into guild_members (user_id, guild_id) values ($1, $2)", [B, g.id]);
-  const H = "00000000-0000-0000-0000-00000000000c"; await login(db, H, "humain");
+  const H = "00000000-0000-0000-0000-00000000000c"; await login(db, H, "humain", 12);
   await db.query("select guild_join($1)", [g.id]);
   const { rows: m } = await db.query("select user_id from guild_members where guild_id = $1 order by user_id", [g.id]);
   assert.deepEqual(m.map(r => r.user_id), [A, H], "robot2 a cédé sa place");
@@ -94,7 +94,7 @@ test("guilde de bots : un joueur qui la rejoint prend la place d'un bot et la di
 });
 
 test("bots : paris réglés depuis 3 jours remplacés par un cumul, même total au classement", async () => {
-  const db = await freshDb(); await login(db, A, "robot1");
+  const db = await freshDb(); await login(db, A, "robot1", 12);
   await db.query("update profiles set bot = true");
   await tick(db, "SLM", 2, 10);
   for (const st of [100, 200, 300]) { const b = await open(db, A, "SLM", "up", 1, st); await db.query("select aur_close($1, $2, 0)", [A, b.id]) }

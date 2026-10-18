@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { LANG, setLang } from "./i18n.js";
 const ICONS = {
   market: <path d="M3 17l5-6 4 3 6-8 3 4" />,
-  actions: <><path d="M6 4v16M12 7v13M18 3v14" /><rect x="4" y="8" width="4" height="7" rx="1" /><rect x="10" y="10" width="4" height="6" rx="1" /><rect x="16" y="6" width="4" height="6" rx="1" /></>,
+  quests: <><path d="M9 6h11M9 12h11M9 18h11" /><path d="m3.5 6 1.5 1.5L7.5 5M3.5 12l1.5 1.5 2.5-2.5M3.5 18l1.5 1.5 2.5-2.5" /></>,
   positions: <><rect x="3" y="7" width="18" height="13" rx="2.5" /><path d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7M3 12h18" /></>,
   guild: <><path d="M5 21V4M5 4h11l-2 3.5L16 11H5" /><path d="M3 21h6" /></>,
   more: <><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></>,
@@ -11,7 +11,7 @@ const ICONS = {
 export const Icon = ({ name }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[name]}</svg>;
 
 export function Dock({ tab, setTab, badge }) {
-  const items = [["market", "Marché"], ["actions", "Actions"], ["positions", "Positions"], ["guild", "Guilde"], ["more", "Plus"]];
+  const items = [["market", "Marché"], ["positions", "Positions"], ["quests", "Quêtes"], ["guild", "Guilde"], ["more", "Plus"]];
   const i = items.findIndex(([k]) => k === tab);
   return (
     <nav className="dock" aria-label="Sections">

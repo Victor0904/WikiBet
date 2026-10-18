@@ -9,7 +9,7 @@ const bet = async (db, id) => (await db.query("select * from bets where id = $1"
 const exec = async db => { for (const d of (await db.query("select * from aur_due()")).rows) await db.query("select aur_auto_exec($1, $2, 0)", [d.what, d.id]) };
 
 test("notifications : motif de clôture (liquidation, stop, objectif, main) et liquidations à annoncer", async () => {
-  const db = await freshDb(); await login(db, A, "alice");
+  const db = await freshDb(); await login(db, A, "alice", 12);
   await db.query("update profiles set cash = 1e6 where id = $1", [A]);
   await tick(db, 20, 10);
   const liq = await open(db, "up", 10, 100), stop = await open(db, "up", 5, 100), obj = await open(db, "down", 5, 100), hand = await open(db, "up", 1, 100);

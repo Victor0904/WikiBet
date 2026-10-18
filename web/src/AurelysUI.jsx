@@ -58,10 +58,10 @@ const REG_TXT = {
 const MAJOR = new Set(["resultats", "essai", "scandale", "produit", "taux", "crise", "baleine", "suspension", "reel", "macro"]);
 const isMajor = n => MAJOR.has(n.cat) || Math.abs(n.sent) >= .7;
 
-// La liste des actions a son propre onglet (stocks) ; le Marché garde tableau de bord, journal et carte.
-const VIEWS = [["board", "Tableau de bord"], ["news", "Journal"], ["heat", "Carte"], ["rumors", "Rumeurs"]];
-export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscribe, stocks, onList }) {
-  const [v, setView] = useState("board"), [read, setRead] = useState(null), view = stocks ? "list" : v;
+// Le Marché : tableau de bord, liste des actions, journal, carte et rumeurs.
+const VIEWS = [["board", "Tableau de bord"], ["list", "Actions"], ["news", "Journal"], ["heat", "Carte"], ["rumors", "Rumeurs"]];
+export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscribe }) {
+  const [view, setView] = useState("board"), [read, setRead] = useState(null), onList = () => setView("list");
   const live = aur.live;
   // Rumeurs : relues toutes les 10 s (pastille sur l'onglet quand une nouvelle arrive, dernière vue gardée dans le navigateur).
   const [rum, setRum] = useState(null), [seen, setSeen] = useState(() => { try { return +localStorage.getItem("wb-rumeurs") || 0 } catch { return 0 } });
@@ -77,9 +77,9 @@ export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscri
       <div className="feed-info"><i className={"pulse" + (live ? "" : " off")} aria-hidden="true" />{live ? "Bourse fictive, simulée en continu par des bots et les joueurs" : "Connexion au marché…"} · un jour d'Aurelys = 1 h réelle</div>
       <AurBar aur={aur} now={now} />
       <Flash aur={aur} now={now} onDetail={onDetail} />
-      {!stocks && <div className="chips" role="group" aria-label="Vue">
+      <div className="chips" role="group" aria-label="Vue">
         {VIEWS.map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}{k === "rumors" && top > seen && <i className="chip-dot" role="img" aria-label="nouvelle rumeur" />}</button>)}
-      </div>}
+      </div>
       {view === "board" ? <Board aur={aur} now={now} onDetail={onDetail} onNews={() => setView("news")} onRead={setRead} onList={onList} />
         : view === "list" ? <List aur={aur} now={now} bets={bets} onPick={onPick} onDetail={onDetail} onSubscribe={onSubscribe} onRead={setRead} />
         : view === "news" ? <News aur={aur} now={now} onDetail={onDetail} onRead={setRead} />

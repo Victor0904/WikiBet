@@ -51,7 +51,7 @@ function walk(n, parent, ctx, from) {
   for (const k in n) if (k !== "type" && k !== "start" && k !== "end" && k !== "range" && k !== "loc") walk(n[k], n, ctx, from);
 }
 const files = [...["src"].flatMap(d => readdirSync(new URL(d + "/", root)).filter(f => /\.(jsx?|mjs)$/.test(f) && !/^(en|i18n|seed|engine|demo)\.js$/.test(f)).map(f => d + "/" + f)),
-  "supabase/functions/_shared/aurelys-stories.js", "supabase/functions/aurelys/index.ts"];
+  "supabase/functions/_shared/aurelys-stories.js", "supabase/functions/_shared/progression.js", "supabase/functions/aurelys/index.ts"];
 for (const f of files) { const r = parseSync(f, read(f), { lang: f.endsWith(".ts") ? "ts" : "jsx" }); walk(r.program, null, null, f) }
 // Données du moteur affichées telles quelles : secteurs, humeurs, personnages, sociétés.
 for (const s of Object.values(SECTORS)) add(s.name, "secteurs");

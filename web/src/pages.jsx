@@ -2,6 +2,7 @@
 import { PrivacyText } from "./privacy.jsx";
 import { t } from "./i18n.js";
 import { W, CAP0_TXT } from "./format.js";
+import { levelOf } from "../supabase/functions/_shared/progression.js";
 import { SubHeader } from "./nav.jsx";
 import { AccountLink } from "./social.jsx";
 import { useEffect, useState } from "react";
@@ -64,7 +65,7 @@ export function Profile({ api, me, board, patrimoine, refs, trial, say, go, hasP
         <Avatar pseudo={me.pseudo} />
         <div className="who-txt">
           <h1>{me.pseudo}{guild && <span className="gtag">{guild.tag}</span>}</h1>
-          {me.lvl_floor != null && <small>Niveau {me.lvl_floor}</small>}
+          <small>Niveau {Math.max(levelOf(me.xp ?? 0), me.lvl_floor ?? 1)}</small>
         </div>
         <button type="button" className="gear" onClick={() => go("account")} aria-label="Mon compte">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.0 10.5L21.4 10.8L21.4 13.2L19.0 13.5L18.1 15.9L19.5 17.8L17.8 19.5L15.9 18.1L13.5 19.0L13.2 21.4L10.8 21.4L10.5 19.0L8.1 18.1L6.2 19.5L4.5 17.8L5.9 15.9L5.0 13.5L2.6 13.2L2.6 10.8L5.0 10.5L5.9 8.1L4.5 6.2L6.2 4.5L8.1 5.9L10.5 5.0L10.8 2.6L13.2 2.6L13.5 5.0L15.9 5.9L17.8 4.5L19.5 6.2L18.1 8.1Z" /><circle cx="12" cy="12" r="3" /></svg>

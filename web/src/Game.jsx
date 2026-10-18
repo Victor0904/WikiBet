@@ -1,10 +1,12 @@
-import { LOCALE } from "./i18n.js";
+import { LOCALE, t } from "./i18n.js";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { liqPrice, BK_LIMIT, CAP0, EPOCH, CYCLE_MS } from "./engine.js";
 import { nf0, nf2, W, sW, clock, cls, HIST_DAYS, ALERTS_MAX, MAX_POS } from "./format.js";
+import { LEVS, LEV_LEVEL, LEV_DIVISION, DIVISIONS, QUEST_BY, TRIGGER_LEVEL, unlocksAt } from "../supabase/functions/_shared/progression.js";
 import { useAurelys } from "./aurelys.js";
 import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
 import { Achievements } from "./Succes.jsx";
+import { Quests } from "./Quetes.jsx";
 import { BY as AUR, slip, FEE } from "../supabase/functions/_shared/aurelys.js";
 import { Dock, Segmented, SubHeader, Logo, LangSwitch, LogoLoader } from "./nav.jsx";
 import { Profile, HowTo, Account, Legal, Privacy, PushPanel } from "./pages.jsx";
@@ -18,7 +20,6 @@ const sessName = k => { const d = new Date(EPOCH + k * CYCLE_MS), t = d.toLocale
 
 const feeOpen = r => r.kind === "aurelys" ? r.fee_open ?? r.stake * r.lev * FEE : 0; // frais d'ouverture, en plus de la mise
 
-const AUR_LEVS = [1, 5, 10, 15];
 // Montants cumulables : le premier appui remplace la mise affichée, les suivants s'ajoutent (10, 20, 30…).
 // 10 000 n'apparaît qu'au-delà de 10 000 W de solde.
 function StakeChips({ value, set, cash, max }) {
@@ -101,19 +102,32 @@ export default function Game({ api, trial = false, onNoProfile }) {
     check(); const id = setInterval(check, 30000);
     return () => { alive = false; clearInterval(id) };
   }, [api]); // eslint-disable-line
-  // Messages du serveur (notices), lus une fois : pseudo renommé d'office, refonte du jeu (H1)…
+  // Messages du serveur (notices), lus une fois, relus toutes les 30 s : pseudo renommé d'office, refonte du jeu (H1),
+  // niveau gagné, quête réussie.
   const [notice, setNotice] = useState(null);
   useEffect(() => {
-    api.myNotices?.().then(list => {
+    const check = () => api.myNotices?.().then(list => {
+      const lines = [];
       for (const n of list ?? []) {
         if (n.kind === "pseudo") setToast({ text: `Ton pseudo ressemblait à une adresse e-mail, visible de tous. Il devient ${n.body.pseudo} : tu peux en choisir un autre dans Mon compte.`,
           tone: "up", long: true, at: Date.now(), action: { label: "Choisir mon pseudo", go: () => { setTab("more"); setMore("account") } } });
         if (n.kind === "h1") setNotice(n.body);
+        // Phrases assemblées : traduites morceau par morceau (le dictionnaire ne connaît pas la phrase entière).
+        if (n.kind === "quest") lines.push(t("Quête réussie : {q} · +{xp} XP", { q: t(QUEST_BY[n.body.code]?.text ?? n.body.code), xp: n.body.xp }));
+        if (n.kind === "level") {
+          const got = []; for (let l = n.body.from + 1; l <= n.body.to; l++) got.push(...unlocksAt(l));
+          lines.push(t("Niveau {n} !", { n: n.body.to }) + (got.length ? " " + t("Tu débloques : {list}.", { list: got.map(x => t(x)).join(", ") }) : ""));
+        }
         api.noticeRead(n.id).catch(() => {});
       }
+      if (lines.length) setToast({ text: lines.join(" · "), tone: "up", long: true, at: Date.now(), action: { label: "Voir mes quêtes", go: () => setTab("quests") } });
     }).catch(() => {});
+    check(); const id = setInterval(() => { if (!document.hidden) check() }, 30000);
+    return () => clearInterval(id);
   }, [api]);
-  const aur = useAurelys(api, tab === "market" || tab === "actions" || !!aurDetail || alerts.length > 0 || bets.some(b => b.status === "open" && b.kind === "aurelys"));
+  // Tutoriel (XP de la première séance) : ouvrir une fiche société ; « Comment jouer » est compté à sa fermeture.
+  useEffect(() => { if (aurDetail) api.tutoDone?.("fiche").catch(() => {}) }, [api, aurDetail]);
+  const aur = useAurelys(api, tab === "market" || !!aurDetail || alerts.length > 0 || bets.some(b => b.status === "open" && b.kind === "aurelys"));
   const beat = Math.floor(now / 2500);
   useEffect(() => {
     const hit = alerts.filter(a => { const p = aur.quotes[a.tk]?.p; return p != null && (a.above ? p >= a.price : p <= a.price) });
@@ -136,7 +150,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
   const cancelTrigger = id => run(() => api.aurTriggerCancel(id), () => "Ordre annulé.");
   const closeTrade = b => run(() => b.kind === "aurelys" ? api.aurOrder({ action: "close", id: b.id }).finally(() => { setTimeout(() => unlockCheck.current?.(), 1500) }) : api.closeTrade(b.id),
     r => `Clôturée : ${sW(r.payout - r.stake - feeOpen(r))}${feeOpen(r) ? ` (frais ${W(r.fees)})` : ""}`);
-  const howtoDone = () => { try { localStorage.setItem("wb-howto", "1") } catch { } setFirstVisit(false); setMore(null); setTab("market") };
+  const howtoDone = () => { try { localStorage.setItem("wb-howto", "1") } catch { } api.tutoDone?.("howto").catch(() => {}); setFirstVisit(false); setMore(null); setTab("market") };
   const holdPx = h => h.status === "listed" || h.status === "core" ? aur.quotes[h.tk]?.p ?? h.price : h.price; // cours en direct
   const holdsValue = holds.reduce((a, h) => a + h.qty * holdPx(h), 0), patrimoine = me.cash + openStake + holdsValue;
   const showHowto = firstVisit || (tab === "more" && more === "howto");
@@ -159,10 +173,10 @@ export default function Game({ api, trial = false, onNoProfile }) {
 
         <main className="main">
           <div key={showHowto ? "howto" : tab + (more ?? "")} className="view-anim">
-          {showHowto ? <HowTo first={firstVisit} onBack={firstVisit ? howtoDone : () => setMore(null)} /> : <>
-          {(tab === "market" || tab === "actions") && <MiniTicker aur={aur} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
+          {showHowto ? <HowTo first={firstVisit} onBack={firstVisit ? howtoDone : () => { api.tutoDone?.("howto").catch(() => {}); setMore(null) }} /> : <>
+          {tab === "market" && <MiniTicker aur={aur} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
 
-          {(tab === "market" || tab === "actions") && <AurelysMarket api={api} stocks={tab === "actions"} onList={() => go("actions")} aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onSubscribe={tk => setInvest({ tk, mode: "round" })} onDetail={(tk, hl) => { setAurDetail(tk); setAurHl(hl ?? null) }} />}
+          {tab === "market" && <AurelysMarket api={api} aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onSubscribe={tk => setInvest({ tk, mode: "round" })} onDetail={(tk, hl) => { setAurDetail(tk); setAurHl(hl ?? null) }} />}
 
           {tab === "positions" && <>
             <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` · ${open.length}` : ""}`], ["folio", "Portefeuille"], ["history", "Historique"]]} />
@@ -176,6 +190,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
             </> : <History bets={withExtras(bets.filter(b => b.status !== "open"), refs, refunds)} />}
           </>}
 
+          {tab === "quests" && <Quests api={api} now={now} say={say} />}
           {tab === "guild" && (trial ? <><SubHeader title="Guilde" /><Locked what="Les guildes" /></> : <Guilds api={api} me={me} say={say} />)}
 
           {tab === "more" && (
@@ -222,11 +237,11 @@ function H1Notice({ n, onClose }) {
     <div className="scrim" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label="Le jeu change">
         <div className="sheet-h"><b>Le jeu change</b><button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button></div>
-        <p>Le QG, la banque, les talents et la ville de guilde sont retirés. Arrivent bientôt : niveaux de trader, quêtes, pari du jour, ligues et guildes à objectifs.</p>
+        <p>Le QG, la banque, les talents et la ville de guilde sont retirés. Nouveau : niveaux de trader, quêtes et pari du jour (onglet Quêtes). Bientôt : ligues et guildes à objectifs.</p>
         {n.w > 0 && <p>Remboursement de tes logements, objets et parts de Trésor : <b className="mono">{W(n.w)}</b> dans ton solde.</p>}
         {n.bank > 0 && <p>Ton dépôt à la banque est revenu dans ton solde : <b className="mono">{W(n.bank)}</b>.</p>}
         <p>Ton niveau de trader de départ : <b className="mono">{n.level}</b>.</p>
-        <p className="muted small">Pour tous : stop et objectif, levier jusqu'à ×15, 12 positions ouvertes en même temps. Ces remboursements ne comptent pas dans les classements de gains.</p>
+        <p className="muted small">Stop et objectif pour tous. Le levier et le nombre de positions ouvertes suivent maintenant ton niveau ; tes positions déjà ouvertes ne changent pas. Ces remboursements ne comptent pas dans les classements de gains.</p>
         <button type="button" className="btn big primary" onClick={onClose}>Compris</button>
       </div>
     </div>
@@ -464,11 +479,13 @@ function Board({ board, me }) {
 
 function Ticket({ aur, me, ticket, openCount, pref, setPref, onClose, onSubmit }) {
   const [stake, setStake] = useState(pref.stake), [busy, setBusy] = useState(false), [dir, setDir] = useState(ticket.dir), [trig, setTrig] = useState("");
-  const terms = aur.terms ?? {}, trigPx = trig.trim() === "" ? null : +trig.replace(",", "."), maxPos = terms.max_pos ?? MAX_POS, full = openCount >= maxPos;
+  const terms = aur.terms ?? {}, level = terms.level ?? 1, division = terms.division ?? 0, trigPx = trig.trim() === "" ? null : +trig.replace(",", "."), maxPos = terms.max_pos ?? MAX_POS, full = openCount >= maxPos;
   const set = p => setPref(x => ({ ...x, ...p }));
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k) }, [onClose]);
   // Levier maximal décidé par le serveur (my_terms) ; jeunes pousses : ×5 au plus (vérifié par le serveur).
-  const lev0 = terms.max_lev ?? 15, young = aur.young.some(s => s.tk === ticket.tk), maxLev = young ? Math.min(5, lev0) : lev0;
+  // Un levier fermé dit ce qui l'ouvre : le niveau (pour toujours) ou la ligue (le temps d'y rester).
+  const lockOf = v => level < LEV_LEVEL[v] ? `×${v} : débloqué au niveau ${LEV_LEVEL[v]} (tu es niveau ${level}).` : `×${v} : en ligue ${DIVISIONS[LEV_DIVISION[v]]} ou plus.`;
+  const lev0 = terms.max_lev ?? 1, young = aur.young.some(s => s.tk === ticket.tk), maxLev = young ? Math.min(5, lev0) : lev0;
   useEffect(() => { if (pref.lev > maxLev) setPref(x => ({ ...x, lev: maxLev })) }, [maxLev, pref.lev, setPref]);
   const fee = Math.max(1, stake * pref.lev * aur.feeRate);
   const cap = aurCap(ticket.tk), aq = aur.quotes[ticket.tk], overCap = stake * pref.lev > cap;
@@ -487,8 +504,9 @@ function Ticket({ aur, me, ticket, openCount, pref, setPref, onClose, onSubmit }
         <button type="button" aria-pressed={dir === "down"} className="sell" onClick={() => setDir("down")}>▼ Baisse</button>
       </div>
       <label>Levier</label>
-      <div className="seg" role="group" aria-label="Levier">{AUR_LEVS.map(v => <button key={v} type="button" aria-pressed={pref.lev === v} disabled={v > maxLev} onClick={() => set({ lev: v })}>×{v}{v > maxLev ? " 🔒" : ""}</button>)}</div>
-      {young && <p className="muted small">Jeune pousse, très volatile : levier ×5 au plus.</p>}
+      <div className="seg" role="group" aria-label="Levier">{LEVS.map(v => <button key={v} type="button" aria-pressed={pref.lev === v} disabled={v > maxLev} title={v > maxLev ? lockOf(v) : undefined} onClick={() => set({ lev: v })}>×{v}{v > maxLev ? " 🔒" : ""}</button>)}</div>
+      {young ? <p className="muted small">Jeune pousse, très volatile : levier ×5 au plus.</p>
+        : LEVS.some(v => v > maxLev) && <p className="muted small">{lockOf(LEVS.find(v => v > maxLev))}</p>}
       <div className="rows mono">
         <div className="row"><span>Cours actuel</span><b>{aurPx(p)}</b></div>
         <div className="row"><span>Impact de ton ordre (estimé)</span><b>{dir === "up" ? "+" : "−"}{nf2.format(sl * 100)} %</b></div>
@@ -498,6 +516,7 @@ function Ticket({ aur, me, ticket, openCount, pref, setPref, onClose, onSubmit }
         <div className="row"><span>Liquidation à</span><b>{aurPx(liqPrice(b))}</b></div>
         <div className="row"><span>Plafond sur cette action</span><b>{W(cap)} engagés</b></div>
       </div>
+      {!terms.triggers && <p className="muted small">Ordres à déclenchement (ouvrir quand le cours atteint un seuil) : niveau {TRIGGER_LEVEL}.</p>}
       {terms.triggers && <>
         <label htmlFor="trig">Ouvrir seulement quand le cours atteint (facultatif)</label>
         <input id="trig" className="mono" inputMode="decimal" placeholder="tout de suite" value={trig} onChange={e => setTrig(e.target.value)} />

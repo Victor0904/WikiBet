@@ -66,7 +66,7 @@ try {
   await b.evaluate(`localStorage.setItem("wb-howto", "1"); (() => { const i = document.querySelector("input"), set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
     set.call(i, "Camille"); i.dispatchEvent(new Event("input", { bubbles: true })); return true })()`);
   await b.click("Entrer"); await b.waitFor("!!document.querySelector('.dock')", 120000);
-  await b.evaluate(`window.__wbDemo.query("select guild_create('Les Baleines', 'BAL', 'On achète la rumeur, on vend la nouvelle')").then(() => true)`);
+  await b.evaluate(`window.__wbDemo.query("update profiles set xp = 9999 where not bot").then(() => window.__wbDemo.query("select guild_create('Les Baleines', 'BAL', 'On achète la rumeur, on vend la nouvelle')")).then(() => true)`);
   await sleep(60000); // une base neuve : une minute de cours et de nouvelles
   await b.shot(pub + "captures/marche.webp", false, "webp");
   await b.evaluate(`document.querySelector("main .as-link").click(), true`); await b.waitFor("!!document.querySelector('.sheet.detail')");
