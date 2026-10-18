@@ -88,7 +88,7 @@ export function AurelysMarket({ api, aur, now, bets, onDetail, onSubscribe }) {
   const top = rum?.list[0]?.id ?? 0;
   useEffect(() => { if (view === "rumors" && top > seen) { setSeen(top); try { localStorage.setItem("wb-rumeurs", String(top)) } catch { } } }, [view, top, seen]);
   return (
-    <section>
+    <section className="aur-market">
       {view === "board" ? <AurHero aur={aur} now={now} /> : <AurLine aur={aur} now={now} />}
       <Flash aur={aur} now={now} onDetail={onDetail} />
       <div className="tabs" role="group" aria-label="Vue du marché">
@@ -136,7 +136,7 @@ function Rumors({ data, now, onDetail }) {
         );
       })}
       {!list.length && <p className="muted small">Aucune rumeur ici pour l'instant.</p>}
-      <div className="panel">
+      <section className="d-sec">
         <h2>Sur 7 jours</h2>
         {s?.n ? <>
           <div className="row"><span>Rumeurs résolues</span><b className="mono">{s.n}</b></div>
@@ -144,7 +144,7 @@ function Rumors({ data, now, onDetail }) {
           <div className="row"><span>Réaction moyenne du cours, dans le sens de la rumeur</span><b className={"mono " + cls(s.chg ?? 0)}>{s.chg == null ? "—" : pct(s.chg)}</b></div>
         </> : <p className="muted small">Pas encore de rumeur résolue.</p>}
         <p className="muted small">Réaction : du cours à la sortie de la rumeur jusqu'à sa résolution (ou jusqu'à maintenant si elle est en cours).</p>
-      </div>
+      </section>
     </div>
   );
 }

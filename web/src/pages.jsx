@@ -135,9 +135,10 @@ const STEPS = [
   ["La Bourse d'Aurelys", "Un pays fictif, 13 entreprises inventées, une bourse ouverte 24 h/24. Un jour d'Aurelys dure 1 h réelle : tu as le temps de lire et de réfléchir. Les prix naissent des ordres de bots aux caractères différents, de baleines et des joueurs. Ton propre ordre fait bouger le prix : plus il est gros, et plus l'action est petite, plus tu paies cher."],
   ["Résultats et consensus", "Avant chaque publication de résultats, les analystes annoncent ce qu'ils attendent. Le cours réagit à la surprise, pas au chiffre : +12 % quand on attendait +8 %, ça monte ; +12 % quand on attendait +15 %, ça baisse. Les indices sortent avant : commandes, rumeurs, révisions des analystes."],
   ["Des entreprises branchées sur le réel", "Granterre la pluie et la chaleur en Beauce, Helvane la consommation électrique française, Lumirue les jours fériés et la météo du week-end. Ces chiffres sont réels et à venir : celui qui voit venir une canicule ou un pont a un temps d'avance."],
-  ["Prendre position", "▲ si tu penses que le cours va monter, ▼ s'il va baisser. Ton gain suit la variation, multipliée par le levier : à ×5, +2 % de cours font +10 % sur ta mise. Leviers ×1 à ×15. Sur une jeune pousse, ×5 au plus. Frais de 0,1 % du montant engagé à l'ouverture et à la clôture. Si la position perd toute sa mise, elle est liquidée."],
+  ["Prendre position", "▲ si tu penses que le cours va monter, ▼ s'il va baisser. Ton gain suit la variation, multipliée par le levier : à ×5, +2 % de cours font +10 % sur ta mise. Le levier se débloque avec ton niveau de trader : ×2 au niveau 2, ×5 au 5, ×10 au 12 ; ×15 et ×20 demandent aussi une bonne ligue. Sur une jeune pousse, ×5 au plus. Frais de 0,1 % du montant engagé à l'ouverture et à la clôture. Si la position perd toute sa mise, elle est liquidée."],
   ["Investir sur le long terme", "Dans la fiche d'une entreprise, « Investir » achète de vraies actions : sans levier, sans liquidation, à garder aussi longtemps que tu veux. Certaines versent un dividende chaque jour d'Aurelys. De jeunes entreprises entrent régulièrement en bourse : avec 50 000 W de patrimoine, tu peux souscrire à leur levée de fonds avant la cotation. Elles peuvent beaucoup rapporter… ou faire faillite. Lis leurs articles dans le Courrier d'Aurelys."],
-  ["Stop, objectif et succès", "Sur chaque position, pose un stop (clôture si le cours va contre toi) et un objectif (clôture quand le gain est atteint). Jusqu'à 12 positions ouvertes en même temps. Tes succès se débloquent en jouant : séries, gains, données réelles, et quelques secrets."],
+  ["Stop, objectif et succès", "Sur chaque position, pose un stop (clôture si le cours va contre toi) et un objectif (clôture quand le gain est atteint). Le nombre de positions ouvertes en même temps grandit avec ton niveau. Tes succès se débloquent en jouant : séries, gains, données réelles, et quelques secrets."],
+  ["Niveaux, quêtes et pari du jour", "Ton niveau de trader monte avec l'XP des quêtes (3 par jour, 3 par semaine), de ta série de jours et du pari du jour, jamais avec tes gains. Chaque niveau débloque quelque chose : levier, positions, ordres à déclenchement, guilde. Le pari du jour est gratuit : vote avant 14 h, réponse à 20 h."],
   ["Classements, amis et guildes", "Trois classements : les gains du jour (remis à zéro à minuit), les gains de tous les temps et le patrimoine (solde, valeur actuelle de tes positions et actions). Ajoute tes amis par leur pseudo, ou rejoins une guilde de 30 traders au plus. Lie ta partie à un e-mail dans Mon compte pour la garder."],
   ["Salaire et faillite", "Toutes les 11 minutes, un salaire de 10 % de tes mises sur Aurelys (500 W au plus). Une position compte si elle est restée ouverte une heure d'Aurelys (2 min 30) ; une hausse et une baisse sur la même action s'annulent. C'est une aide pour remonter : salaire plein sous 20 000 W de patrimoine, de moins en moins au-dessus, plus rien à 100 000 W. Sous 2 000 W de patrimoine, tu peux repartir à " + CAP0_TXT + " depuis Mon compte. Le compteur de faillites est visible de tous."],
 ];
@@ -146,9 +147,9 @@ export function HowTo({ onBack, first }) {
   return (
     <section className="howto">
       {first ? <h2 className="howto-title">Bienvenue sur Aurelys</h2> : <SubHeader title="Comment jouer" onBack={onBack} />}
-      <ol className="steps">
-        {STEPS.map(([t, p], i) => <li key={t} className="panel"><span className="step-n mono">{i + 1}</span><div><b>{t}</b><p>{p}</p></div></li>)}
-      </ol>
+      <div className="guide">
+        {STEPS.map(([t, p]) => <section key={t}><h2>{t}</h2><p>{p}</p></section>)}
+      </div>
       <button type="button" className="btn primary big" onClick={onBack}>{first ? "C'est parti" : "Retour"}</button>
     </section>
   );

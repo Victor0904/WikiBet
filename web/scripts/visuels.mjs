@@ -69,7 +69,7 @@ try {
   await b.evaluate(`window.__wbDemo.query("update profiles set xp = 9999 where not bot").then(() => window.__wbDemo.query("select guild_create('Les Baleines', 'BAL', 'On achète la rumeur, on vend la nouvelle')")).then(() => true)`);
   await sleep(60000); // une base neuve : une minute de cours et de nouvelles
   await b.shot(pub + "captures/marche.webp", false, "webp");
-  await b.evaluate(`document.querySelector("main .as-link").click(), true`); await b.waitFor("!!document.querySelector('.sheet.detail')");
+  await b.evaluate(`document.querySelector("main .p-row").click(), true`); await b.waitFor("!!document.querySelector('.sheet.detail')");
   await b.click("1 min", ".sheet.detail"); await sleep(2500);
   await b.shot(pub + "captures/fiche.webp", false, "webp");
   await b.evaluate(`document.querySelector(".sheet.detail .x").click(), true`);

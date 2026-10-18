@@ -72,7 +72,7 @@ export default function Landing() {
         </figure>
       </section>
 
-      <section className="land-band panel" aria-label="Le marché vit en ce moment">
+      <section className="land-band" aria-label="Le marché vit en ce moment">
         <h2>Le marché vit en ce moment <span className="muted">aperçu simulé</span></h2>
         <div className="land-quotes">
           <div><small>AUR-12</small><b className="mono">{px(d?.last[INDEX])}</b><span className={"mono " + cls(chg(INDEX))}>{pct(chg(INDEX))}</span></div>
@@ -94,10 +94,10 @@ export default function Landing() {
       <section className="land-sec">
         <h2>Ce qui le rend différent</h2>
         <div className="land-cards">
-          <article className="panel"><b>Un marché qui réagit à tes ordres</b><p>Les prix naissent des ordres des joueurs, des bots et des baleines. Un gros ordre fait bouger le cours.</p></article>
-          <article className="panel"><b>Branché sur le vrai monde</b><p>Granterre suit la pluie en Beauce, Helvane la consommation d'électricité (RTE), Lumirue les jours fériés.</p></article>
-          <article className="panel"><b>Des guildes</b><p>Rejoins une guilde de 30 traders au plus et grimpe au classement des guildes avec les autres membres.</p></article>
-          <article className="panel"><b>Succès</b><p>47 succès à débloquer en jouant : séries, gains, données réelles, et quelques secrets.</p></article>
+          <article><b>Un marché qui réagit à tes ordres</b><p>Les prix naissent des ordres des joueurs, des bots et des baleines. Un gros ordre fait bouger le cours.</p></article>
+          <article><b>Branché sur le vrai monde</b><p>Granterre suit la pluie en Beauce, Helvane la consommation d'électricité (RTE), Lumirue les jours fériés.</p></article>
+          <article><b>Niveaux, quêtes, pari du jour</b><p>Des quêtes chaque jour et chaque semaine, un pari gratuit : ton niveau monte, et chaque niveau débloque du levier.</p></article>
+          <article><b>Des guildes</b><p>Rejoins une guilde de 30 traders au plus et grimpe au classement des guildes avec les autres membres.</p></article>
         </div>
       </section>
 
