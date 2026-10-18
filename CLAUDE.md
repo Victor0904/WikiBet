@@ -118,6 +118,15 @@ Deux versions cohabitent :
 
 Noir bleuté `#08090D`, panneaux `#0F1117`/`#161922`, filets `#222634`. Gain `#1FCB8B`, perte `#F04B5C` (toujours doublés d'un signe ou d'une flèche ▲▼), action principale ambre `#F5B83D`. IBM Plex Sans (texte), Plex Sans Condensed (titres, noms), Plex Mono (chiffres). Mobile : positions en tête puis onglets Marché / Duels / Historique / Classement. À partir de 1024 px : positions en colonne gauche collante.
 
+**Refonte visuelle (octobre 2026, skill `frontend-design` dans `.claude/skills`, validée par Victor sur l'écran Plus) :**
+- Une seule chose marquante par écran : l'anneau du niveau (Plus), l'indice AUR-12 et sa courbe (Marché), la courbe (fiche), le gain ou la perte (carte de position), le graphique en bougies (accueil). Tout le reste reste calme.
+- Listes et filets plutôt que cartes : liste groupée `.p-list` / `.p-row` (lignes cliquables, valeur à droite), liste simple `.plain` / `.plain-row` (libellé, chiffre), chiffres côte à côte séparés par des filets (`.p-figs`, `.macro`, `.t-figs`). Une carte seulement pour un vrai objet (position, pari du jour).
+- Pas de libellés en majuscules, pas de « · » pour joindre des informations (virgules, ou une ligne par message dans les bandeaux), chasse fixe (Plex Mono) pour les chiffres seulement. Les détails secondaires se replient (`<details class="t-more">` : détail de l'ordre, frais et impact).
+- Une colonne lisible sur grand écran : 560 px (Profil, Mon compte), 640 px (Comment jouer), 760 px (Marché).
+- Onglets du Marché soulignés (`.tabs`) ; les grands onglets de section gardent le contrôle segmenté en verre.
+- Texte d'une phrase assemblée : un seul nœud de texte (gabarit) ou `t("… {x} …", { x })`, sinon la traduction anglaise ne le trouve pas.
+- Juger le rendu : `node scripts/capture-ecrans.mjs <dossier> [375|1280] [écran…]`, `node scripts/capture-accueil.mjs <dossier>`, `node scripts/capture-plus.mjs <dossier>`.
+
 **Navigation (refonte mobile d'octobre 2026, demandée par Victor) :**
 - Barre d'onglets flottante en bas, en « liquid glass » (verre flouté, `src/nav.jsx`, classe `.dock`) : Marché (tableau de bord, actions, journal, carte, rumeurs), Positions (En cours | Portefeuille | Historique, badge du nombre de paris ouverts), Quêtes (depuis H4), Guilde (depuis H1, à la place du QG), Plus. 5 entrées au plus : Quêtes, Ligue et Profil (H4, H6) devront y trouver leur place sans surcharger la barre.
 - Le menu Plus (`src/pages.jsx`, page Profil) regroupe Classement, Succès, Amis, Ma guilde, Comment jouer, Mon compte (patrimoine, faillite, pseudo), Sources des données et Confidentialité.
