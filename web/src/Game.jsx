@@ -176,7 +176,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
           {showHowto ? <HowTo first={firstVisit} onBack={firstVisit ? howtoDone : () => { api.tutoDone?.("howto").catch(() => {}); setMore(null) }} /> : <>
           {tab === "market" && <MiniTicker aur={aur} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
 
-          {tab === "market" && <AurelysMarket api={api} aur={aur} now={now} bets={open} onSubscribe={tk => setInvest({ tk, mode: "round" })} onDetail={(tk, hl) => { setAurDetail(tk); setAurHl(hl ?? null) }} />}
+          {tab === "market" && <AurelysMarket api={api} aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onSubscribe={tk => setInvest({ tk, mode: "round" })} onDetail={(tk, hl) => { setAurDetail(tk); setAurHl(hl ?? null) }} />}
 
           {tab === "positions" && <>
             <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` (${open.length})` : ""}`], ["folio", "Portefeuille"], ["history", "Historique"]]} />

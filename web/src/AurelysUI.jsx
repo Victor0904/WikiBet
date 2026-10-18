@@ -76,7 +76,7 @@ const isMajor = n => MAJOR.has(n.cat) || Math.abs(n.sent) >= .7;
 
 // Le Marché : tableau de bord, liste des actions, journal, carte et rumeurs.
 const VIEWS = [["board", "Aperçu"], ["list", "Actions"], ["news", "Journal"], ["heat", "Carte"], ["rumors", "Rumeurs"]];
-export function AurelysMarket({ api, aur, now, bets, onDetail, onSubscribe }) {
+export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscribe }) {
   const [view, setView] = useState("board"), [read, setRead] = useState(null), onList = () => setView("list");
   // Rumeurs : relues toutes les 10 s (pastille sur l'onglet quand une nouvelle arrive, dernière vue gardée dans le navigateur).
   const [rum, setRum] = useState(null), [seen, setSeen] = useState(() => { try { return +localStorage.getItem("wb-rumeurs") || 0 } catch { return 0 } });
@@ -95,7 +95,7 @@ export function AurelysMarket({ api, aur, now, bets, onDetail, onSubscribe }) {
         {VIEWS.map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}{k === "rumors" && top > seen && <i className="chip-dot" role="img" aria-label="nouvelle rumeur" />}</button>)}
       </div>
       {view === "board" ? <Board aur={aur} now={now} onDetail={onDetail} onNews={() => setView("news")} onRead={setRead} onList={onList} />
-        : view === "list" ? <List aur={aur} now={now} bets={bets} onDetail={onDetail} onSubscribe={onSubscribe} onRead={setRead} />
+        : view === "list" ? <List aur={aur} now={now} bets={bets} onPick={onPick} onDetail={onDetail} onSubscribe={onSubscribe} onRead={setRead} />
         : view === "news" ? <News aur={aur} now={now} onDetail={onDetail} onRead={setRead} />
         : view === "rumors" ? <Rumors data={rum} now={now} onDetail={onDetail} />
         : <Heat aur={aur} now={now} onDetail={onDetail} />}
@@ -206,17 +206,23 @@ function Board({ aur, now, onDetail, onNews, onRead, onList }) {
   );
 }
 
-function List({ aur, now, bets, onDetail, onSubscribe, onRead }) {
+function List({ aur, now, bets, onPick, onDetail, onSubscribe, onRead }) {
   const mine = tk => bets.some(b => b.kind === "aurelys" && b.aur === tk);
   const row = s => {
     const q = aur.quotes[s.tk], c = chgOf(aur, s.tk, now), v = closesOf(aur, s.tk, 60), young = !STORIES[s.tk];
     return (
-      <button key={s.tk} type="button" className={"srow" + (mine(s.tk) ? " mine" : "")} onClick={() => onDetail(s.tk)} aria-label={`Fiche de ${s.name}`}>
-        <TkIcon tk={s.tk} />
-        <span className="srow-n"><b>{s.name}{LINKS[s.tk] && <i className="real-tag" title={LINKS[s.tk].src}>réel</i>}{young && <i className="risk-tag">risqué</i>}</b><small>{q?.halt ? "cotation suspendue" : info(s.tk).what}</small></span>
-        {v.length > 1 ? <Spark path={v} t={v.length - 1} /> : <span />}
-        <span className="r mono"><b>{px(q?.p)}</b><small className={cls(c)}>{q ? pct(c) : ""}</small></span>
-      </button>
+      <div key={s.tk} className={"srow" + (mine(s.tk) ? " mine" : "")}>
+        <button type="button" className="srow-open" onClick={() => onDetail(s.tk)} aria-label={`Fiche de ${s.name}`}>
+          <TkIcon tk={s.tk} />
+          <span className="srow-n"><b>{s.name}{LINKS[s.tk] && <i className="real-tag" title={LINKS[s.tk].src}>réel</i>}{young && <i className="risk-tag">risqué</i>}</b><small>{q?.halt ? "cotation suspendue" : info(s.tk).what}</small></span>
+          {v.length > 1 ? <Spark path={v} t={v.length - 1} /> : <span />}
+          <span className="r mono"><b>{px(q?.p)}</b><small className={cls(c)}>{q ? pct(c) : ""}</small></span>
+        </button>
+        <span className="srow-q">
+          <button type="button" className="q-up" disabled={!q || q.halt} onClick={() => onPick(s.tk, "up")} aria-label={`Hausse sur ${s.name}`}>▲</button>
+          <button type="button" className="q-down" disabled={!q || q.halt} onClick={() => onPick(s.tk, "down")} aria-label={`Baisse sur ${s.name}`}>▼</button>
+        </span>
+      </div>
     );
   };
   const news = tk => aur.news.find(n => n.tk == null && n.cat === "ipo" && n.title.startsWith(BY[tk]?.name));
@@ -240,7 +246,7 @@ function List({ aur, now, bets, onDetail, onSubscribe, onRead }) {
       </>}
       <h2 className="l-head">Cote principale <span className="muted">cours et variation du jour</span></h2>
       <div className="p-list">{STOCKS.map(row)}</div>
-      <p className="muted small">Touche une société pour voir sa fiche, puis prendre position à la hausse ou à la baisse.</p>
+      <p className="muted small">▲ ou ▼ pour prendre position tout de suite ; touche une société pour voir sa fiche.</p>
       <h2 className="l-head">Jeunes pousses</h2>
       <p className="muted small">{`Très volatiles : radiées sous ${Math.round(IPO.delist * 100)} % de leur prix d'introduction.`}</p>
       {aur.young.length ? <div className="p-list">{aur.young.map(row)}</div> : <p className="muted small">Aucune pour l'instant : la prochaine levée de fonds arrive.</p>}

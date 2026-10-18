@@ -804,18 +804,26 @@ a.btn.primary { color: var(--accent-ink) }
 .plain-row b { flex: none; font-weight: 500; font-size: 13.5px; color: var(--muted) }
 .b-more { align-self: flex-start; color: var(--accent); font-weight: 600 }
 .round-teaser { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px 14px; background: none; border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--line)); border-radius: 12px; color: inherit }
-.srow { display: grid; grid-template-columns: auto minmax(0, 1fr) 64px auto; align-items: center; gap: 12px; min-height: 64px; padding: 8px 16px; background: none; border: 0; border-top: 1px solid var(--line); text-align: left; color: inherit }
+.srow { display: flex; align-items: center; border-top: 1px solid var(--line); padding-right: 12px }
 .srow:first-child { border-top: 0 }
-.srow:active { background: var(--panel2) }
 .srow.mine { box-shadow: inset 3px 0 0 var(--accent) }
+.srow-open { flex: 1; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 64px; padding: 8px 4px 8px 16px; background: none; border: 0; text-align: left; color: inherit }
+.srow-open:active { background: var(--panel2) }
 .srow-n { display: flex; flex-direction: column; gap: 2px; min-width: 0 }
 .srow-n b { font: 700 16px/1.2 var(--f-cond); overflow-wrap: anywhere }
 .srow-n small { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
-.srow .spark { height: 26px }
+.srow .spark { display: none; height: 26px }
 .srow .r { display: flex; flex-direction: column; align-items: flex-end; text-align: right }
 .srow .r b { font-weight: 600; font-size: 15px }
 .srow .r small { font-size: 12.5px }
-@media (min-width: 900px) { .srow { grid-template-columns: auto minmax(0, 1fr) 160px 110px } .srow .spark { height: 32px } }
+/* Trader sans ouvrir la fiche : deux petits boutons carrés aux couleurs de la hausse et de la baisse. */
+.srow-q { flex: none; display: flex; gap: 6px; margin-left: 8px }
+.srow-q button { width: 36px; height: 36px; border-radius: 10px; font-size: 13px; display: grid; place-items: center; border: 1px solid; transition: transform .15s }
+.srow-q .q-up { color: var(--up); background: var(--up-soft); border-color: color-mix(in srgb, var(--up) 40%, transparent) }
+.srow-q .q-down { color: var(--down); background: var(--down-soft); border-color: color-mix(in srgb, var(--down) 40%, transparent) }
+.srow-q button:active { transform: scale(.94) }
+@media (min-width: 480px) { .srow-open { grid-template-columns: auto minmax(0, 1fr) 64px auto } .srow .spark { display: block } }
+@media (min-width: 900px) { .srow-open { grid-template-columns: auto minmax(0, 1fr) 160px 110px } .srow .spark { height: 32px } }
 
 /* Fiche société et ticket d'ordre (refonte) */
 .d-hint { margin: -2px 0 6px }
@@ -896,3 +904,4 @@ a.btn.primary { color: var(--accent-ink) }
 .land-cards { gap: 0 28px }
 .land-cards article { padding: 14px 0 16px; border-top: 1px solid var(--line) }
 .land-cards b { font: 700 17px var(--f-cond) }
+.real-tag, .risk-tag { white-space: nowrap }
