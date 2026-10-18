@@ -21,7 +21,7 @@ test("écran Succès : aucun débordement horizontal à 360, 375 et 414 px", { s
       assert.ok(o.scroll <= o.client, `${w} px : la page fait ${o.scroll} px pour ${o.client} px`);
       const out = await b.evaluate("[...document.querySelectorAll('.talents *')].filter(e => e.getBoundingClientRect().right > document.documentElement.clientWidth + .5).map(e => e.className).slice(0, 5)");
       assert.deepEqual(out, [], `${w} px : éléments qui dépassent`);
-      assert.match(await b.evaluate("document.querySelector('.ach-head p').textContent"), /^3 \/ 47 succès$/);
+      assert.match(await b.evaluate("document.querySelector('.ach-head p').textContent"), /^3 succès débloqués sur 47$/);
     }
   } finally { await b.close(); await srv.close() }
 });

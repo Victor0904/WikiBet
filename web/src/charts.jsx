@@ -47,7 +47,7 @@ export const TradeChart = ({ b, path, upto, h }) => {
 };
 
 // Mini-courbe d'un article sur la séance en cours (ouverture → maintenant), couleur selon la variation.
-export function Spark({ path, t, h = 30 }) {
+export function Spark({ path, t, h = 30, fill }) {
   const n = Math.max(1, t), step = Math.max(1, Math.floor(n / 80)), v = [];
   for (let i = 0; i <= n; i += step) v.push(path[i]);
   if ((n % step) !== 0) v.push(path[n]);
@@ -55,7 +55,8 @@ export function Spark({ path, t, h = 30 }) {
   const line = pathD(v.map((p, k) => [k / Math.max(1, v.length - 1) * 100, 3 + (1 - (p - lo) / r) * (h - 6)]));
   return (
     <svg className="spark" viewBox={`0 0 100 ${h}`} preserveAspectRatio="none" aria-hidden="true">
-      <path d={line} fill="none" stroke={up ? "var(--up)" : "var(--down)"} strokeWidth="1.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      {fill && <path d={`${line}L100,${h}L0,${h}Z`} fill={up ? "var(--up-soft)" : "var(--down-soft)"} />}
+      <path d={line} fill="none" stroke={up ? "var(--up)" : "var(--down)"} strokeWidth={fill ? 2 : 1.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }

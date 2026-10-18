@@ -70,7 +70,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
         ...(prevT ? tg.filter(g => prevT.get(g.id) === "wait" && g.status === "failed").map(g => `Ordre refusé : ${name(g.tk)}. ${g.msg}`) : []),
         ...refNotes(rf),
       ];
-      if (notes.length) setToast({ text: notes.join(" · "), tone: ended.some(x => x.closed_by === "liq" || x.closed_by === "stop") ? "down" : "up", at: Date.now(), long: true });
+      if (notes.length) setToast({ text: notes.join("\n"), tone: ended.some(x => x.closed_by === "liq" || x.closed_by === "stop") ? "down" : "up", at: Date.now(), long: true });
       setMe(m); setBets(b); setBoard(l); if (rb) setRefunds(rb); setHolds(h.map(x => ({ ...x, qty: +x.qty, cost: +x.cost, price: +x.price }))); setTriggers(tg); if (rf) setRefs(rf);
       if (won.length && !notes.length) setToast({ text: `Gagné : ${sW(won.reduce((a, x) => a + x.payout - x.stake, 0))}`, tone: "up", at: Date.now() });
     } catch (e) { say(e.message, "down") }
@@ -120,7 +120,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
         }
         api.noticeRead(n.id).catch(() => {});
       }
-      if (lines.length) setToast({ text: lines.join(" · "), tone: "up", long: true, at: Date.now(), action: { label: "Voir mes quêtes", go: () => setTab("quests") } });
+      if (lines.length) setToast({ text: lines.join("\n"), tone: "up", long: true, at: Date.now(), action: { label: "Voir mes quêtes", go: () => setTab("quests") } });
     }).catch(() => {});
     check(); const id = setInterval(() => { if (!document.hidden) check() }, 30000);
     return () => clearInterval(id);
@@ -132,7 +132,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
   useEffect(() => {
     const hit = alerts.filter(a => { const p = aur.quotes[a.tk]?.p; return p != null && (a.above ? p >= a.price : p <= a.price) });
     if (!hit.length) return;
-    say(hit.map(a => `Alerte : ${AUR[a.tk].name} ${a.above ? "au-dessus" : "en dessous"} de ${aurPx(a.price)}`).join(" · "), "up");
+    say(hit.map(a => `Alerte : ${AUR[a.tk].name} ${a.above ? "au-dessus" : "en dessous"} de ${aurPx(a.price)}`).join("\n"), "up");
     setAlerts(l => l.filter(a => !hit.includes(a)));
   }, [beat]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -176,10 +176,10 @@ export default function Game({ api, trial = false, onNoProfile }) {
           {showHowto ? <HowTo first={firstVisit} onBack={firstVisit ? howtoDone : () => { api.tutoDone?.("howto").catch(() => {}); setMore(null) }} /> : <>
           {tab === "market" && <MiniTicker aur={aur} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
 
-          {tab === "market" && <AurelysMarket api={api} aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onSubscribe={tk => setInvest({ tk, mode: "round" })} onDetail={(tk, hl) => { setAurDetail(tk); setAurHl(hl ?? null) }} />}
+          {tab === "market" && <AurelysMarket api={api} aur={aur} now={now} bets={open} onSubscribe={tk => setInvest({ tk, mode: "round" })} onDetail={(tk, hl) => { setAurDetail(tk); setAurHl(hl ?? null) }} />}
 
           {tab === "positions" && <>
-            <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` · ${open.length}` : ""}`], ["folio", "Portefeuille"], ["history", "Historique"]]} />
+            <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` (${open.length})` : ""}`], ["folio", "Portefeuille"], ["history", "Historique"]]} />
             {posView === "folio" ? <Portfolio holds={holds} aur={aur} px={holdPx} onSell={h => setInvest({ tk: h.tk, mode: "sell", qty: h.qty })} onBuy={tk => setInvest({ tk, mode: "buy" })} onMarket={() => go("market")} />
             : posView === "open" ? <>
               {api.push && positions.length > 0 && <PushPanel push={api.push} compact />}
@@ -378,7 +378,7 @@ function History({ bets }) {
       {bets.map(b => {
         if (b.kind === "parrainage") return (
           <div key={b.id} className="hrow">
-            <span><b>{b.text}</b><small>{clock(Date.parse(b.at))} · hors classement des gains</small></span>
+            <span><b>{b.text}</b><small>{`${clock(Date.parse(b.at))}, hors classement des gains`}</small></span>
             <span className="r mono"><b className={cls(b.gain)}>{sW(b.gain)}</b><small>{b.note}</small></span>
           </div>
         );
@@ -391,7 +391,7 @@ function History({ bets }) {
           : "Duel Wikipédia";
         if (b.kind === "aurelys") return (
           <div key={b.id} className="hrow">
-            <span><b>{AUR[b.aur]?.name ?? b.aur} {b.dir === "up" ? "▲" : "▼"} ×{b.lev} · Aurelys</b><small>{clock(Date.parse(b.created_at))} → {b.exit_at ? clock(Date.parse(b.exit_at)) : "—"} · {aurPx(b.entry)} → {b.exit != null ? aurPx(b.exit) : "—"} · frais {W(b.fees)}{b.payout === 0 ? " · liquidée" : ""}{b.insured ? " · assurée" : ""}</small></span>
+            <span><b>{`${AUR[b.aur]?.name ?? b.aur} ${b.dir === "up" ? "▲" : "▼"} ×${b.lev}`}</b><small>{`${clock(Date.parse(b.created_at))} → ${b.exit_at ? clock(Date.parse(b.exit_at)) : "—"}, de ${aurPx(b.entry)} à ${b.exit != null ? aurPx(b.exit) : "—"}, frais ${W(b.fees)}${b.payout === 0 ? ", liquidée" : ""}${b.insured ? ", assurée" : ""}`}</small></span>
             <span className="r mono"><b className={cls(net - feeOpen(b))}>{sW(net - feeOpen(b))}</b><small>mise {W(b.stake)}</small></span>
           </div>
         );
@@ -467,7 +467,7 @@ function Board({ board, me }) {
         {board.map((p, i) => (
           <div key={p.id} className={"brow" + (p.id === me.id ? " me" : "")}>
             <span className="rk mono">{i + 1}</span>
-            <span><b>{p.pseudo}<BotTag id={p.id} /></b><small>{[p.level != null && `niv. ${p.level}`, p.bankruptcies > 0 && `${p.bankruptcies} faillite${p.bankruptcies > 1 ? "s" : ""}`].filter(Boolean).join(" · ")}</small></span>
+            <span><b>{p.pseudo}<BotTag id={p.id} /></b><small>{[p.level != null && `niveau ${p.level}`, p.bankruptcies > 0 && `${p.bankruptcies} faillite${p.bankruptcies > 1 ? "s" : ""}`].filter(Boolean).join(", ")}</small></span>
             <span className="r mono">{W(p.patrimoine ?? p.cash)}<small>solde {W(p.cash)}</small></span>
           </div>
         ))}
@@ -497,32 +497,40 @@ function Ticket({ aur, me, ticket, openCount, pref, setPref, onClose, onSubmit }
   {
     const p = aq?.p ?? 0, sl = slip(null, ticket.tk, stake * pref.lev), entry = p * (1 + (dir === "up" ? sl : -sl)), b = { entry, lev: pref.lev, dir, stake };
     title = AUR[ticket.tk].name;
-    cta = `${trigPx ? "Placer l'ordre · " : ""}${dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×${pref.lev} · ${W(stake)}`;
+    cta = `${trigPx ? "Placer l'ordre : " : ""}${dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×${pref.lev}, ${W(stake)}`;
     body = <>
       <div className="seg" role="group" aria-label="Sens">
         <button type="button" aria-pressed={dir === "up"} className="buy" onClick={() => setDir("up")}>▲ Hausse</button>
         <button type="button" aria-pressed={dir === "down"} className="sell" onClick={() => setDir("down")}>▼ Baisse</button>
       </div>
+      <label htmlFor="stake">Mise</label>
+      <div className="stake"><input id="stake" className="mono" type="number" inputMode="numeric" min="1" step="1" value={stake} onChange={e => setStake(Math.max(0, Math.floor(+e.target.value || 0)))} /><span>W</span></div>
+      <StakeChips value={stake} set={setStake} cash={me.cash} max={maxStake} />
       <label>Levier</label>
       <div className="seg" role="group" aria-label="Levier">{LEVS.map(v => <button key={v} type="button" aria-pressed={pref.lev === v} disabled={v > maxLev} title={v > maxLev ? lockOf(v) : undefined} onClick={() => set({ lev: v })}>×{v}{v > maxLev ? " 🔒" : ""}</button>)}</div>
       {young ? <p className="muted small">Jeune pousse, très volatile : levier ×5 au plus.</p>
         : LEVS.some(v => v > maxLev) && <p className="muted small">{lockOf(LEVS.find(v => v > maxLev))}</p>}
-      <div className="rows mono">
-        <div className="row"><span>Cours actuel</span><b>{aurPx(p)}</b></div>
-        <div className="row"><span>Impact de ton ordre (estimé)</span><b>{dir === "up" ? "+" : "−"}{nf2.format(sl * 100)} %</b></div>
-        <div className="row"><span>Prix d'exécution estimé</span><b>{aurPx(entry)}</b></div>
-        <div className="row"><span>1 % de variation</span><b>±{W(stake * pref.lev / 100)}</b></div>
-        <div className="row"><span>Frais d'ouverture (0,1 %)</span><b>{W(fee)}</b></div>
-        <div className="row"><span>Liquidation à</span><b>{aurPx(liqPrice(b))}</b></div>
-        <div className="row"><span>Plafond sur cette action</span><b>{W(cap)} engagés</b></div>
-      </div>
+      <dl className="t-figs">
+        <div><dt>Si le cours bouge de 1 %</dt><dd className="mono">±{W(stake * pref.lev / 100)}</dd></div>
+        <div><dt>Liquidation à</dt><dd className="mono">{aurPx(liqPrice(b))}</dd></div>
+      </dl>
+      <details className="t-more">
+        <summary>Détail de l'ordre</summary>
+        <div className="plain">
+          <div className="plain-row"><span>Cours actuel</span><b className="mono">{aurPx(p)}</b></div>
+          <div className="plain-row"><span>Impact de ton ordre (estimé)</span><b className="mono">{dir === "up" ? "+" : "−"}{nf2.format(sl * 100)} %</b></div>
+          <div className="plain-row"><span>Prix d'exécution estimé</span><b className="mono">{aurPx(entry)}</b></div>
+          <div className="plain-row"><span>Frais d'ouverture (0,1 %)</span><b className="mono">{W(fee)}</b></div>
+          <div className="plain-row"><span>Plafond sur cette action</span><b className="mono">{W(cap)} engagés</b></div>
+        </div>
+        <p className="muted small">Ton ordre fait bouger le cours : plus il est gros, et plus l'action est peu liquide, plus tu paies cher (même chose à la clôture). Le prix exact est calculé par le serveur. La position reste ouverte jusqu'à ce que tu la clôtures, ou jusqu'à la liquidation.</p>
+      </details>
       {!terms.triggers && <p className="muted small">Ordres à déclenchement (ouvrir quand le cours atteint un seuil) : niveau {TRIGGER_LEVEL}.</p>}
       {terms.triggers && <>
         <label htmlFor="trig">Ouvrir seulement quand le cours atteint (facultatif)</label>
         <input id="trig" className="mono" inputMode="decimal" placeholder="tout de suite" value={trig} onChange={e => setTrig(e.target.value)} />
         {trigPx > 0 && <p className="muted small">L'ordre attend que le cours {trigPx > p ? "monte" : "descende"} à {aurPx(trigPx)}, puis part au cours du marché (prix qui peut différer un peu). Ton solde n'est débité qu'à ce moment-là.</p>}
       </>}
-      <p className="muted small">Ton ordre fait bouger le cours : plus il est gros, et plus l'action est peu liquide, plus tu paies cher (même chose à la clôture). Le prix exact est calculé par le serveur. La position reste ouverte jusqu'à ce que tu la clôtures, ou jusqu'à la liquidation.</p>
     </>;
   }
   return (
@@ -534,9 +542,6 @@ function Ticket({ aur, me, ticket, openCount, pref, setPref, onClose, onSubmit }
       }}>
         <div className="sheet-h"><h2>{title}</h2><button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button></div>
         {body}
-        <label htmlFor="stake">Mise</label>
-        <div className="stake"><input id="stake" className="mono" type="number" inputMode="numeric" min="1" step="1" value={stake} onChange={e => setStake(Math.max(0, Math.floor(+e.target.value || 0)))} /><span>W</span></div>
-        <StakeChips value={stake} set={setStake} cash={me.cash} max={maxStake} />
         {full && <p className="error small">Au plus {maxPos} positions ouvertes ou en attente.</p>}
         {overCap && <p className="error small">Au plus {W(cap)} engagés (mise × levier) sur cette action.</p>}
         {aq?.halt && <p className="error small">Cotation suspendue, reprise dans quelques secondes.</p>}

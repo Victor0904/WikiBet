@@ -1,5 +1,5 @@
 // Bourse d'Aurelys : tableau de bord, liste des actions, actualités, carte thermique, fiche entreprise, carte de position.
-import { LOCALE } from "./i18n.js";
+import { LOCALE, t } from "./i18n.js";
 import { Loading } from "./nav.jsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -24,7 +24,7 @@ const gwhen = (atMs, nowMs) => { const a = gameClock(atMs / 1000), n = gameClock
 const real = ms => { const d = new Date(ms), t = clock(ms), n = new Date(), days = Math.round((new Date(d).setHours(0, 0, 0, 0) - new Date(n).setHours(0, 0, 0, 0)) / 864e5);
   return days === 0 ? t : days === 1 ? `demain ${t}` : days === -1 ? `hier ${t}` : `${dayFmt.format(d)} ${t}` };
 const dayFmt = new Intl.DateTimeFormat(LOCALE, { weekday: "short", day: "numeric", month: "short" });
-const signed = v => `${v >= 0 ? "+" : "−"}${nf2.format(Math.abs(v)).replace(/,?0+$/, "")} %`;
+const signed = v => `${v >= 0 ? "+" : "−"}${nf2.format(Math.abs(v)).replace(/[.,]?0+$/, "")} %`; // « +7 % », « +1,5 % » (« +1.5 % » en anglais)
 const agoTxt = ms => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `il y a ${s} s` : s < 3600 ? `il y a ${Math.floor(s / 60)} min` : `il y a ${Math.floor(s / 3600)} h` };
 // Derniers cours pour une mini-courbe : bougies d'une heure d'Aurelys, ou cours minute par minute tant qu'il y a peu de bougies.
 const closesOf = (aur, tk, n) => { const c = (aur.candles[tk] ?? []).slice(-n).map(k => k[4]); return c.length >= 5 ? c : (aur.ticks[tk] ?? []).map(k => k[1]) };
@@ -34,14 +34,30 @@ const chgOf = (aur, tk, now) => { const p = aur.quotes[tk]?.p, o = dayOpen(aur, 
 const info = tk => STORIES[tk] ?? BY[tk] ?? {};
 const paras = t => (t ?? "").split("\n\n").filter(Boolean);
 
-// Bandeau : horloge d'Aurelys (décor), régime, AUR-12.
-function AurBar({ aur, now }) {
-  const c = gameClock(sec(now)), reg = REGIMES[aur.x?.reg ?? "calme"], idx = aur.quotes[INDEX]?.p, ch = chgOf(aur, INDEX, now);
+// Tête du Marché : l'indice AUR-12 en grand avec sa courbe (l'élément marquant de l'écran), puis l'heure et l'humeur
+// d'Aurelys en une phrase. Les autres vues du Marché n'en gardent qu'une ligne (AurLine).
+function AurHero({ aur, now }) {
+  const c = gameClock(sec(now)), k = aur.x?.reg ?? "calme", idx = aur.quotes[INDEX]?.p, ch = chgOf(aur, INDEX, now), path = closesOf(aur, INDEX, 36);
   return (
-    <div className="aur-bar">
-      <span className="aur-clock mono" title="Heure d'Aurelys : une journée dure 1 h réelle"><small>Aurelys · jour {c.day}</small>{c.hm}</span>
-      <span className="aur-reg" title={REG_TXT[aur.x?.reg ?? "calme"]}><i aria-hidden="true">{reg.icon}</i>{reg.name}</span>
-      <span className="r mono"><b>AUR-12 {px(idx)}</b><small className={cls(ch)}>{pct(ch)} jour</small></span>
+    <header className="aur-hero">
+      <div className="hero-top">
+        <span className="hero-idx"><small>AUR-12, l'indice des 13 sociétés</small><b className="mono">{px(idx)}</b></span>
+        <span className={"hero-ch mono " + cls(ch)}><b>{ch >= 0 ? "▲" : "▼"} {pct(ch)}</b><small>depuis 00:00</small></span>
+      </div>
+      {path.length > 1 ? <div className="hero-chart"><Spark path={path} t={path.length - 1} h={110} fill /></div> : <div className="hero-chart"><Loading size={40} /></div>}
+      <p className="hero-say"><i className={"pulse" + (aur.live ? "" : " off")} aria-hidden="true" />
+        <span>{aur.live ? `Jour ${c.day}, ${c.hm} à Aurelys.` : "Connexion au marché…"}</span>{" "}
+        <span className="reg"><i aria-hidden="true">{REGIMES[k].icon}</i> {REG_TXT[k]}</span></p>
+    </header>
+  );
+}
+function AurLine({ aur, now }) {
+  const c = gameClock(sec(now)), reg = REGIMES[aur.x?.reg ?? "calme"], ch = chgOf(aur, INDEX, now);
+  return (
+    <div className="aur-line">
+      <i className={"pulse" + (aur.live ? "" : " off")} aria-hidden="true" />
+      <b className="mono">AUR-12 {px(aur.quotes[INDEX]?.p)}</b><span className={"mono " + cls(ch)}>{pct(ch)}</span>
+      <span className="muted">{`jour ${c.day}, ${c.hm}`}</span><span className="muted">{reg.icon} {reg.name}</span>
     </div>
   );
 }
@@ -59,10 +75,9 @@ const MAJOR = new Set(["resultats", "essai", "scandale", "produit", "taux", "cri
 const isMajor = n => MAJOR.has(n.cat) || Math.abs(n.sent) >= .7;
 
 // Le Marché : tableau de bord, liste des actions, journal, carte et rumeurs.
-const VIEWS = [["board", "Tableau de bord"], ["list", "Actions"], ["news", "Journal"], ["heat", "Carte"], ["rumors", "Rumeurs"]];
-export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscribe }) {
+const VIEWS = [["board", "Aperçu"], ["list", "Actions"], ["news", "Journal"], ["heat", "Carte"], ["rumors", "Rumeurs"]];
+export function AurelysMarket({ api, aur, now, bets, onDetail, onSubscribe }) {
   const [view, setView] = useState("board"), [read, setRead] = useState(null), onList = () => setView("list");
-  const live = aur.live;
   // Rumeurs : relues toutes les 10 s (pastille sur l'onglet quand une nouvelle arrive, dernière vue gardée dans le navigateur).
   const [rum, setRum] = useState(null), [seen, setSeen] = useState(() => { try { return +localStorage.getItem("wb-rumeurs") || 0 } catch { return 0 } });
   useEffect(() => {
@@ -74,18 +89,18 @@ export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscri
   useEffect(() => { if (view === "rumors" && top > seen) { setSeen(top); try { localStorage.setItem("wb-rumeurs", String(top)) } catch { } } }, [view, top, seen]);
   return (
     <section>
-      <div className="feed-info"><i className={"pulse" + (live ? "" : " off")} aria-hidden="true" />{live ? "Bourse fictive, simulée en continu par des bots et les joueurs" : "Connexion au marché…"} · un jour d'Aurelys = 1 h réelle</div>
-      <AurBar aur={aur} now={now} />
+      {view === "board" ? <AurHero aur={aur} now={now} /> : <AurLine aur={aur} now={now} />}
       <Flash aur={aur} now={now} onDetail={onDetail} />
-      <div className="chips" role="group" aria-label="Vue">
+      <div className="tabs" role="group" aria-label="Vue du marché">
         {VIEWS.map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}{k === "rumors" && top > seen && <i className="chip-dot" role="img" aria-label="nouvelle rumeur" />}</button>)}
       </div>
       {view === "board" ? <Board aur={aur} now={now} onDetail={onDetail} onNews={() => setView("news")} onRead={setRead} onList={onList} />
-        : view === "list" ? <List aur={aur} now={now} bets={bets} onPick={onPick} onDetail={onDetail} onSubscribe={onSubscribe} onRead={setRead} />
+        : view === "list" ? <List aur={aur} now={now} bets={bets} onDetail={onDetail} onSubscribe={onSubscribe} onRead={setRead} />
         : view === "news" ? <News aur={aur} now={now} onDetail={onDetail} onRead={setRead} />
         : view === "rumors" ? <Rumors data={rum} now={now} onDetail={onDetail} />
         : <Heat aur={aur} now={now} onDetail={onDetail} />}
       {read && <Article api={api} n={read} now={now} onClose={() => setRead(null)} onDetail={tk => { setRead(null); onDetail(tk) }} />}
+      <p className="fine">Un jour d'Aurelys dure 1 h réelle.</p>
       <p className="fine">Marché entièrement fictif : entreprises, personnages, cours et actualités sont simulés. Les prix naissent des ordres de bots (fondamentalistes, suiveurs de tendance, contrariens, chartistes, petits porteurs), de baleines et des joueurs : un gros ordre fait bouger le cours. Frais de 0,1 % du montant engagé à l'ouverture et à la clôture.</p>
     </section>
   );
@@ -145,73 +160,63 @@ function Flash({ aur, now, onDetail }) {
 // Prochain rendez-vous, avec le consensus des analystes pour les résultats.
 const CalRow = ({ e, aur, now }) => {
   const c = e.tk ? aur.x?.cons?.[e.tk] : null;
-  return <div className="row"><span>{e.title}{c != null && <small className="cons"> · attendu {signed(c)}</small>}</span><b className="mono">{gwhen(e.at, now)}</b></div>;
+  return <div className="plain-row"><span>{e.title}{c != null && <small>{`Attendu : ${signed(c)} sur un an`}</small>}</span><b className="mono">{gwhen(e.at, now)}</b></div>;
 };
 
 function Board({ aur, now, onDetail, onNews, onRead, onList }) {
-  const x = aur.x, reg = REGIMES[x?.reg ?? "calme"], idx = closesOf(aur, INDEX, 36);
+  const x = aur.x;
   // Palmarès figé une heure d'Aurelys (5 min réelles) pour ne pas bouger sous le doigt.
   const slot = Math.floor(now / 300000);
   const movers = useMemo(() => STOCKS.map(s => ({ s, c: chgOf(aur, s.tk, now) })).sort((a, b) => b.c - a.c), [slot, aur.ok]); // eslint-disable-line
   const cal = calendar(sec(now), 4, aur.young), last = aur.news.filter(isMajor).slice(0, 3);
+  const mover = ({ s }) => { const c = chgOf(aur, s.tk, now);
+    return <button key={s.tk} type="button" className="p-row" onClick={() => onDetail(s.tk)}><TkIcon tk={s.tk} size={24} /><span className="p-lab">{s.name}</span><span className={"p-val mono " + cls(c)}>{c >= 0 ? "▲" : "▼"} {pct(c)}</span></button> };
   return (
     <div className="aur-board">
-      <div className="panel">
-        <h2>AUR-12 <span className="muted">36 dernières heures d'Aurelys</span></h2>
-        {idx.length > 1 ? <Spark path={idx} t={idx.length - 1} h={80} /> : <Loading size={40} />}
-        <p className="muted small">Moyenne des 13 sociétés, pondérée par leur capitalisation (1 000 au lancement).</p>
-      </div>
-      <div className="tiles">
-        <div className="tile wide-tile"><small>Humeur du marché{x?.regAge != null ? ` · depuis ${x.regAge < 1 ? "moins d'une heure" : `${x.regAge} h`}` : ""}</small><b>{reg.icon} {reg.name}</b><p className="muted small">{REG_TXT[x?.reg ?? "calme"]}</p></div>
-        <div className="tile"><small>Peur (VIXA)</small><b className="mono">{x ? nf0.format(x.vixa) : "—"}</b></div>
-        <div className="tile"><small>Taux directeur</small><b className="mono">{x ? nf2.format(x.r) + " %" : "—"}</b></div>
-        <div className="tile"><small>Croissance · inflation</small><b className="mono">{x ? `${nf2.format(x.g)} · ${nf2.format(x.pi)} %` : "—"}</b></div>
-      </div>
+      <dl className="macro">
+        <div><dt>Peur (VIXA)</dt><dd className="mono">{x ? nf0.format(x.vixa) : "—"}</dd></div>
+        <div><dt>Taux directeur</dt><dd className="mono">{x ? nf2.format(x.r) + " %" : "—"}</dd></div>
+        <div><dt>Croissance</dt><dd className="mono">{x ? nf2.format(x.g) + " %" : "—"}</dd></div>
+        <div><dt>Inflation</dt><dd className="mono">{x ? nf2.format(x.pi) + " %" : "—"}</dd></div>
+      </dl>
       {aur.rounds.map(d => (
-        <button key={d.tk} type="button" className="panel round-teaser" onClick={onList}>
-          <span className="paper-kicker">Introduction en bourse · levée de fonds</span>
-          <b>{d.name} · {d.what}</b>
-          <span className="muted small">Souscription à {px(d.roundPrice)} W jusqu'à {real(d.roundEnds)} · dès {W(IPO.minWealth)} disponibles</span>
-          <span className="accent small">Voir la levée →</span>
+        <button key={d.tk} type="button" className="round-teaser" onClick={onList}>
+          <span className="paper-kicker">Introduction en bourse</span>
+          <b>{d.name}, {d.what}</b>
+          <span className="muted small">{`Souscription à ${px(d.roundPrice)} W jusqu'à ${real(d.roundEnds)}, dès ${W(IPO.minWealth)} disponibles.`}</span>
         </button>
       ))}
-      <div className="panel">
+      <section className="b-sec">
         <h2>Le jour d'Aurelys <span className="muted">depuis 00:00</span></h2>
-        {[...movers.slice(0, 3), ...movers.slice(-3)].map(({ s }) => {
-          const c = chgOf(aur, s.tk, now);
-          return <button key={s.tk} type="button" className="row as-link wide" onClick={() => onDetail(s.tk)}><span className="who"><TkIcon tk={s.tk} size={22} />{s.name}</span><b className={"mono " + cls(c)}>{c >= 0 ? "▲" : "▼"} {pct(c)}</b></button>;
-        })}
-      </div>
-      <div className="panel">
+        <div className="p-list">{movers.slice(0, 3).map(mover)}<span className="p-gap" aria-hidden="true" />{movers.slice(-3).map(mover)}</div>
+      </section>
+      <section className="b-sec">
         <h2>À venir</h2>
-        {cal.map(e => <CalRow key={e.m + (e.tk ?? "")} e={e} aur={aur} now={now} />)}
+        <div className="plain">{cal.map(e => { const c = e.tk ? aur.x?.cons?.[e.tk] : null;
+          return <div key={e.m + (e.tk ?? "")} className="plain-row"><span>{e.title}{c != null && <small>{`Attendu : ${signed(c)} sur un an`}</small>}</span><b className="mono">{gwhen(e.at, now)}</b></div> })}</div>
         <p className="muted small">Le cours réagit à l'écart entre le chiffre publié et ce qui était attendu. Les indices sortent avant : commandes, rumeurs, révisions des analystes.</p>
-      </div>
-      <div className="panel">
-        <h2>Dernières actualités <button type="button" className="btn ghost" onClick={onNews}>Tout voir</button></h2>
+      </section>
+      <section className="b-sec">
+        <h2>Dernières actualités</h2>
         {last.map(n => <NewsItem key={n.id} n={n} now={now} onDetail={onDetail} onRead={onRead} />)}
         {!last.length && <p className="muted small">Les premières nouvelles arrivent.</p>}
-      </div>
+        <button type="button" className="link b-more" onClick={onNews}>Tout le journal</button>
+      </section>
     </div>
   );
 }
 
-function List({ aur, now, bets, onPick, onDetail, onSubscribe, onRead }) {
+function List({ aur, now, bets, onDetail, onSubscribe, onRead }) {
   const mine = tk => bets.some(b => b.kind === "aurelys" && b.aur === tk);
   const row = s => {
     const q = aur.quotes[s.tk], c = chgOf(aur, s.tk, now), v = closesOf(aur, s.tk, 60), young = !STORIES[s.tk];
     return (
-      <div key={s.tk} className={"mrow" + (mine(s.tk) ? " mine" : "")}>
-        <button type="button" className="name who as-link" onClick={() => onDetail(s.tk)} aria-label={`Fiche de ${s.name}`}>
-          <TkIcon tk={s.tk} /><span><b>{s.name}{LINKS[s.tk] && <i className="real-tag" title={LINKS[s.tk].src}>réel</i>}{young && <i className="risk-tag">risqué</i>}</b><small>{q?.halt ? "cotation suspendue" : info(s.tk).what}</small></span>
-        </button>
+      <button key={s.tk} type="button" className={"srow" + (mine(s.tk) ? " mine" : "")} onClick={() => onDetail(s.tk)} aria-label={`Fiche de ${s.name}`}>
+        <TkIcon tk={s.tk} />
+        <span className="srow-n"><b>{s.name}{LINKS[s.tk] && <i className="real-tag" title={LINKS[s.tk].src}>réel</i>}{young && <i className="risk-tag">risqué</i>}</b><small>{q?.halt ? "cotation suspendue" : info(s.tk).what}</small></span>
         {v.length > 1 ? <Spark path={v} t={v.length - 1} /> : <span />}
         <span className="r mono"><b>{px(q?.p)}</b><small className={cls(c)}>{q ? pct(c) : ""}</small></span>
-        <span className="act">
-          <button type="button" className="buy" disabled={!q || q.halt} onClick={() => onPick(s.tk, "up")} aria-label={`Hausse sur ${s.name}`}>▲</button>
-          <button type="button" className="sell" disabled={!q || q.halt} onClick={() => onPick(s.tk, "down")} aria-label={`Baisse sur ${s.name}`}>▼</button>
-        </span>
-      </div>
+      </button>
     );
   };
   const news = tk => aur.news.find(n => n.tk == null && n.cat === "ipo" && n.title.startsWith(BY[tk]?.name));
@@ -233,13 +238,12 @@ function List({ aur, now, bets, onPick, onDetail, onSubscribe, onRead }) {
           </article>
         ))}
       </>}
-      <h3 className="sec">Cote principale</h3>
-      <div className="market">
-        <div className="mrow head"><span>Société</span><span /><span className="r">Cours · jour</span><span /></div>
-        {STOCKS.map(row)}
-      </div>
-      <h3 className="sec">Jeunes pousses <span className="muted small">très volatiles, radiées sous {Math.round(IPO.delist * 100)} % de leur prix d'introduction</span></h3>
-      {aur.young.length ? <div className="market">{aur.young.map(row)}</div> : <p className="muted small">Aucune pour l'instant : la prochaine levée de fonds arrive.</p>}
+      <h2 className="l-head">Cote principale <span className="muted">cours et variation du jour</span></h2>
+      <div className="p-list">{STOCKS.map(row)}</div>
+      <p className="muted small">Touche une société pour voir sa fiche, puis prendre position à la hausse ou à la baisse.</p>
+      <h2 className="l-head">Jeunes pousses</h2>
+      <p className="muted small">{`Très volatiles : radiées sous ${Math.round(IPO.delist * 100)} % de leur prix d'introduction.`}</p>
+      {aur.young.length ? <div className="p-list">{aur.young.map(row)}</div> : <p className="muted small">Aucune pour l'instant : la prochaine levée de fonds arrive.</p>}
     </>
   );
 }
@@ -323,11 +327,11 @@ function News({ aur, now, onDetail, onRead }) {
         <span className="paper-lead">{paras(une.body)[0]}</span>
         <span className="accent small">Lire l'article →</span>
       </button>}
-      <div className="panel">
+      <section className="b-sec n-cal">
         <h2>Calendrier</h2>
-        {calendar(sec(now), 6, aur.young).map(e => <CalRow key={e.m + (e.tk ?? "")} e={e} aur={aur} now={now} />)}
+        <div className="plain">{calendar(sec(now), 6, aur.young).map(e => <CalRow key={e.m + (e.tk ?? "")} e={e} aur={aur} now={now} />)}</div>
         <p className="muted small">Avant un rendez-vous, le marché est nerveux : la volatilité monte.</p>
-      </div>
+      </section>
       <input type="search" className="news-search" placeholder="Rechercher une entreprise (Nexora, SLM…)" value={q} onChange={e => setQ(e.target.value)} aria-label="Rechercher une entreprise dans le journal" />
       {k && <p className="muted small">{found ? `${found} article${found > 1 ? "s" : ""} en tête${hits.size ? ` : ${[...hits].map(tk => BY[tk].name).join(", ")}` : ""}.` : "Aucun article des 2 dernières heures ne correspond."}</p>}
       <div className="chips" role="group" aria-label="Filtre">
@@ -487,7 +491,7 @@ export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onClose
     <div className="scrim" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet detail" role="dialog" aria-modal="true" aria-label={s.name}>
         <div className="sheet-h">
-          <span className="who"><TkIcon tk={tk} size={38} /><span><b className="detail-name">{s.name}</b><small className="muted">{tk} · {SECTORS[s.sector].name}{!STORIES[tk] ? " · jeune pousse" : ""}</small></span></span>
+          <span className="who"><TkIcon tk={tk} size={38} /><span><b className="detail-name">{s.name}</b><small className="muted">{`${tk}, ${SECTORS[s.sector].name}${!STORIES[tk] ? ", jeune pousse" : ""}`}</small></span></span>
           <button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button>
         </div>
         <div className="detail-price"><b className="mono">{px(q?.p)}</b><span className={"mono " + cls(c)}>{q?.halt ? "cotation suspendue" : `${c >= 0 ? "▲" : "▼"} ${pct(c)} jour`}</span></div>
@@ -502,31 +506,38 @@ export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onClose
           <button type="button" className="buy" disabled={!q || q.halt} onClick={() => onPick(tk, "up")}><span>▲ Hausse</span></button>
           <button type="button" className="sell" disabled={!q || q.halt} onClick={() => onPick(tk, "down")}><span>▼ Baisse</span></button>
         </div>
-        <button type="button" className="btn invest-btn" disabled={!q || q.halt} onClick={() => onInvest(tk)}>Investir : acheter des actions (sans levier, à garder)</button>
+        <button type="button" className="btn invest-btn" disabled={!q || q.halt} onClick={() => onInvest(tk)}>Investir sans levier</button>
+        <p className="muted small d-hint">Hausse et Baisse : une position à levier, à clôturer quand tu veux. Investir : de vraies actions, sans liquidation, à garder.</p>
         {setAlerts && <Alerts tk={tk} last={q?.p} alerts={alerts} setAlerts={setAlerts} max={alertsMax} />}
-        {nextRes && <div className="panel cons-box">
-          <p className="small"><b>Prochains résultats</b> · {gwhen(nextRes.at, now)}</p>
-          <p className="small">{cons != null ? <>Les analystes attendent un chiffre d'affaires en hausse de <b className="mono">{signed(cons)}</b> sur un an. Le cours réagira à l'écart avec ce chiffre.</> : "Le consensus des analystes arrive."}</p>
-        </div>}
-        {LINKS[tk] && <div className="panel real-box">
-          <p className="small"><b>Branchée sur du réel</b> · {LINKS[tk].src}.</p>
-          <p className="small">{sig ? <>Dernier relevé : {sig.txt}. {sig.z > .02 ? "Au-dessus de la normale : bon pour l'entreprise." : sig.z < -.02 ? "Sous la normale : mauvais pour l'entreprise." : "Proche de la normale."}</> : "Premier relevé en attente."}</p>
-          <p className="muted small">Ces chiffres sont réels et à venir : celui qui anticipe (une sortie de jeu, une canicule, un long week-end) a un temps d'avance.</p>
-        </div>}
-        <div className="story">
-          <p className="small"><b>{info(tk).what}</b> · fondée en {info(tk).since}</p>
-          <p className="small">{info(tk).story}</p>
-          <p className="small muted">{s.desc}</p>
-        </div>
-        <div className="rows mono">
-          <div className="row"><span>Capitalisation</span><b>{q ? `${nf0.format(q.p * s.shares / 1e6)} M` : "—"}</b></div>
-          <div className="row"><span>PER</span><b>{q && eps ? nf2.format(q.p / eps) : "—"}</b></div>
-          <div className="row"><span>Rendement du dividende</span><b>{q && s.div ? pct(s.div / 100 * s.p0 / q.p) : "aucun"}</b></div>
-          <div className="row"><span>Volatilité habituelle</span><b>{nf2.format(s.sig * 100)} % par jour d'Aurelys</b></div>
-          <div className="row"><span>Volatilité mesurée (dernier jour)</span><b>{vol == null ? "—" : `${nf2.format(vol * 100)} %`}</b></div>
-          <div className="row"><span>Liquidité · bêta</span><b>{s.liq} · {nf2.format(s.beta)}</b></div>
-        </div>
-        {people.map(p => <p key={p.name} className="small"><b>{p.name}</b>, {p.role.toLowerCase()} : {p.bio}</p>)}
+        {nextRes && <section className="d-sec">
+          <h2>Prochains résultats <span className="muted">{gwhen(nextRes.at, now)}</span></h2>
+          <p>{cons != null ? <>Les analystes attendent un chiffre d'affaires en hausse de <b className="mono">{signed(cons)}</b> sur un an. Le cours réagira à l'écart avec ce chiffre.</> : "Le consensus des analystes arrive."}</p>
+        </section>}
+        {LINKS[tk] && <section className="d-sec d-real">
+          <h2>Branchée sur du réel</h2>
+          <p className="muted">{LINKS[tk].src}.</p>
+          <p>{sig ? <>Dernier relevé : {sig.txt}. {sig.z > .02 ? "Au-dessus de la normale : bon pour l'entreprise." : sig.z < -.02 ? "Sous la normale : mauvais pour l'entreprise." : "Proche de la normale."}</> : "Premier relevé en attente."}</p>
+          <p className="muted">Ces chiffres sont réels et à venir : celui qui anticipe (une sortie de jeu, une canicule, un long week-end) a un temps d'avance.</p>
+        </section>}
+        <section className="d-sec">
+          <h2>L'entreprise</h2>
+          <p><b>{info(tk).what}</b>{(([y, c]) => c ? t(", fondée en {y} à {c}.", { y, c }) : t(", fondée en {y}.", { y }))(String(info(tk).since ?? "").split(" · "))}</p>
+          <p>{info(tk).story}</p>
+          <p className="muted">{s.desc}</p>
+          {people.map(p => <p key={p.name}><b>{p.name}</b>, {p.role.toLowerCase()} : {p.bio}</p>)}
+        </section>
+        <section className="d-sec">
+          <h2>Chiffres clés</h2>
+          <div className="plain">
+            <div className="plain-row"><span>Capitalisation</span><b className="mono">{q ? `${nf0.format(q.p * s.shares / 1e6)} M` : "—"}</b></div>
+            <div className="plain-row"><span>PER</span><b className="mono">{q && eps ? nf2.format(q.p / eps) : "—"}</b></div>
+            <div className="plain-row"><span>Rendement du dividende</span><b className="mono">{q && s.div ? pct(s.div / 100 * s.p0 / q.p) : "aucun"}</b></div>
+            <div className="plain-row"><span>Volatilité habituelle</span><b className="mono">{nf2.format(s.sig * 100)} % par jour d'Aurelys</b></div>
+            <div className="plain-row"><span>Volatilité mesurée (dernier jour)</span><b className="mono">{vol == null ? "—" : `${nf2.format(vol * 100)} %`}</b></div>
+            <div className="plain-row"><span>Liquidité</span><b>{s.liq}</b></div>
+            <div className="plain-row"><span>Bêta</span><b className="mono">{nf2.format(s.beta)}</b></div>
+          </div>
+        </section>
         <h2>Actualités</h2>
         {news.slice(0, 8).map(n => <NewsItem key={n.id} n={n} now={now} onDetail={() => {}} onRead={setMark} />)}
         {!news.length && <p className="muted small">Rien de neuf pour l'instant.</p>}
@@ -596,31 +607,38 @@ export function AurelysCard({ b, aur, now, onClose, onAuto, canStop, onDetail, F
   return (
     <article className={"pos " + (x.net >= 0 ? "gain" : "loss") + (danger ? " danger" : "")}>
       <div className="pos-h">
-        <button type="button" className="who link" onClick={() => onDetail?.(b.aur)} aria-label={`Voir le marché de ${BY[b.aur]?.name ?? b.aur}`}><TkIcon tk={b.aur} size={22} /><b>{BY[b.aur]?.name ?? b.aur}</b> <small className="muted">marché ›</small></button>
+        <button type="button" className="who link" onClick={() => onDetail?.(b.aur)} aria-label={`Voir le marché de ${BY[b.aur]?.name ?? b.aur}`}><TkIcon tk={b.aur} size={22} /><b>{BY[b.aur]?.name ?? b.aur}</b></button>
         <span className={"side " + b.dir}>{b.dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×{b.lev}</span>
       </div>
-      <div className="pos-pnl mono"><span className={cls(x.net)}>{sW(x.net)}</span><span className={cls(x.net)}>{pct(x.net / b.stake)}</span></div>
+      <div className="pos-pnl"><b className={"mono " + cls(x.net)}>{sW(x.net)}</b><span className={"mono " + cls(x.net)}>{pct(x.net / b.stake)}</span><small>si tu clôtures maintenant</small></div>
       <div className="pos-chart" role="button" tabIndex={0} onClick={() => onDetail?.(b.aur)} onKeyDown={e => e.key === "Enter" && onDetail?.(b.aur)} aria-label="Voir le graphique du marché">
         <PositionChart id={b.id} entry={b.entry} dir={b.dir} pts={pts} x0={t0} x1={Math.max(now, t0 + 60 * SPM * 1000)} h={130} fmt={px} />
       </div>
       <Facts items={[
-        ["Mise", `${W(b.stake)} · ×${b.lev}`],
-        ["Valeur à la clôture", W(x.value), cls(x.net)],
-        ["Entrée", `${px(b.entry)} · ${gwhen(t0, now)}`],
+        ["Mise", `${W(b.stake)} à ×${b.lev}`],
+        ["Valeur", W(x.value), cls(x.net)],
+        ["Entrée", px(b.entry)],
         ["Cours", `${px(x.px)} (${pct(x.px / b.entry - 1)})`, cls((x.px / b.entry - 1) * (b.dir === "up" ? 1 : -1))],
         ["Liquidation", `${px(x.lq)} (${pct(d)})`, Math.abs(d) < .03 ? "down warn" : ""],
-        ["Frais", `${W(b.fees)} payés + ${W(x.closeFee)}`],
-        ["Impact à la clôture", `${pct(-x.sl)} · −${W(b.stake * b.lev * x.sl)}`],
         ["Ouverte depuis", `${gdur(now - t0)} d'Aurelys`],
         b.sl != null && ["Stop", px(b.sl), "down"],
         b.tp != null && ["Objectif", px(b.tp), "up"],
         x.halt && ["Clôture", "à la reprise de la cotation"],
       ]} />
+      <details className="t-more">
+        <summary>Frais et impact</summary>
+        <div className="plain">
+          <div className="plain-row"><span>Frais d'ouverture payés</span><b className="mono">{W(b.fees)}</b></div>
+          <div className="plain-row"><span>Frais de clôture</span><b className="mono">{W(x.closeFee)}</b></div>
+          <div className="plain-row"><span>Impact de l'ordre de clôture</span><b className="mono">{`${pct(-x.sl)}, soit −${W(b.stake * b.lev * x.sl)}`}</b></div>
+          <div className="plain-row"><span>Ouverte le</span><b className="mono">{gwhen(t0, now)}</b></div>
+        </div>
+      </details>
       {onAuto && (auto ? <AutoForm b={b} onAuto={onAuto} canStop={canStop} onDone={() => setAuto(false)} />
         : <button type="button" className="link" onClick={() => setAuto(true)}>{b.sl != null || b.tp != null ? (canStop ? "Modifier le stop et l'objectif" : "Modifier l'objectif") : canStop ? "Ajouter un stop ou un objectif" : "Ajouter un objectif (take profit)"}</button>)}
       {x.hit
         ? <p className="muted small">Seuil de liquidation touché, règlement en cours…</p>
-        : <button type="button" className="btn primary" disabled={busy || x.halt} onClick={() => setAsk(true)}>Clôturer · {W(x.value)}</button>}
+        : <button type="button" className="btn primary" disabled={busy || x.halt} onClick={() => setAsk(true)}>{`Clôturer pour ${W(x.value)}`}</button>}
       {ask && !x.hit && <CloseSheet b={b} x={x} busy={busy} onCancel={() => setAsk(false)} onConfirm={async () => { setBusy(true); await onClose(b); setBusy(false); setAsk(false) }} />}
     </article>
   );

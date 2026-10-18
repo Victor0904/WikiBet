@@ -13,14 +13,14 @@ export function Achievements({ api }) {
   const got = data.list.filter(a => a.at).length, cats = [...new Set(data.list.map(a => a.cat))];
   return (
     <section className="talents">
-      <header className="panel ach-head">
-        <h2>Succès</h2>
-        <p className="mono">{got} / {data.total} succès</p>
+      <header className="ach-head">
+        <p><b className="mono">{got}</b>{` succès débloqué${got > 1 ? "s" : ""} sur ${data.total}`}</p>
+        <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={data.total} aria-valuenow={got} aria-label="Succès débloqués"><i style={{ width: `${100 * got / Math.max(1, data.total)}%` }} /></div>
       </header>
       {cats.map(c => (
         <div key={c} className="ach-cat">
           <h3>{c}</h3>
-          {data.list.filter(a => a.cat === c).map(a => {
+          <div className="q-list">{data.list.filter(a => a.cat === c).map(a => {
             const done = !!a.at, bar = !done && a.goal && a.cur != null;
             return (
               <article key={a.code} className={"ach" + (done ? " done" : "")}>
@@ -36,7 +36,7 @@ export function Achievements({ api }) {
                 </div>
               </article>
             );
-          })}
+          })}</div>
         </div>
       ))}
     </section>

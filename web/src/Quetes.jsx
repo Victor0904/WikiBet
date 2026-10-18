@@ -25,17 +25,17 @@ export function Quests({ api, now, say }) {
   const t = now / 1000, next = unlocksAt(q.level + 1);
   const list = period => q.quests.filter(x => x.period === period);
   const item = x => (
-    <article key={x.code} className={"quest" + (x.done ? " done" : "")}>
+    <div key={x.code} className={"quest" + (x.done ? " done" : "")}>
       <span className="ach-ico" aria-hidden="true">{x.done ? "✓" : ""}</span>
       <div className="quest-b">
         <div className="ach-h"><b>{QUEST_BY[x.code]?.text ?? x.code}</b><span className="xp-tag mono">+{x.xp} XP</span></div>
-        {!x.done && <><Bar cur={x.cur} goal={x.goal} label={`Progression : ${QUEST_BY[x.code]?.text ?? x.code}`} /><small className="mono muted">{`${x.cur} / ${x.goal}`}</small></>}
+        {x.done ? <small className="up">Réussie</small> : <span className="q-prog"><Bar cur={x.cur} goal={x.goal} label={`Progression : ${QUEST_BY[x.code]?.text ?? x.code}`} /><small className="mono muted">{`${x.cur} / ${x.goal}`}</small></span>}
       </div>
-    </article>
+    </div>
   );
   return (
     <section className="quests talents">
-      <header className="panel quest-head">
+      <header className="quest-head">
         <div className="quest-lv"><span><small>Niveau de trader</small><b className="mono">{q.level}</b></span>
           <span className="streak"><small>Série</small><b className="mono">{`${q.streak} jour${q.streak > 1 ? "s" : ""}`}</b></span></div>
         {q.next != null && <><Bar cur={q.xp - q.from} goal={q.next - q.from} label="Vers le niveau suivant" />
@@ -46,11 +46,11 @@ export function Quests({ api, now, say }) {
       <Pari api={api} pari={pari} t={t} say={say} onDone={load} />
       <div className="ach-cat">
         <h3>Quêtes du jour <small className="muted">{`· nouvelles dans ${left(q.day_end - t)}`}</small></h3>
-        {list("day").map(item)}
+        <div className="q-list">{list("day").map(item)}</div>
       </div>
       <div className="ach-cat">
         <h3>Quêtes de la semaine <small className="muted">{`· nouvelles dans ${left(q.week_end - t)}`}</small></h3>
-        {list("week").map(item)}
+        <div className="q-list">{list("week").map(item)}</div>
         {q.chest && <p className="small accent">Coffre de la semaine gagné : il s'ouvrira avec les profils, bientôt.</p>}
       </div>
     </section>

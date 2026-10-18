@@ -158,23 +158,22 @@ export function Account({ account, push, me, patrimoine, openStake, holds, canRe
   return (
     <section className="account">
       <SubHeader title="Mon compte" onBack={onBack} />
-      <div className="panel">
-        <p className="acc-name"><b>{me.pseudo}</b></p>
-        <div className="rows mono">
-          <div className="row"><span>Patrimoine</span><b>{W(patrimoine)}</b></div>
-          <div className="row"><span>Solde</span><b>{W(me.cash)}</b></div>
-          <div className="row"><span>Positions (valeur actuelle)</span><b>{W(openStake)}</b></div>
-          <div className="row"><span>Actions</span><b>{W(holds)}</b></div>
-          <div className="row"><span>Faillites</span><b>{me.bankruptcies}</b></div>
-        </div>
+      <h1 className="acc-name">{me.pseudo}</h1>
+      <div className="plain">
+        <div className="plain-row acc-total"><span>Patrimoine</span><b className="mono">{W(patrimoine)}</b></div>
+        <div className="plain-row"><span>Solde</span><b className="mono">{W(me.cash)}</b></div>
+        <div className="plain-row"><span>Positions (valeur actuelle)</span><b className="mono">{W(openStake)}</b></div>
+        <div className="plain-row"><span>Actions</span><b className="mono">{W(holds)}</b></div>
+        <div className="plain-row"><span>Faillites</span><b className="mono">{me.bankruptcies}</b></div>
       </div>
       {me.pseudo_free && <PseudoForm onPseudo={onPseudo} />}
       {account && <AccountLink account={account} pseudo={me.pseudo} />}
       {push && <PushPanel push={push} />}
-      <div className="panel bk">
-        <p><b>Faillite</b>Sous 2 000 W de patrimoine (solde, valeur actuelle de tes positions et de tes actions), tu peux repartir à {CAP0_TXT}. Tes paris en cours sont perdus et le compteur de faillites augmente.</p>
-        <button type="button" className="btn" disabled={!canRestart} onClick={onRestart}>Repartir</button>
-      </div>
+      <section className="d-sec">
+        <h2>Faillite</h2>
+        <p className="muted">Sous 2 000 W de patrimoine (solde, valeur actuelle de tes positions et de tes actions), tu peux repartir à {CAP0_TXT}. Tes paris en cours sont perdus et le compteur de faillites augmente.</p>
+        <button type="button" className="btn acc-restart" disabled={!canRestart} onClick={onRestart}>Repartir à zéro</button>
+      </section>
       {demo && <p className="fine">Mode démo locale : ta partie est enregistrée dans ce navigateur uniquement, sans compte.</p>}
     </section>
   );

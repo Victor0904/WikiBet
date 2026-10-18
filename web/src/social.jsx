@@ -87,7 +87,7 @@ const useLoad = (load, deps) => {
   useEffect(() => { setRows(null); reload() }, [reload]);
   return [rows, reload];
 };
-const sub = (...a) => a.filter(Boolean).join(" · ");
+const sub = (...a) => a.filter(Boolean).join(", ");
 export const BotTag = ({ id }) => BOTS.has(id) ? <i className="gtag bot" title="Joueur fictif, géré par le jeu">bot</i> : null;
 
 export function Ranking({ api, me, wealth }) {
@@ -105,7 +105,7 @@ export function Ranking({ api, me, wealth }) {
             {rows.map((p, i) => (
               <div key={p.id} className={"brow" + (p.id === me.id ? " me" : "")}>
                 <span className="rk mono">{i + 1}</span>
-                <span><b>{p.pseudo}<BotTag id={p.id} />{p.guild && <> <i className="gtag">{p.guild}</i></>}</b><small>{sub(p.level != null ? `niv. ${p.level}` : null, sub(p.title, `${p.bets} pari${p.bets > 1 ? "s" : ""} clôturé${p.bets > 1 ? "s" : ""}`))}</small></span>
+                <span><b>{p.pseudo}<BotTag id={p.id} />{p.guild && <> <i className="gtag">{p.guild}</i></>}</b><small>{sub(p.level != null ? `niveau ${p.level}` : null, sub(p.title, `${p.bets} pari${p.bets > 1 ? "s" : ""} clôturé${p.bets > 1 ? "s" : ""}`))}</small></span>
                 <span className={"r mono " + cls(p.gain)}>{sW(p.gain)}</span>
               </div>
             ))}
@@ -166,7 +166,7 @@ export function Guilds({ api, me, say }) {
       <SubHeader title={sel ? sel.name : "Guilde"} onBack={sel ? () => setSel(null) : null} />
       {shown ? <GuildView api={api} me={me} g={shown} mine={shown.id === mine?.id} canJoin={!mine} run={run} />
         : create ? <GuildForm onCreate={v => run(() => api.guildCreate(v), `Guilde ${v.name} fondée.`)} onCancel={() => setCreate(false)} />
-        : <div className="panel guild-intro"><p className="muted">Une guilde réunit jusqu'à 30 traders. Ses gains sont la somme de ceux de ses membres.</p>
+        : <div className="guild-intro"><p className="muted">Une guilde réunit jusqu'à 30 traders. Ses gains sont la somme de ceux de ses membres.</p>
             <button type="button" className="btn primary" onClick={() => setCreate(true)}>Fonder une guilde</button></div>}
       <h3 className="sec">Classement des guildes</h3>
       <Segmented label="Période" value={period} onChange={setPeriod} options={[["today", "Aujourd'hui"], ["total", "Total"]]} />
