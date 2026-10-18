@@ -2,7 +2,7 @@
 import { PrivacyText } from "./privacy.jsx";
 import { t } from "./i18n.js";
 import { W, CAP0_TXT } from "./format.js";
-import { levelOf } from "../supabase/functions/_shared/progression.js";
+import { levelOf, XP_TOTAL } from "../supabase/functions/_shared/progression.js";
 import { SubHeader } from "./nav.jsx";
 import { AccountLink } from "./social.jsx";
 import { useEffect, useState } from "react";
@@ -30,13 +30,29 @@ export function PushPanel({ push, compact }) {
   );
 }
 
-// Page Profil (onglet « Plus ») : qui je suis, inviter des amis, accès rapides. Ne relit rien de lourd : les
-// données du jeu déjà chargées d'abord, guilde / amis / trophées ensuite, une fois la page affichée.
+// Page Profil (onglet « Plus ») : qui je suis (niveau, patrimoine, rang), mes accès (classement, succès, guilde,
+// amis), le parrainage, puis les pages pratiques. Une seule chose marquante : l'anneau du niveau autour de l'avatar ;
+// le reste est une liste sobre. Les données déjà chargées s'affichent tout de suite, guilde / amis / succès ensuite.
 const initials = p => (p ?? "?").split(/[\s._-]+/).filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?";
 const ordinal = n => n === 1 ? "1er" : `${n}e`;
 export const Avatar = ({ pseudo, size = 56, accent }) => (
   <span className="avatar" style={{ width: size, height: size, fontSize: size * .38, background: accent }} aria-hidden="true">{initials(pseudo)}</span>
 );
+// Anneau de progression vers le niveau suivant (même calcul que trader_level en SQL : le niveau de départ est un plancher).
+function LevelRing({ pseudo, xp, floor }) {
+  const lvl = Math.max(levelOf(xp), floor ?? 1), from = XP_TOTAL[lvl], to = XP_TOTAL[lvl + 1];
+  const part = to ? Math.min(1, Math.max(0, (xp - from) / (to - from))) : 1, R = 33, C = 2 * Math.PI * R;
+  return (
+    <div className="lv-ring" role="img" aria-label={`Niveau ${lvl}${to ? `, ${Math.round(part * 100)} % vers le niveau ${lvl + 1}` : ""}`}>
+      <svg viewBox="0 0 76 76" aria-hidden="true">
+        <circle cx="38" cy="38" r={R} className="track" />
+        <circle cx="38" cy="38" r={R} className="fill" style={{ strokeDasharray: C, "--off": C * (1 - part), "--c": C }} />
+      </svg>
+      <Avatar pseudo={pseudo} size={58} />
+      <b className="lv-badge mono">{lvl}</b>
+    </div>
+  );
+}
 
 export function Profile({ api, me, board, patrimoine, refs, trial, say, go, hasPush }) {
   const [guild, setGuild] = useState(undefined), [friends, setFriends] = useState(null), [ach, setAch] = useState(null);
@@ -48,73 +64,66 @@ export function Profile({ api, me, board, patrimoine, refs, trial, say, go, hasP
     return () => { alive = false };
   }, [api, me.id]);
 
+  const xp = me.xp ?? 0, lvl = Math.max(levelOf(xp), me.lvl_floor ?? 1), toNext = XP_TOTAL[lvl + 1] != null ? XP_TOTAL[lvl + 1] - xp : null;
   const rank = board.findIndex(r => r.id === me.id) + 1 || null, delta = rank && refs?.rank_day ? refs.rank_day - rank : 0;
-  const mine = refs?.mine ?? [], rewarded = mine.filter(r => r.paid > 0).length;
-  const slots = [...mine.filter(r => r.status === "validé"), ...mine.filter(r => r.status !== "validé")].slice(0, 4);
+  const mine = refs?.mine ?? [], validated = mine.filter(r => r.status === "validé");
   const link = refs?.code ? `${location.origin}/?ref=${refs.code}` : null;
   const share = async () => {
     const text = t("Rejoins-moi sur Aurelys, la bourse inventée où les joueurs font les cours. Mon code : {code}", { code: refs.code }); // partagé hors de la page : traduit ici
     if (navigator.share) { try { await navigator.share({ title: "Aurelys", text, url: link }); return } catch (e) { if (e?.name === "AbortError") return } }
     try { await navigator.clipboard.writeText(link); say("Lien copié : colle-le à tes amis.") } catch { say(`Ton lien : ${link}`) }
   };
-  const online = friends?.filter(f => f.online).length ?? 0, best = friends?.length ? friends.reduce((a, f) => f.today > a.today ? f : a) : null;
+  const online = friends?.filter(f => f.online).length ?? 0;
+  const row = (k, label, value) => (
+    <button key={k} type="button" className="p-row" onClick={() => go(k)}>
+      <span>{label}</span>{value != null && <span className="p-val">{value}</span>}<span className="chev" aria-hidden="true">›</span>
+    </button>
+  );
 
   return (
     <div className="profile">
-      <header className="profile-head">
-        <Avatar pseudo={me.pseudo} />
-        <div className="who-txt">
+      <header className="p-id">
+        <LevelRing pseudo={me.pseudo} xp={xp} floor={me.lvl_floor} />
+        <div className="p-name">
           <h1>{me.pseudo}{guild && <span className="gtag">{guild.tag}</span>}</h1>
-          <small>Niveau {Math.max(levelOf(me.xp ?? 0), me.lvl_floor ?? 1)}</small>
+          <p>{toNext != null ? `Niveau ${lvl}, encore ${toNext} XP pour le ${lvl + 1}` : `Niveau ${lvl}`}</p>
         </div>
-        <button type="button" className="gear" onClick={() => go("account")} aria-label="Mon compte">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.0 10.5L21.4 10.8L21.4 13.2L19.0 13.5L18.1 15.9L19.5 17.8L17.8 19.5L15.9 18.1L13.5 19.0L13.2 21.4L10.8 21.4L10.5 19.0L8.1 18.1L6.2 19.5L4.5 17.8L5.9 15.9L5.0 13.5L2.6 13.2L2.6 10.8L5.0 10.5L5.9 8.1L4.5 6.2L6.2 4.5L8.1 5.9L10.5 5.0L10.8 2.6L13.2 2.6L13.5 5.0L15.9 5.9L17.8 4.5L19.5 6.2L18.1 8.1Z" /><circle cx="12" cy="12" r="3" /></svg>
-        </button>
       </header>
-      <div className="profile-stats">
-        <div><small>Patrimoine</small><b className="mono">{W(patrimoine)}</b></div>
-        <div><small>Classement</small><b className="mono">{rank ? ordinal(rank) : "au-delà du 50e"}
-          {delta !== 0 && <span className={delta > 0 ? "up" : "down"}> {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}<span className="sr"> place{Math.abs(delta) > 1 ? "s" : ""} depuis hier</span></span>}</b></div>
-      </div>
 
-      {trial && <section className="invite panel">
-        <div className="invite-h"><h2><span aria-hidden="true">🔒 </span>Parrainage</h2></div>
-        <p className="muted small">Le parrainage demande un compte : +10 000 W pour toi à chaque ami validé.</p>
+      <dl className="p-figs">
+        <div><dt>Patrimoine</dt><dd className="mono">{W(patrimoine)}</dd></div>
+        <div><dt>Classement</dt><dd className="mono">{rank ? ordinal(rank) : "après le 50e"}
+          {delta !== 0 && <span className={delta > 0 ? "up" : "down"}> {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}<span className="sr"> place{Math.abs(delta) > 1 ? "s" : ""} depuis hier</span></span>}</dd></div>
+      </dl>
+
+      <nav className="p-list" aria-label="Mon jeu">
+        {row("board", "Classements", board[0] && board[0].id !== me.id ? `1er : ${board[0].pseudo}` : null)}
+        {row("succes", "Succès", ach ? `${ach.list.filter(a => a.at).length} sur ${ach.total}` : null)}
+        {row("guilds", "Guilde", guild === undefined ? null : guild ? guild.name : "Rejoindre")}
+        {row("friends", "Amis", !friends ? null : friends.length ? `${online} en ligne sur ${friends.length}` : "Ajouter")}
+      </nav>
+
+      {trial ? <section className="p-invite">
+        <h2>Invite tes amis</h2>
+        <p>Le parrainage demande un compte : +10 000 W pour toi à chaque ami validé.</p>
         <a className="btn primary" href="/jouer">Créer mon compte</a>
-      </section>}
-      {link && <section className="invite panel">
-        <div className="invite-h"><h2>Invite tes amis</h2><span className="mono">{rewarded}/4</span></div>
-        <p className="muted small">+10 000 W pour toi et +2 000 W pour ton ami quand il a clôturé 5 positions (100 W ou plus, sur 2 jours) et atteint le niveau 3 de trader.</p>
-        <ul className="slots">
-          {[0, 1, 2, 3].map(i => { const r = slots[i]; return (
-            <li key={i} className={"slot" + (r ? (r.status === "validé" ? " done" : " wait") : "")}>
-              {r ? <><Avatar pseudo={r.pseudo} size={40} accent={r.status === "validé" ? "var(--accent)" : undefined} /><small>{r.status === "validé" ? r.pseudo : "en cours"}</small></>
-                 : <><span className="avatar empty" aria-hidden="true">+</span><small>libre</small></>}
-            </li>) })}
-        </ul>
-        <div className="invite-code"><span><small>Ton code</small><b className="mono">{refs.code}</b></span>
-          <button type="button" className="btn primary" onClick={share}>Partager</button></div>
+      </section>
+      : link && <section className="p-invite">
+        <h2>Invite tes amis</h2>
+        <p>+10 000 W pour toi et +2 000 W pour ton ami, quand il a clôturé 5 positions (100 W ou plus, sur 2 jours) et atteint le niveau 3.</p>
+        <div className="p-code">
+          <span className="mono" aria-label="Ton code de parrainage">{refs.code}</span>
+          <button type="button" className="btn primary" onClick={share}>Partager</button>
+        </div>
+        <p className="p-slots">
+          <span className="dots" aria-hidden="true">{[0, 1, 2, 3].map(i => <i key={i} className={i < validated.length ? "on" : i < mine.length ? "wait" : ""} />)}</span>
+          {validated.length ? `${validated.length} sur 4 validés : ${validated.map(r => r.pseudo).join(", ")}` : mine.length ? `${mine.length} inscrit${mine.length > 1 ? "s" : ""}, en attente de validation` : "4 parrainages récompensés au plus"}
+        </p>
       </section>}
 
-      <div className="ptiles">
-        <button type="button" className="ptile panel" onClick={() => go("board")}>
-          <b>Classement</b><span>{board[0] ? `1er : ${board[0].pseudo}` : "—"}</span><small>{rank ? `Toi : ${ordinal(rank)}` : "Toi : au-delà du 50e"}</small>
-        </button>
-        <button type="button" className="ptile panel" onClick={() => go("guilds")}>
-          <b>Ma guilde</b>{guild === undefined ? <span>…</span> : guild ? <><span>{guild.name}</span><small>{ordinal(guild.rank)} du jour</small></> : <span>Rejoindre une guilde</span>}
-        </button>
-        <button type="button" className="ptile panel" onClick={() => go("friends")}>
-          <b>Amis</b>{!friends ? <span>…</span> : <><span>{friends.length ? `${online} en ligne` : "Ajouter des amis"}</span>
-            {best && best.today > 0 && <small>Meilleur gain du jour : {best.pseudo}</small>}</>}
-        </button>
-        <button type="button" className="ptile panel" onClick={() => go("succes")}>
-          <b>Succès</b><span>{ach ? `${ach.list.filter(a => a.at).length}/${ach.total}` : "…"}</span><small>Voir mes succès</small>
-        </button>
-      </div>
-
-      <nav className="menu discreet" aria-label="Autres pages">
-        {[["howto", "Comment jouer"], ...(hasPush ? [["notifs", "Notifications"]] : []), ["account", "Mon compte"], ["legal", "Sources des données"], ["privacy", "Confidentialité"]].map(([k, t]) => (
-          <button key={k} type="button" className="menu-row" onClick={() => go(k)}><span><b>{t}</b></span><span className="chev" aria-hidden="true">›</span></button>
+      <nav className="p-more" aria-label="Autres pages">
+        {[["howto", "Comment jouer"], ...(hasPush ? [["notifs", "Notifications"]] : []), ["account", "Mon compte"], ["legal", "Sources des données"], ["privacy", "Confidentialité"]].map(([k, l]) => (
+          <button key={k} type="button" onClick={() => go(k)}>{l}</button>
         ))}
       </nav>
     </div>
