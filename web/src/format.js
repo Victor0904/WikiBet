@@ -10,15 +10,9 @@ export const cls = v => v > 1e-9 ? "up" : v < -1e-9 ? "down" : "flat";
 const hhmm = new Intl.DateTimeFormat(LOCALE, { hour: "2-digit", minute: "2-digit" });
 export const clock = ms => Number.isFinite(+ms) ? hhmm.format(ms) : "—";
 
-// QG : noms des logements (palier 0 = chambre offerte) et couleurs des thèmes.
-export const HOME_NAMES = ["Chambre", "Studio", "Open space", "Loft", "Penthouse", "Villa", "Manoir", "Château", "Île privée"];
-// Avantages durables du logement : jours d'historique des paris, alertes de prix sur Aurelys.
-// pos : positions Aurelys ouvertes en même temps (aur_max_pos en SQL). Stop dès le loft (3), objectif pour tous, ordres à déclenchement au penthouse (4).
-export const PERKS = [{ hist: 1, alerts: 1, pos: 3 }, { hist: 3, alerts: 2, pos: 5 }, { hist: 7, alerts: 3, pos: 8 }, { hist: 30, alerts: 5, pos: 12 }, { hist: 90, alerts: 10, pos: 20 },
-  { hist: 180, alerts: 15, pos: 25 }, { hist: 365, alerts: 20, pos: 30 }, { hist: 730, alerts: 30, pos: 40 }, { hist: 1095, alerts: 50, pos: 50 }];
-export const AUTO_LV = 3, TRIGGER_LV = 4;
-export const THEMES = { theme_cyan: "#3CC8E6", theme_violet: "#A78BFA", theme_rose: "#F472B6", theme_or: "#E8C547" };
-export const DEFAULT_ACCENT = "#F5B83D";
+// Pour tous jusqu'aux niveaux de trader (H3) : jours d'historique des paris, alertes de prix sur Aurelys (gardées dans
+// le navigateur), positions Aurelys ouvertes en même temps (aur_max_pos en SQL, relu par my_terms).
+export const HIST_DAYS = 30, ALERTS_MAX = 5, MAX_POS = 12;
 // Joueurs fictifs (profiles.bot), chargés au démarrage : toujours affichés comme tels.
 export const BOTS = new Set();
 export const CAP0_TXT = "10 000 W"; // capital de départ, pour les textes

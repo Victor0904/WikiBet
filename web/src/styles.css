@@ -204,43 +204,11 @@ h2 .muted { font: 400 12.5px var(--f-body) }
 .bk p { margin: 0; font-size: 13.5px; color: var(--muted) }
 .bk p b { display: block; color: var(--ink); font-weight: 600 }
 
-/* QG et boutique */
-.qg { display: flex; flex-direction: column; gap: 10px }
-.qg-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px }
-.qg-head h2 { font-size: 22px; justify-content: flex-start; gap: 10px }
-.qg-head .big-num { font-size: 20px; font-weight: 600 }
-.qg-head small { font-size: 12px; color: var(--faint) }
-.title-tag, .accent { color: var(--accent); margin: 2px 0 0; font-size: 13px; font-weight: 600 }
-.small-btn { padding: 5px 10px; font-size: 13px; margin-bottom: 6px }
-.qg-scene { position: relative; height: 340px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
-  background: radial-gradient(ellipse at 50% 35%, #1a2036 0%, var(--panel) 70%) }
-.qg-scene canvas { display: block; width: 100% !important; height: 100% !important; touch-action: pan-y }
-.qg-badges { display: flex; flex-wrap: wrap; gap: 6px }
-.badge { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px }
-.badge.done { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600 }
-.next-home { display: flex; justify-content: space-between; align-items: center; gap: 12px }
-.next-home > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px }
-.next-home p { margin: 0 }
-.next-home .bar { height: 4px; background: var(--panel2); border-radius: 2px; overflow: hidden }
-.next-home .bar i { display: block; height: 100%; background: var(--accent) }
-.shop { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px }
-.item { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0 }
-.item.owned { border-color: var(--accent) }
-.item.locked { opacity: .55 }
-.item-h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline }
-.item-h b { font: 700 16px var(--f-cond) }
-.item p { margin: 0 }
-.item .btn { margin-top: auto }
-.item-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto }
-.item-acts .btn { flex: 1; margin: 0 }
+.accent { color: var(--accent); margin: 2px 0 0; font-size: 13px; font-weight: 600 }
 .me small { display: block; font-size: 11px; color: var(--accent); text-align: right }
 button.brow { width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); color: inherit; font: inherit; cursor: pointer }
 button.brow:hover { background: var(--panel2) }
 .brow .r small { display: block; font-size: 11px; color: var(--faint) }
-.rain { position: fixed; inset: 0; pointer-events: none; z-index: 70; overflow: hidden }
-.rain i { position: absolute; top: -30px; width: 8px; height: 13px; border-radius: 2px; animation: fall 2.4s linear forwards }
-.rain i.bill { width: 30px; height: 16px; background: #1fcb8b; color: #04140d; font: 700 10px/16px var(--f-mono); text-align: center }
-@keyframes fall { to { transform: translateY(110vh) rotate(520deg) } }
 
 /* Boutons, ticket d'ordre */
 .btn { border: 1px solid var(--line); background: var(--panel2); border-radius: 8px; padding: 9px 14px; font-weight: 600; font-size: 14px }
@@ -273,6 +241,7 @@ button.brow:hover { background: var(--panel2) }
 
 .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 60; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; font-size: 14px; font-weight: 500; max-width: calc(100% - 32px); box-shadow: 0 12px 30px -10px #000; animation: rise .25s ease-out }
 .toast.up { border-color: var(--up) } .toast.down { border-color: var(--down) }
+.toast.update { top: calc(12px + env(safe-area-inset-top, 0px)); bottom: auto; border-color: var(--accent); z-index: 80 } /* nouvelle version : en haut, au-dessus des bandeaux */
 @keyframes drop { from { transform: translate(-50%, -10px); opacity: 0 } }
 @keyframes rise { from { transform: translate(-50%, 10px); opacity: 0 } }
 @keyframes up { from { transform: translateY(24px); opacity: .5 } }
@@ -477,48 +446,11 @@ button:active:not(:disabled) { transform: scale(.96) }
 .talents { display: flex; flex-direction: column; gap: 10px; min-width: 0 }
 .talents * { min-width: 0 }
 .talents p, .talents b, .talents small, .talents span { overflow-wrap: anywhere }
-.tal-head { position: sticky; top: 54px; z-index: 5; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: var(--panel) }
-.tal-head-row { display: flex; align-items: center; gap: 12px }
-.tal-lv { display: flex; flex-direction: column; align-items: center; line-height: 1.1 } .tal-lv b { font-size: 24px }
-.tal-pts { flex: 1; font-size: 14px; color: var(--muted) }
-.tal-pts b { display: inline-block; min-width: 26px; padding: 1px 8px; margin-right: 4px; border-radius: 99px; background: var(--panel2); color: var(--ink); text-align: center }
-.tal-pts.on { color: var(--ink) } .tal-pts.on b { background: var(--accent); color: var(--accent-ink) }
-.tal-more { position: relative }
-.tal-dots { width: 44px; height: 44px; border: 0; border-radius: 8px; background: none; color: var(--muted); font-size: 22px; line-height: 1 }
-.tal-menu { position: absolute; right: 0; top: 46px; z-index: 6; width: min(280px, calc(100vw - 32px)); background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 4px; box-shadow: 0 8px 24px rgba(0, 0, 0, .5) }
-.tal-menu button { width: 100%; min-height: 44px; text-align: left; border: 0; background: none; padding: 8px 10px; font-size: 14px; color: var(--ink); border-radius: 8px }
-.tal-head .bar, .tal-gauge .bar { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden }
-.tal-head .bar i, .tal-gauge .bar i { display: block; height: 100%; background: var(--accent) }
-.tal-ach { display: flex; justify-content: space-between; gap: 10px; width: 100%; min-height: 44px; align-items: center; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); font-size: 14px; text-align: left }
 .accent-txt { color: var(--accent); font-weight: 600; white-space: nowrap }
-.tal-tabs { grid-auto-columns: minmax(0, 1fr); margin-bottom: 0 }
-.tal-tabs button { padding: 7px 2px; min-height: 52px }
-.tal-tab { display: flex; flex-direction: column; align-items: center; gap: 2px } .tal-tab small { font-size: 12px; line-height: 1.1 }
-.tal-tab .tal-ico { width: 15px; height: 15px; vertical-align: -2px }
-.tal-ico { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round }
-.tal-list { display: flex; flex-direction: column; gap: 10px; touch-action: pan-y }
-.tal-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: start }
-.tal-col { display: flex; flex-direction: column; gap: 10px }
-.tal-col h2 { font-size: 15px } .tal-col h2 span { display: flex; align-items: center; gap: 6px }
-.tal-card { display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px }
-.tal-card p { margin: 0; font-size: 14px; line-height: 1.35 }
-.tal-card.on { border-color: rgba(245, 184, 61, .45) }
-.tal-card.ult { border: 2px solid var(--accent); background: linear-gradient(180deg, rgba(245, 184, 61, .08), var(--panel) 60%) }
-.tal-card-h { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px } .tal-card-h b { flex: 1 1 auto; font: 700 16px/1.2 var(--f-cond); overflow-wrap: break-word }
-.tal-card-h .pips { margin-left: auto } .tal-card-h .tal-ico { color: var(--accent) }
-.tal-ult-tag { color: var(--accent); font-size: 12px !important; font-weight: 700; letter-spacing: .06em; text-transform: uppercase }
-.pips { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end }
-.pips i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--muted); box-sizing: border-box }
-.pips i.full { background: var(--accent); border-color: var(--accent) }
 .tal-gauge { display: flex; flex-direction: column; gap: 4px }
-.tal-plus { width: 100%; min-height: 44px; margin-top: 2px }
-.tal-plus:disabled { opacity: 1; background: var(--panel2); color: var(--muted); border-color: var(--line) }
-.tal-sheet h2 { font-size: 20px }
-.tal-recap { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--panel2); border-radius: 10px }
-.tal-recap div { display: flex; flex-direction: column; gap: 2px }
-.sheet-acts { display: flex; flex-direction: column; gap: 2px }
+.tal-gauge .bar { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden }
+.tal-gauge .bar i { display: block; height: 100%; background: var(--accent) }
 /* Succès */
-.tal-back { align-self: flex-start; min-height: 44px }
 .ach-head p { margin: 4px 0 0; font-size: 13px; color: var(--muted) }
 .ach-cat { display: flex; flex-direction: column; gap: 8px } .ach-cat h3 { margin: 6px 0 0; font: 700 15px/1.2 var(--f-cond); color: var(--muted); text-transform: uppercase; letter-spacing: .05em }
 .ach { display: flex; gap: 10px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; color: var(--muted) }
@@ -527,11 +459,8 @@ button:active:not(:disabled) { transform: scale(.96) }
 .ach.done .ach-ico { background: var(--accent); color: var(--accent-ink) }
 .ach-b { flex: 1; display: flex; flex-direction: column; gap: 4px } .ach-b p { margin: 0; font-size: 13.5px; line-height: 1.35 }
 .ach-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px } .ach-h b { font: 700 15px/1.2 var(--f-cond) }
-.ach-pts { flex: none; font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line) }
-.ach-pts.on { color: var(--accent); border-color: rgba(245, 184, 61, .5) }
 .ach-date { color: var(--accent) }
 .toast-act { display: block; margin-top: 6px; border: 0; background: none; padding: 4px 0; color: var(--accent); font-weight: 700; font-size: 14px }
-@media (min-width: 900px) { .tal-card p { font-size: 13px } }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 13px }
 .btn.fresh { width: 100%; margin-bottom: 8px }
 .heat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px }
@@ -599,15 +528,6 @@ button:active:not(:disabled) { transform: scale(.96) }
 .real-box { border-color: color-mix(in srgb, var(--up) 40%, var(--line)) }
 .heat.map { display: block; position: relative; width: 100%; aspect-ratio: 4 / 3; max-height: 70vh }
 .heat.map .hcell { position: absolute; min-height: 0; border: 2px solid var(--bg); border-radius: 8px; padding: 6px 8px; overflow: hidden }
-.troph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 8px }
-.troph { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; opacity: .55 }
-.troph.got { opacity: 1; border-color: #e8c547 }
-.troph b { font: 700 15px var(--f-cond) } .troph.got b { color: #e8c547 }
-.troph small { font-size: 12px; color: var(--muted) }
-.perks p { margin: 4px 0 0 }
-.city { display: flex; flex-direction: column; gap: 10px }
-.city p { margin: 0 }
-.city-scene { height: 420px }
 
 /* ===== Portefeuille, levées de fonds, journal ===== */
 .risk-tag { font: 600 10px var(--f-mono); font-style: normal; color: var(--down); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-left: 6px; vertical-align: 2px }
@@ -672,17 +592,6 @@ button:active:not(:disabled) { transform: scale(.96) }
 .folio-card .spark { width: 100%; height: 40px; display: block }
 .obs { margin: 0; color: var(--muted); border-left: 2px solid var(--accent); padding-left: 6px }
 .stake-chips button { font-variant-numeric: tabular-nums }
-.photo-btn { align-self: flex-end; margin-top: -6px }
-.city-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center }
-.city-head span { display: flex; flex-direction: column; min-width: 0 }
-.city-head b { font: 700 20px var(--f-cond) }
-.goals, .identity { display: flex; flex-direction: column; gap: 8px }
-.goals p { margin: 0 }
-.goal { display: flex; flex-direction: column; gap: 4px }
-.swatches { display: flex; gap: 8px; flex-wrap: wrap }
-.swatches button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line) }
-.swatches button[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 2px var(--bg) inset }
-.land { display: flex; flex-direction: column; gap: 6px } .land p { margin: 0 }
 
 /* Ordres automatiques (stop, objectif, déclenchement) */
 .auto-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; align-items: end }

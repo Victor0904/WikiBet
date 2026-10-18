@@ -50,7 +50,7 @@ function walk(n, parent, ctx, from) {
   }
   for (const k in n) if (k !== "type" && k !== "start" && k !== "end" && k !== "range" && k !== "loc") walk(n[k], n, ctx, from);
 }
-const files = [...["src", "src/qg"].flatMap(d => readdirSync(new URL(d + "/", root)).filter(f => /\.(jsx?|mjs)$/.test(f) && !/^(en|i18n|seed|engine|demo)\.js$/.test(f)).map(f => d + "/" + f)),
+const files = [...["src"].flatMap(d => readdirSync(new URL(d + "/", root)).filter(f => /\.(jsx?|mjs)$/.test(f) && !/^(en|i18n|seed|engine|demo)\.js$/.test(f)).map(f => d + "/" + f)),
   "supabase/functions/_shared/aurelys-stories.js", "supabase/functions/aurelys/index.ts"];
 for (const f of files) { const r = parseSync(f, read(f), { lang: f.endsWith(".ts") ? "ts" : "jsx" }); walk(r.program, null, null, f) }
 // Données du moteur affichées telles quelles : secteurs, humeurs, personnages, sociétés.
@@ -78,7 +78,7 @@ for (const m of read("supabase/functions/aurelys/index.ts").matchAll(/error: "([
 const db = new PGlite();
 await db.exec(read("src/demo-stub.sql"));
 for (const f of readdirSync(new URL("supabase/migrations/", root)).sort()) await db.exec(read("supabase/migrations/" + f));
-for (const t of ["achievements", "talent_defs", "shop_items", "city_catalog"]) for (const r of (await db.query(`select * from ${t}`)).rows) for (const v of Object.values(r)) if (typeof v === "string" && (/ /.test(v) || /^[A-ZÀ-Ý]\p{Ll}/u.test(v))) add(v, "base " + t);
+for (const t of ["achievements"]) for (const r of (await db.query(`select * from ${t}`)).rows) for (const v of Object.values(r)) if (typeof v === "string" && (/ /.test(v) || /^[A-ZÀ-Ý]\p{Ll}/u.test(v))) add(v, "base " + t);
 
 const EN = (await import("../src/en.js").catch(() => ({ default: {} }))).default;
 const missing = [...keys].filter(([k]) => !(k in EN)).map(([k, from]) => ({ k, from }));

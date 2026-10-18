@@ -8,10 +8,15 @@ const read = p => readFileSync(new URL(p, import.meta.url), "utf8");
 export const data = JSON.parse(read("../src/pageviews.json"));
 export const engine = createEngine(data);
 
-export async function freshDb() {
+// `until` : s'arrêter avant cette migration (préparer des données d'avant), puis finir avec migrateFrom(db, until).
+const MIGRATIONS = readdirSync(new URL("../supabase/migrations/", import.meta.url)).sort();
+export async function migrateFrom(db, from) {
+  for (const f of MIGRATIONS.filter(f => f >= from)) await db.exec(read("../supabase/migrations/" + f));
+}
+export async function freshDb({ until } = {}) {
   const db = new PGlite();
   await db.exec(read("../src/demo-stub.sql"));
-  for (const f of readdirSync(new URL("../supabase/migrations/", import.meta.url)).sort()) await db.exec(read("../supabase/migrations/" + f));
+  for (const f of MIGRATIONS.filter(f => !until || f < until)) await db.exec(read("../supabase/migrations/" + f));
   const rows = seedRows(engine);
   for (const t of ["game_config", "articles", "views", "prices", "duels"])
     await db.query(`insert into ${t} select * from json_populate_recordset(null::${t}, $1::json)`, [JSON.stringify(rows[t])]);

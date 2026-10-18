@@ -18,13 +18,12 @@ test("impact : 100 000 W ≈ 0,35 % par sens sur une petite valeur, ≈ 0,1 % su
   assert.ok(rt > .05 && rt < .1, `aller-retour ×10 sur Pixelfold : ${(rt * 100).toFixed(1)} % de la mise`);
 });
 
-test("impact : la valeur affichée (closeQuote) est le paiement réel de aur_close, ▲ et ▼, ×1 à ×20, petite et grosse mise", async () => {
+test("impact : la valeur affichée (closeQuote) est le paiement réel de aur_close, ▲ et ▼, ×1 à ×15, petite et grosse mise, comme un joueur sans talent", async () => {
   const db = await freshDb(); await login(db, A, "alice");
   await db.query("update profiles set cash = 1e6 where id = $1", [A]);
-  await db.query("select buy_item('studio')"); // ×20
   const rate = (await db.query("select my_fee_rate() as r")).rows[0].r;
   assert.equal(rate, .001);
-  for (const dir of ["up", "down"]) for (const lev of [1, 10, 20]) for (const stake of [100, Math.floor(110000 / lev)]) {
+  for (const dir of ["up", "down"]) for (const lev of [1, 10, 15]) for (const stake of [100, Math.floor(110000 / lev)]) {
     await tick(db, 3, 10);
     const n = stake * lev, b = (await db.query("select * from aur_open($1, 'SLM', $2, $3, $4, $5)", [A, dir, lev, stake, slip(null, "SLM", n)])).rows[0];
     await tick(db, 2, 10.04); // le cours bouge un peu après l'ouverture

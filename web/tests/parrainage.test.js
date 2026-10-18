@@ -16,8 +16,9 @@ const closed = (db, u, days, stake = 100, held = 200) => db.query(
   `insert into bets (user_id, session, day, kind, stake, status, payout, aur, dir, lev, entry, created_at, closed_at)
    values ($1, 0, 0, 'aurelys', $2::float8, 'won', $2::float8 * 1.1, 'SLM', 'up', 1, 10, now() - make_interval(days => $3, secs => $4), now() - make_interval(days => $3))`,
   [u, stake, days, held]);
-const studio = (db, u) => db.query("insert into inventory (user_id, item_id, qty) values ($1, 'studio', 1)", [u]);
-const ready = async (db, u) => { for (const d of [0, 0, 0, 1, 1]) await closed(db, u, d); await studio(db, u) };
+// Niveau 3 de trader (H1 : niveau de départ ; l'XP arrive en H3).
+const level3 = (db, u) => db.query("update profiles set lvl_floor = 3 where id = $1", [u]);
+const ready = async (db, u) => { for (const d of [0, 0, 0, 1, 1]) await closed(db, u, d); await level3(db, u) };
 const check = async db => (await db.query("select referral_check() n")).rows[0].n;
 const ref = async (db, u) => (await db.query("select * from referrals where filleul = $1", [u])).rows[0];
 
@@ -34,18 +35,19 @@ test("parrainage : code unique, auto-parrainage refusé, code inconnu refusé sa
   assert.equal((await db.query("select count(*)::int n from referrals")).rows[0].n, 1);
 });
 
-test("parrainage : validé seulement avec 5 positions ≥ 100 W tenues 150 s sur 2 jours, et un logement acheté", async () => {
+test("parrainage : validé seulement avec 5 positions ≥ 100 W tenues 150 s sur 2 jours, et le niveau 3 de trader", async () => {
   const db = await freshDb(); await login(db, P, "Vayk");
   const F = id(2); await signup(db, F, "Tom", await codeOf(db, P));
   await closed(db, F, 0, 50); await closed(db, F, 1, 100, 100); // trop petite, trop courte : ne comptent pas
   for (const d of [0, 0, 0, 0]) await closed(db, F, d);
-  await studio(db, F);
+  await level3(db, F);
   assert.equal(await check(db), 0, "4 positions valables, un seul jour");
-  await db.query("delete from inventory where user_id = $1", [F]);
+  await db.query("update profiles set lvl_floor = 2 where id = $1", [F]);
   await closed(db, F, 1);
-  assert.equal(await check(db), 0, "5 positions sur 2 jours, mais pas de logement");
+  assert.equal(await check(db), 0, "5 positions sur 2 jours, mais niveau 2 : en attente, rien de perdu");
+  assert.equal((await ref(db, F)).status, "en_attente");
   const p0 = await cash(db, P), f0 = await cash(db, F);
-  await studio(db, F);
+  await level3(db, F);
   assert.equal(await check(db), 1);
   const r = await ref(db, F);
   assert.equal(r.status, "validé"); assert.equal(r.paid_parrain, 10000); assert.equal(r.paid_filleul, 2000);

@@ -5,29 +5,24 @@ import { freshDb, login } from "./db.js";
 const A = "00000000-0000-0000-0000-00000000000a";
 const tick = (db, ago, p) => db.query("insert into aur_ticks (tk, t, p) values ('SLM', now() - make_interval(secs => $1), $2)", [ago, p]);
 const open = async (db, dir, lev, stake) => (await db.query("select * from aur_open($1, 'SLM', $2, $3, $4, 0)", [A, dir, lev, stake])).rows[0];
-const move = async (db, ...homes) => { for (const h of homes) await db.query("select buy_item($1)", [h]) };
 const due = async db => (await db.query("select * from aur_due()")).rows;
 const exec = async db => { for (const d of await due(db)) await db.query("select aur_auto_exec($1, $2, 0)", [d.what, d.id]) };
 const bet = async (db, id) => (await db.query("select * from bets where id = $1", [id])).rows[0];
 
-test("ordres auto : nombre de positions ouvertes selon le logement", async () => {
+// Jusqu'aux niveaux de trader (H3) : 12 positions ouvertes pour tous.
+test("ordres auto : 12 positions ouvertes au plus pour tous", async () => {
   const db = await freshDb(); await login(db, A, "alice");
   await db.query("update profiles set cash = 1e6 where id = $1", [A]);
   await tick(db, 2, 10);
-  for (let i = 0; i < 3; i++) await open(db, "up", 1, 10);
-  await assert.rejects(open(db, "up", 1, 10), /Au plus 3 positions/);
-  await move(db, "studio");
-  for (let i = 0; i < 2; i++) await open(db, "up", 1, 10);
-  await assert.rejects(open(db, "up", 1, 10), /Au plus 5 positions/);
+  for (let i = 0; i < 12; i++) await open(db, "up", 1, 10);
+  await assert.rejects(open(db, "up", 1, 10), /Au plus 12 positions/);
 });
 
-test("ordres auto : stop et objectif dès le loft, exécutés au cours du marché quand le seuil est touché", async () => {
+test("ordres auto : stop et objectif pour tous, exécutés au cours du marché quand le seuil est touché", async () => {
   const db = await freshDb(); await login(db, A, "alice");
   await db.query("update profiles set cash = 1e6 where id = $1", [A]);
   await tick(db, 10, 10);
   const b = await open(db, "up", 5, 100); // liquidation à 8
-  await assert.rejects(db.query("select aur_set_auto($1, 9, 12)", [b.id]), /loft/);
-  await move(db, "studio", "openspace", "loft");
   await assert.rejects(db.query("select aur_set_auto($1, 7.5, null)", [b.id]), /Stop invalide/, "sous la liquidation");
   await assert.rejects(db.query("select aur_set_auto($1, 10.5, null)", [b.id]), /Stop invalide/, "au-dessus du cours");
   await assert.rejects(db.query("select aur_set_auto($1, null, 9.5)", [b.id]), /Objectif invalide/);
@@ -44,12 +39,13 @@ test("ordres auto : stop et objectif dès le loft, exécutés au cours du march�
   assert.equal((await due(db)).length, 0);
 });
 
-test("ordres auto : ordre à déclenchement au penthouse, annulé avec son motif s'il échoue", async () => {
+// Ordres à déclenchement : gardés par ceux qui avaient le penthouse (trig_ok), jusqu'aux niveaux de trader (H3).
+test("ordres auto : ordre à déclenchement si le droit a été gardé, annulé avec son motif s'il échoue", async () => {
   const db = await freshDb(); await login(db, A, "alice");
   await db.query("update profiles set cash = 1e6 where id = $1", [A]);
   await tick(db, 10, 10);
-  await assert.rejects(db.query("select aur_trigger_add('SLM', 'up', 1, 100, 9)"), /penthouse/);
-  await move(db, "studio", "openspace", "loft", "penthouse");
+  await assert.rejects(db.query("select aur_trigger_add('SLM', 'up', 1, 100, 9)"), /niveaux de trader/);
+  await db.query("update profiles set trig_ok = true where id = $1", [A]);
   const { rows: [g] } = await db.query("select * from aur_trigger_add('SLM', 'up', 1, 100, 9)");
   assert.equal(g.above, false, "achat sur repli");
   const { rows: [g2] } = await db.query("select * from aur_trigger_add('SLM', 'down', 1, 1e9, 11)");

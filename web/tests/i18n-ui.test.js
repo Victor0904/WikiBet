@@ -42,14 +42,12 @@ test("anglais : les écrans principaux n'affichent plus de français", { skip: !
     await press("Stocks", ".dock"); await check("Stocks");
     await press("Positions", ".dock"); await check("Positions");
     for (const v of ["Portfolio", "History"]) { await press(v); await check(`Positions · ${v}`) }
-    await press("HQ", ".dock"); await check("HQ");
-    for (const v of ["Bank", "Talents"]) { await press(v); await check(`HQ · ${v}`) }
+    await press("Guild", ".dock"); await sleep(1500); await check("Guild");
     await press("More", ".dock"); await check("Profile");
-    for (const v of ["Leaderboard", "My account", "How to play", "Data sources", "Privacy", "My guild"]) { await press("More", ".dock"); await press(v); await check(v) }
-    await sleep(2500); await check("Ville de la guilde");
+    for (const v of ["Leaderboard", "Achievements", "My account", "How to play", "Data sources", "Privacy"]) { await press("More", ".dock"); await press(v); await check(v) }
     await b.goto(srv.url + "jouer?demo=1"); await b.waitFor("!!document.querySelector('.intro-slide')", 30000); await check("Présentation de l'essai");
     await b.waitFor("!!document.querySelector('.trial-bar')", 120000); await check("Essai");
-    await press("More", ".dock"); await press("My guild"); await check("Essai · guilde verrouillée");
+    await press("Guild", ".dock"); await check("Essai · guilde verrouillée");
   } finally { await b.close(); await srv.close() }
   const list = [...bad].map(([l, w]) => `${w} : ${l}`);
   assert.deepEqual(list, [], "textes restés en français");

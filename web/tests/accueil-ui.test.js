@@ -30,11 +30,11 @@ test("accueil, parrainage et essai sans compte", { skip: !chromePath() && !proce
     await b.waitFor("!!document.querySelector('.dock') && !!document.querySelector('.trial-bar')", 120000);
     assert.ok(await b.evaluate("!!document.querySelector('.coach')"), "bulles du tutoriel");
     assert.equal(await b.evaluate("localStorage.getItem('wb-ref')"), "ABCD-123", "l'essai garde le code pour la vraie inscription");
-    await b.click("QG", ".dock"); await sleep(500); await b.click("Talents", "main"); await sleep(500);
-    assert.match(await text(), /Les talents demandent un compte/);
+    await b.click("Guilde", ".dock"); await sleep(500);
+    assert.match(await text(), /Les guildes demandent un compte/);
     await b.click("Plus", ".dock"); await sleep(500);
     assert.match(await text(), /Le parrainage demande un compte/);
-    await b.click("Ma guilde", "main"); await sleep(500);
-    assert.match(await text(), /Les guildes demandent un compte/);
+    await b.click("Succès", "main"); await sleep(500);
+    assert.match(await text(), /Les succès demandent un compte/);
   } finally { await b.close(); await srv.close() }
 });

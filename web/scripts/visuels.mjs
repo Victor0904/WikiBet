@@ -73,7 +73,7 @@ try {
   await b.click("1 min", ".sheet.detail"); await sleep(2500);
   await b.shot(pub + "captures/fiche.webp", false, "webp");
   await b.evaluate(`document.querySelector(".sheet.detail .x").click(), true`);
-  await b.click("Plus", ".dock"); await sleep(800); await b.click("Ma guilde", "main"); await sleep(2500);
+  await b.click("Guilde", ".dock"); await sleep(1500);
   await b.shot(pub + "captures/guilde.webp", false, "webp");
   for (const f of ["og.png", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "captures/marche.webp", "captures/fiche.webp", "captures/guilde.webp"])
     console.log(f, Math.round(statSync(pub + f).size / 1024), "Ko");

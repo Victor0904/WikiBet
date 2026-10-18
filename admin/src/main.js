@@ -170,13 +170,12 @@ function card() {
     const p = snap.players.find(x => x.id === selected.id);
     if (!p) { el.style.display = "none"; return }
     html = `<h3>${esc(p.pseudo)} ${p.bot ? '<span class="muted">bot</span>' : ""}</h3>`
-      + row("Patrimoine", W(p.patrimoine)) + row("Caisse / banque", `${W(p.cash)} / ${W(p.bank)}`)
-      + row("Niveau", `${p.level} · ${W(p.tal_cum)} net`) + row("Faillites", p.bankruptcies)
+      + row("Patrimoine", W(p.patrimoine)) + row("Caisse", W(p.cash))
+      + row("Niveau", `${p.level ?? "—"} · ${W(p.tal_cum)} net`) + row("Faillites", p.bankruptcies)
       + row("Inscrit", ago(p.created)) + row("Dernière connexion", ago(p.seen))
       + row("Parrain", esc(p.parrain ?? "—")) + row("Filleuls", p.filleuls.map(f => `${esc(f.pseudo)}${f.status === "validé" ? " ✓" : ""}`).join(", ") || "—")
       + `<h2 style="margin-top:10px">Positions (${p.positions.length})</h2>`
       + (p.positions.map(q => { const g = q.value - q.stake; return row(`${q.tk} ${q.dir === "up" ? "▲" : "▼"} ×${q.lev}`, `${W(q.stake)} → ${W(q.value)}`, g >= 0 ? "up" : "down") }).join("") || '<div class="muted">aucune</div>')
-      + `<h2 style="margin-top:10px">Talents</h2><div class="num">${Object.entries(p.talents).map(([k, v]) => `${k} ${v}`).join(" · ") || "—"}</div>`
       + `<h2 style="margin-top:10px">Succès (${p.achievements.length})</h2><div class="num muted">${p.achievements.join(" · ") || "—"}</div>`;
   } else {
     const s = snap.stocks.find(x => x.tk === selected.tk);

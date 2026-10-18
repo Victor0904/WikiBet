@@ -5,21 +5,14 @@ import { freshDb, login } from "./db.js";
 const id = n => `00000000-0000-0000-0000-${String(n).padStart(12, "0")}`;
 const A = id(20);
 
-test("faillite : on repart à 10 000 W de patrimoine, logements compris (plus d'aller-retour gagnant)", async () => {
+test("faillite : sous 2 000 W de patrimoine, on repart à 10 000 W ; positions perdues", async () => {
   const db = await freshDb(); await login(db, A, "alice");
-  await db.query("update profiles set cash = 13000 where id = $1", [A]);
-  await db.query("select buy_item('studio')"); // 12 000 W : il reste 1 000 W, sous le seuil
-  const price = (await db.query("select price from shop_items where id = 'studio'")).rows[0].price;
+  await db.query("update profiles set cash = 2500 where id = $1", [A]);
+  await assert.rejects(db.query("select restart()"), /pas en faillite/);
+  await db.query("update profiles set cash = 100 where id = $1", [A]);
   const p = (await db.query("select * from restart()")).rows[0];
-  assert.equal(p.cash, Math.max(2000, 10000 - Math.floor(price * .6)), "10 000 W moins 60 % du studio");
+  assert.equal(p.cash, 10000);
   assert.equal(p.bankruptcies, 1);
-  // Sans logement : 10 000 W comme avant ; jamais moins de 2 000 W en caisse.
-  const B = id(21); await login(db, B, "bob");
-  await db.query("update profiles set cash = 100 where id = $1", [B]);
-  assert.equal((await db.query("select cash from restart()")).rows[0].cash, 10000);
-  await db.query("insert into inventory (user_id, item_id, qty) values ($1, 'penthouse', 1)", [B]);
-  await db.query("update profiles set cash = 100 where id = $1", [B]);
-  assert.equal((await db.query("select cash from restart()")).rows[0].cash, 2000, "grand logement : 2 000 W en caisse au moins");
 });
 
 test("classement de la semaine : entre joueurs seulement, un bot devant ne prive pas le premier joueur", async () => {

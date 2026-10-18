@@ -25,7 +25,21 @@ const Wait = () => <main className="center"><LogoLoader size={72} ariaLabel={TRI
 
 export default function App() {
   if (LANDING) return <Suspense fallback={<main className="center"><LogoLoader size={72} /></main>}><Landing /></Suspense>;
-  return <Play />;
+  return <><Play /><NewVersion /></>;
+}
+
+// Page chargée avant une mise à jour : une fonction du serveur n'existe plus (api.js, « wb-version »), ou un morceau
+// du site n'est plus en ligne (Vite, « vite:preloadError »). Le service worker ne met rien en cache : recharger suffit.
+function NewVersion() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const show = e => { setOn(true); e?.preventDefault?.() };
+    addEventListener("wb-version", show); addEventListener("vite:preloadError", show);
+    return () => { removeEventListener("wb-version", show); removeEventListener("vite:preloadError", show) };
+  }, []);
+  if (!on) return null;
+  return <div className="toast update" role="alert">Nouvelle version disponible.
+    <button type="button" className="toast-act" onClick={() => location.reload()}>Recharger</button></div>;
 }
 
 function Play() {

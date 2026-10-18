@@ -1,6 +1,5 @@
 // Comptes (pseudo et mot de passe), classement des gains, amis et guildes.
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-const City = lazy(() => import("./City.jsx")); // Three.js n'est chargé qu'à l'ouverture d'une ville
+import { useCallback, useEffect, useState } from "react";
 import { W, sW, cls, BOTS } from "./format.js";
 import { Segmented, SubHeader, Loading } from "./nav.jsx";
 
@@ -91,7 +90,7 @@ const useLoad = (load, deps) => {
 const sub = (...a) => a.filter(Boolean).join(" · ");
 export const BotTag = ({ id }) => BOTS.has(id) ? <i className="gtag bot" title="Joueur fictif, géré par le jeu">bot</i> : null;
 
-export function Ranking({ api, me, wealth, onVisit }) {
+export function Ranking({ api, me, wealth }) {
   const [period, setPeriod] = useState("today"), [scope, setScope] = useState("all");
   const [rows] = useLoad(() => period === "wealth" ? Promise.resolve([]) : api.gainsBoard(period, scope), [api, period, scope]);
   return (
@@ -104,11 +103,11 @@ export function Ranking({ api, me, wealth, onVisit }) {
         {rows === null ? <Loading size={48} /> : !rows.length ? <p className="muted">{period === "today" ? "Aucun pari clôturé aujourd'hui pour l'instant." : "Aucun pari clôturé."}</p> : (
           <div className="board">
             {rows.map((p, i) => (
-              <button type="button" key={p.id} className={"brow" + (p.id === me.id ? " me" : "")} onClick={() => onVisit(p)} aria-label={`Voir le QG de ${p.pseudo}`}>
+              <div key={p.id} className={"brow" + (p.id === me.id ? " me" : "")}>
                 <span className="rk mono">{i + 1}</span>
                 <span><b>{p.pseudo}<BotTag id={p.id} />{p.guild && <> <i className="gtag">{p.guild}</i></>}</b><small>{sub(p.level != null ? `niv. ${p.level}` : null, sub(p.title, `${p.bets} pari${p.bets > 1 ? "s" : ""} clôturé${p.bets > 1 ? "s" : ""}`))}</small></span>
                 <span className={"r mono " + cls(p.gain)}>{sW(p.gain)}</span>
-              </button>
+              </div>
             ))}
           </div>
         )}
@@ -119,16 +118,16 @@ export function Ranking({ api, me, wealth, onVisit }) {
 }
 
 // ===== Amis =====
-export function Friends({ api, say, onVisit, onBack }) {
+export function Friends({ api, say, onBack }) {
   const [rows, reload] = useLoad(() => api.myFriends(), [api]), [pseudo, setPseudo] = useState("");
   const run = async (fn, ok) => { try { const r = await fn(); if (ok) say(ok(r), "up"); reload() } catch (e) { say(e.message, "down") } };
   const part = st => (rows ?? []).filter(r => r.state === st);
   const row = (f, acts) => (
     <div key={f.id} className="brow frow">
-      <button type="button" className="fname" onClick={() => onVisit(f)} aria-label={`Voir le QG de ${f.pseudo}`}>
+      <span className="fname">
         <b>{f.pseudo}{f.guild && <> <i className="gtag">{f.guild}</i></>}</b>
         {f.state === "ami" && <small className="mono">jour <span className={cls(f.today)}>{sW(f.today)}</span> · total <span className={cls(f.total)}>{sW(f.total)}</span></small>}
-      </button>
+      </span>
       <span className="f-acts">{acts}</span>
     </div>
   );
@@ -155,7 +154,8 @@ export function Friends({ api, say, onVisit, onBack }) {
 }
 
 // ===== Guildes =====
-export function Guilds({ api, me, say, onVisit, onBack, accent }) {
+// Onglet Guilde : ma guilde (ou en fonder une) et le classement des guildes.
+export function Guilds({ api, me, say }) {
   const [period, setPeriod] = useState("today"), [sel, setSel] = useState(null), [create, setCreate] = useState(false);
   const [list, reload] = useLoad(() => api.guildList(period), [api, period]);
   const mine = list?.find(g => g.mine);
@@ -163,14 +163,8 @@ export function Guilds({ api, me, say, onVisit, onBack, accent }) {
   const shown = sel ?? (create ? null : mine);
   return (
     <section>
-      <SubHeader title="Guildes" onBack={sel ? () => setSel(null) : onBack} />
-      {shown ? <>
-          <GuildView api={api} me={me} g={shown} mine={shown.id === mine?.id} canJoin={!mine} run={run} onVisit={onVisit} />
-          <h3 className="sec">La ville de {shown.name}</h3>
-          <Suspense fallback={<Loading label="Chargement de la ville…" />}>
-            <City key={shown.id} api={api} guildId={shown.id} me={me} mine={shown.id === mine?.id} say={say} onVisit={onVisit} accent={accent} />
-          </Suspense>
-        </>
+      <SubHeader title={sel ? sel.name : "Guilde"} onBack={sel ? () => setSel(null) : null} />
+      {shown ? <GuildView api={api} me={me} g={shown} mine={shown.id === mine?.id} canJoin={!mine} run={run} />
         : create ? <GuildForm onCreate={v => run(() => api.guildCreate(v), `Guilde ${v.name} fondée.`)} onCancel={() => setCreate(false)} />
         : <div className="panel guild-intro"><p className="muted">Une guilde réunit jusqu'à 30 traders. Ses gains sont la somme de ceux de ses membres.</p>
             <button type="button" className="btn primary" onClick={() => setCreate(true)}>Fonder une guilde</button></div>}
@@ -191,7 +185,7 @@ export function Guilds({ api, me, say, onVisit, onBack, accent }) {
   );
 }
 
-function GuildView({ api, me, g, mine, canJoin, run, onVisit }) {
+function GuildView({ api, me, g, mine, canJoin, run }) {
   const [members] = useLoad(() => api.guildMembers(g.id), [api, g.id, g.members]);
   const boss = members?.find(m => m.owner)?.id === me.id;
   return (
@@ -201,10 +195,10 @@ function GuildView({ api, me, g, mine, canJoin, run, onVisit }) {
       <div className="board">
         {(members ?? []).map(m => (
           <div key={m.id} className={"brow frow" + (m.id === me.id ? " me" : "")}>
-            <button type="button" className="fname" onClick={() => onVisit(m)} aria-label={`Voir le QG de ${m.pseudo}`}>
+            <span className="fname">
               <b>{m.pseudo}<BotTag id={m.id} />{m.owner && <small className="accent"> · fondateur</small>}</b>
               <small className="mono">jour <span className={cls(m.today)}>{sW(m.today)}</span> · total <span className={cls(m.total)}>{sW(m.total)}</span></small>
-            </button>
+            </span>
             <span className="f-acts">{boss && m.id !== me.id && <button type="button" className="btn ghost" onClick={() => run(() => api.guildKick(m.id), `${m.pseudo} a quitté la guilde.`)}>Exclure</button>}</span>
           </div>
         ))}

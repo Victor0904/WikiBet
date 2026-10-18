@@ -22,7 +22,8 @@ export async function connect() {
     session = r.data.session;
   }
   const uid = session.user.id;
-  const rpc = async (fn, args) => { const { data, error } = await sb.rpc(fn, args); if (error) throw new Error(error.message); return data };
+  // Fonction absente du serveur : la page a été chargée avant une mise à jour (bandeau « Nouvelle version », App.jsx).
+  const rpc = async (fn, args) => { const { data, error } = await sb.rpc(fn, args); if (error) { if (error.code === "PGRST202") dispatchEvent(new Event("wb-version")); throw new Error(error.message) } return data };
   const rows = async q => { const { data, error } = await q; if (error) throw new Error(error.message); return data };
   // Appel direct (sans functions.invoke) pour toujours montrer le message du serveur, jamais « non-2xx status code ».
   const invoke = async (fn, body) => {
@@ -87,6 +88,7 @@ export async function connect() {
     me: async () => (await rows(sb.from("profiles").select("*").eq("id", uid).maybeSingle())) ?? null,
     createProfile: (pseudo, ref) => rpc("create_profile", { p_pseudo: pseudo, p_ref: ref || null }),
     myReferrals: () => rpc("my_referrals"),
+    myRefunds: () => rpc("my_refunds"),
     myNotices: () => rpc("my_notices"),
     noticeRead: id => rpc("notice_read", { p_id: id }),
     pseudoChange: pseudo => rpc("pseudo_change", { p_pseudo: pseudo }),
@@ -99,20 +101,14 @@ export async function connect() {
     aurTicks: (tk, minutes) => rpc("aur_ticks_of", { p_tk: tk, p_minutes: minutes }),
     aurMaxLev: () => rpc("my_max_lev"),
     aurTerms: () => rpc("my_terms"),
-    aurInsider: () => rpc("aur_insider"),
-    myTalents: () => rpc("my_talents"),
     myAchievements: () => rpc("my_achievements"),
     myUnlocks: since => rpc("my_unlocks", { p_since: since }),
     articleRead: id => rpc("article_read", { p_id: id }),
-    talentBuy: code => rpc("talent_buy", { p_code: code }),
-    talentReset: () => rpc("talent_reset"),
-    krakenArm: on => rpc("kraken_arm", { p_on: on }),
     aurRumors: () => rpc("aur_rumor_list"),
     aurStocks: () => rows(sb.from("aur_stocks").select("*").order("status").order("tk")),
     aurSubscribe: (tk, amount) => rpc("aur_subscribe", { p_tk: tk, p_amount: amount }),
     myHoldings: () => rpc("my_holdings"),
     aurRounds: () => rpc("aur_round_stats"),
-    myCity: () => rpc("my_city"),
     myWealth: () => rpc("my_wealth"),
     touch: () => rpc("touch"),
     souvenirs: user => rpc("souvenirs", { p_user: user }),
@@ -124,7 +120,6 @@ export async function connect() {
     aurTriggerCancel: id => rpc("aur_trigger_cancel", { p_id: id }),
     myTriggers: async () => rows(sb.from("aur_triggers").select("*").or(`status.eq.wait,done_at.gt.${new Date(Date.now() - 864e5).toISOString()}`).order("id", { ascending: false })),
     restart: () => rpc("restart"),
-    bankMove: amount => rpc("bank_move", { p_amount: amount }), // > 0 : dépôt, < 0 : retrait
     myBets: async minSession => (await rows(sb.from("bets").select("*").eq("user_id", uid).or(`status.eq.open,session.gte.${minSession}`).order("id", { ascending: false }))).map(normBet),
     leaderboard: async () => (await rpc("leaderboard")).map(normBoard),
     gainsBoard: (period, scope) => rpc("gains_board", { p_period: period, p_scope: scope }),
@@ -137,25 +132,12 @@ export async function connect() {
     guildJoin: id => rpc("guild_join", { p_id: id }),
     guildLeave: () => rpc("guild_leave"),
     guildKick: id => rpc("guild_kick", { p_user: id }),
-    cityView: id => rpc("city_view", { p_guild: id }),
-    cityCatalog: () => rows(sb.from("city_catalog").select("*").order("sort")),
-    cityGive: (amount, kind) => rpc("city_give", { p_amount: amount, p_kind: kind }),
-    cityBuild: id => rpc("city_build", { p_building: id }),
-    cityBuyLand: () => rpc("city_buy_land"),
-    shopItems: () => rows(sb.from("shop_items").select("*").order("sort")),
     trophies: user => rpc("trophies", { p_user: user }),
-    inventoryOf: user => rows(sb.from("inventory").select("item_id,qty,equipped").eq("user_id", user).gt("qty", 0)),
     profileOf: async user => (await rows(sb.from("profiles").select("id,pseudo,cash,bankruptcies").eq("id", user).maybeSingle())) ?? null,
-    buyItem: id => rpc("buy_item", { p_item: id }),
-    sellItem: id => rpc("sell_item", { p_item: id }),
-    equipItem: id => rpc("equip_item", { p_item: id }),
-    unequip: category => rpc("unequip", { p_category: category }),
-    useBonus: id => rpc("use_bonus", { p_item: id }),
     onChange(cb) {
       const ch = sb.channel("wikibourse")
         .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `id=eq.${uid}` }, cb) // mon profil seulement (le classement se rafraîchit toutes les 60 s)
         .on("postgres_changes", { event: "*", schema: "public", table: "bets", filter: `user_id=eq.${uid}` }, cb)
-        .on("postgres_changes", { event: "*", schema: "public", table: "inventory", filter: `user_id=eq.${uid}` }, cb)
         .subscribe();
       return () => sb.removeChannel(ch);
     },

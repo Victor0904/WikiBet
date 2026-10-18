@@ -11,7 +11,6 @@ const exec = async db => { for (const d of (await db.query("select * from aur_du
 test("notifications : motif de clôture (liquidation, stop, objectif, main) et liquidations à annoncer", async () => {
   const db = await freshDb(); await login(db, A, "alice");
   await db.query("update profiles set cash = 1e6 where id = $1", [A]);
-  for (const h of ["studio", "openspace", "loft"]) await db.query("select buy_item($1)", [h]);
   await tick(db, 20, 10);
   const liq = await open(db, "up", 10, 100), stop = await open(db, "up", 5, 100), obj = await open(db, "down", 5, 100), hand = await open(db, "up", 1, 100);
   await db.query("update bets set created_at = now() - interval '60 seconds'");

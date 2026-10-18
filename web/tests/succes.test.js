@@ -44,25 +44,10 @@ test("succès : règle des pourcentages (mise de 1 000 W ou plus, levier ×5 au 
 
 test("succès : idempotence (deux settle() = un seul déblocage) et Diversifié", async () => {
   const db = await freshDb(); await player(db);
-  await db.query("insert into talents values ($1, 'multitache', 2)", [A]); // 5 positions
   for (const tk of ["SLM", "NXR", "PXF", "GTR", "HLV"]) { await tick(db, tk, 10); await db.query("select aur_open($1, $2, 'up', 1, 100, 0)", [A, tk]) }
   await db.query("select settle()"); await db.query("select settle()");
   assert.equal(await has(db, "DIVERSIFIE"), 1);
   assert.equal((await db.query("select achievement_grant($1, 'DIVERSIFIE') ok", [A])).rows[0].ok, false);
-});
-
-test("succès : 21 points au plus, réinitialiser les talents garde les points des succès", async () => {
-  const db = await freshDb(); await player(db);
-  assert.equal((await db.query("select sum(points)::int s, count(*)::int n from achievements")).rows[0].s, 21);
-  await db.query("insert into achievements (code, name, descr, points) values ('BONUS', 'Bonus', 'test', 3)");
-  await db.query("insert into aur_achievements (user_id, code) select $1, code from achievements", [A]);
-  const t = (await db.query("select my_talents() t")).rows[0].t;
-  assert.equal(t.ach, 21, "plafond");
-  await db.query("delete from aur_achievements where code <> 'FIRST_TRADE'");
-  await db.query("select talent_buy('frais')"); await db.query("select talent_reset()");
-  const t2 = (await db.query("select my_talents() t")).rows[0].t;
-  assert.equal(t2.ach, 1); assert.equal(t2.spent, 0);
-  assert.equal((await db.query("select talent_points($1) p", [A])).rows[0].p, 1, "le point du succès est de nouveau disponible");
 });
 
 test("succès : le parrainage ne compte pas dans le gain net (tal_hwm), mais débloque Parrain", async () => {
@@ -73,7 +58,7 @@ test("succès : le parrainage ne compte pas dans le gain net (tal_hwm), mais dé
   await db.query("select create_profile('Tom', $1)", [code]);
   for (const d of [0, 0, 0, 1, 1]) await db.query(`insert into bets (user_id, session, day, kind, stake, status, payout, aur, dir, lev, entry, created_at, closed_at)
     values ($1, 0, 0, 'aurelys', 100, 'won', 110, 'SLM', 'up', 1, 10, now() - make_interval(days => $2, secs => 200), now() - make_interval(days => $2))`, [F, d]);
-  await db.query("insert into inventory (user_id, item_id, qty) values ($1, 'studio', 1)", [F]);
+  await db.query("update profiles set lvl_floor = 3 where id = $1", [F]); // niveau 3 de trader
   const c0 = await cash(db, A);
   await db.query("select settle()");
   assert.equal(await cash(db, A) - c0, 10000, "parrainage payé");
@@ -89,7 +74,7 @@ test("succès : rétroactif sur l'historique, secrets masqués, classement de la
   await db.query("select ach_history($1)", [A]);
   for (const c of ["FIRST_TRADE", "SCALPEUR", "SERIE_10", "TOUS_SECTEURS", "AGRONOME"]) assert.equal(await has(db, c), 1, c);
   const list = (await db.query("select my_achievements() r")).rows[0].r;
-  assert.equal(list.total, 51);
+  assert.equal(list.total, 47); // 51 moins PROPRIO, BANQUIER, SPECIALISTE, POLYVALENT (H1)
   const noct = list.list.find(a => a.code === "NOCTAMBULE");
   assert.equal(noct.name, "???"); assert.equal(noct.descr, null); assert.equal(noct.hint, "Les marchés ne dorment jamais");
   assert.equal(list.list.find(a => a.code === "VETERAN").cur, 65, "progression : 65 / 500 trades valides");

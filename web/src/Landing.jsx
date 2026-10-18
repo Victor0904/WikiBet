@@ -96,8 +96,8 @@ export default function Landing() {
         <div className="land-cards">
           <article className="panel"><b>Un marché qui réagit à tes ordres</b><p>Les prix naissent des ordres des joueurs, des bots et des baleines. Un gros ordre fait bouger le cours.</p></article>
           <article className="panel"><b>Branché sur le vrai monde</b><p>Granterre suit la pluie en Beauce, Helvane la consommation d'électricité (RTE), Lumirue les jours fériés.</p></article>
-          <article className="panel"><b>Des guildes</b><p>Rejoins une guilde, remplis son trésor et construis sa ville avec les autres membres.</p></article>
-          <article className="panel"><b>Talents et succès</b><p>Ton gain de trading te fait monter de niveau. 4 branches de talents, 51 succès à débloquer.</p></article>
+          <article className="panel"><b>Des guildes</b><p>Rejoins une guilde de 30 traders au plus et grimpe au classement des guildes avec les autres membres.</p></article>
+          <article className="panel"><b>Succès</b><p>47 succès à débloquer en jouant : séries, gains, données réelles, et quelques secrets.</p></article>
         </div>
       </section>
 

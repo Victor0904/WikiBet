@@ -37,13 +37,13 @@ export const Avatar = ({ pseudo, size = 56, accent }) => (
   <span className="avatar" style={{ width: size, height: size, fontSize: size * .38, background: accent }} aria-hidden="true">{initials(pseudo)}</span>
 );
 
-export function Profile({ api, me, tal, title, home, board, patrimoine, refs, trial, accent, say, go, onTrophies, hasPush }) {
-  const [guild, setGuild] = useState(undefined), [friends, setFriends] = useState(null), [troph, setTroph] = useState(null);
+export function Profile({ api, me, board, patrimoine, refs, trial, say, go, hasPush }) {
+  const [guild, setGuild] = useState(undefined), [friends, setFriends] = useState(null), [ach, setAch] = useState(null);
   useEffect(() => {
     let alive = true;
     api.guildList?.("today").then(l => { if (!alive) return; const i = l.findIndex(g => g.mine); setGuild(i < 0 ? null : { ...l[i], rank: i + 1 }) }).catch(() => alive && setGuild(null));
     api.myFriends?.().then(f => alive && setFriends(f.filter(x => x.state === "ami"))).catch(() => {});
-    api.trophies?.(me.id).then(t => alive && setTroph(t)).catch(() => {});
+    api.myAchievements?.().then(a => alive && setAch(a)).catch(() => {});
     return () => { alive = false };
   }, [api, me.id]);
 
@@ -61,10 +61,10 @@ export function Profile({ api, me, tal, title, home, board, patrimoine, refs, tr
   return (
     <div className="profile">
       <header className="profile-head">
-        <Avatar pseudo={me.pseudo} accent={accent} />
+        <Avatar pseudo={me.pseudo} />
         <div className="who-txt">
           <h1>{me.pseudo}{guild && <span className="gtag">{guild.tag}</span>}</h1>
-          <small>{[tal && !tal.bot && `Niveau ${tal.level}`, title, home].filter(Boolean).join(" · ")}</small>
+          {me.lvl_floor != null && <small>Niveau {me.lvl_floor}</small>}
         </div>
         <button type="button" className="gear" onClick={() => go("account")} aria-label="Mon compte">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.0 10.5L21.4 10.8L21.4 13.2L19.0 13.5L18.1 15.9L19.5 17.8L17.8 19.5L15.9 18.1L13.5 19.0L13.2 21.4L10.8 21.4L10.5 19.0L8.1 18.1L6.2 19.5L4.5 17.8L5.9 15.9L5.0 13.5L2.6 13.2L2.6 10.8L5.0 10.5L5.9 8.1L4.5 6.2L6.2 4.5L8.1 5.9L10.5 5.0L10.8 2.6L13.2 2.6L13.5 5.0L15.9 5.9L17.8 4.5L19.5 6.2L18.1 8.1Z" /><circle cx="12" cy="12" r="3" /></svg>
@@ -83,11 +83,11 @@ export function Profile({ api, me, tal, title, home, board, patrimoine, refs, tr
       </section>}
       {link && <section className="invite panel">
         <div className="invite-h"><h2>Invite tes amis</h2><span className="mono">{rewarded}/4</span></div>
-        <p className="muted small">+10 000 W pour toi et +2 000 W pour ton ami quand il a clôturé 5 positions (100 W ou plus, sur 2 jours) et acheté son premier logement.</p>
+        <p className="muted small">+10 000 W pour toi et +2 000 W pour ton ami quand il a clôturé 5 positions (100 W ou plus, sur 2 jours) et atteint le niveau 3 de trader.</p>
         <ul className="slots">
           {[0, 1, 2, 3].map(i => { const r = slots[i]; return (
             <li key={i} className={"slot" + (r ? (r.status === "validé" ? " done" : " wait") : "")}>
-              {r ? <><Avatar pseudo={r.pseudo} size={40} accent={r.status === "validé" ? accent : undefined} /><small>{r.status === "validé" ? r.pseudo : "en cours"}</small></>
+              {r ? <><Avatar pseudo={r.pseudo} size={40} accent={r.status === "validé" ? "var(--accent)" : undefined} /><small>{r.status === "validé" ? r.pseudo : "en cours"}</small></>
                  : <><span className="avatar empty" aria-hidden="true">+</span><small>libre</small></>}
             </li>) })}
         </ul>
@@ -106,11 +106,8 @@ export function Profile({ api, me, tal, title, home, board, patrimoine, refs, tr
           <b>Amis</b>{!friends ? <span>…</span> : <><span>{friends.length ? `${online} en ligne` : "Ajouter des amis"}</span>
             {best && best.today > 0 && <small>Meilleur gain du jour : {best.pseudo}</small>}</>}
         </button>
-        {tal && !tal.bot && <button type="button" className="ptile panel" onClick={() => go("talents")}>
-          <b>Talents</b><span>Niveau {tal.level}</span><small>{tal.level + Number(tal.ach) - Number(tal.spent)} point{tal.level + Number(tal.ach) - Number(tal.spent) > 1 ? "s" : ""} à dépenser</small>
-        </button>}
-        <button type="button" className="ptile panel" onClick={onTrophies}>
-          <b>Trophées</b><span>{troph ? `${troph.filter(t => t.got).length}/${troph.length}` : "…"}</span><small>Voir mon QG</small>
+        <button type="button" className="ptile panel" onClick={() => go("succes")}>
+          <b>Succès</b><span>{ach ? `${ach.list.filter(a => a.at).length}/${ach.total}` : "…"}</span><small>Voir mes succès</small>
         </button>
       </div>
 
@@ -128,11 +125,11 @@ const STEPS = [
   ["La Bourse d'Aurelys", "Un pays fictif, 13 entreprises inventées, une bourse ouverte 24 h/24. Un jour d'Aurelys dure 1 h réelle : tu as le temps de lire et de réfléchir. Les prix naissent des ordres de bots aux caractères différents, de baleines et des joueurs. Ton propre ordre fait bouger le prix : plus il est gros, et plus l'action est petite, plus tu paies cher."],
   ["Résultats et consensus", "Avant chaque publication de résultats, les analystes annoncent ce qu'ils attendent. Le cours réagit à la surprise, pas au chiffre : +12 % quand on attendait +8 %, ça monte ; +12 % quand on attendait +15 %, ça baisse. Les indices sortent avant : commandes, rumeurs, révisions des analystes."],
   ["Des entreprises branchées sur le réel", "Granterre la pluie et la chaleur en Beauce, Helvane la consommation électrique française, Lumirue les jours fériés et la météo du week-end. Ces chiffres sont réels et à venir : celui qui voit venir une canicule ou un pont a un temps d'avance."],
-  ["Prendre position", "▲ si tu penses que le cours va monter, ▼ s'il va baisser. Ton gain suit la variation, multipliée par le levier : à ×5, +2 % de cours font +10 % sur ta mise. Leviers ×1 à ×15 pour tous, ×20 avec un logement (QG), ×25 dans une guilde qui a une salle des marchés. Sur une jeune pousse, ×5 au plus. Frais de 0,1 % du montant engagé à l'ouverture et à la clôture. Si la position perd toute sa mise, elle est liquidée."],
+  ["Prendre position", "▲ si tu penses que le cours va monter, ▼ s'il va baisser. Ton gain suit la variation, multipliée par le levier : à ×5, +2 % de cours font +10 % sur ta mise. Leviers ×1 à ×15. Sur une jeune pousse, ×5 au plus. Frais de 0,1 % du montant engagé à l'ouverture et à la clôture. Si la position perd toute sa mise, elle est liquidée."],
   ["Investir sur le long terme", "Dans la fiche d'une entreprise, « Investir » achète de vraies actions : sans levier, sans liquidation, à garder aussi longtemps que tu veux. Certaines versent un dividende chaque jour d'Aurelys. De jeunes entreprises entrent régulièrement en bourse : avec 50 000 W de patrimoine, tu peux souscrire à leur levée de fonds avant la cotation. Elles peuvent beaucoup rapporter… ou faire faillite. Lis leurs articles dans le Courrier d'Aurelys."],
-  ["Ton QG", "Dépense tes gains : logements, déco en 3D, thèmes, titres et bonus. Un plus grand logement donne aussi un historique plus long et plus d'alertes de prix. Tes trophées s'affichent au mur. Le classement compte ton patrimoine (solde, valeur actuelle de tes positions, actions et 60 % de la valeur de tes objets)."],
-  ["Classements, amis et guildes", "Trois classements : les gains du jour (remis à zéro à minuit), les gains de tous les temps et le patrimoine. Ajoute tes amis par leur pseudo, ou rejoins une guilde de 30 traders au plus. Lie ta partie à un e-mail dans Mon compte pour la garder."],
-  ["Salaire et faillite", "Toutes les 11 minutes, un salaire de 10 % de tes mises sur Aurelys (500 W au plus). Une position compte si elle est restée ouverte une heure d'Aurelys (2 min 30) ; une hausse et une baisse sur la même action s'annulent. C'est une aide pour remonter : salaire plein sous 20 000 W de patrimoine, de moins en moins au-dessus, plus rien à 100 000 W. Sous 2 000 W (solde, mises et valeur de revente de tes objets), tu peux repartir à " + CAP0_TXT + " de patrimoine depuis Mon compte (tes logements gardés comptent à 60 %, avec au moins 2 000 W en caisse). Le compteur de faillites est visible de tous."],
+  ["Stop, objectif et succès", "Sur chaque position, pose un stop (clôture si le cours va contre toi) et un objectif (clôture quand le gain est atteint). Jusqu'à 12 positions ouvertes en même temps. Tes succès se débloquent en jouant : séries, gains, données réelles, et quelques secrets."],
+  ["Classements, amis et guildes", "Trois classements : les gains du jour (remis à zéro à minuit), les gains de tous les temps et le patrimoine (solde, valeur actuelle de tes positions et actions). Ajoute tes amis par leur pseudo, ou rejoins une guilde de 30 traders au plus. Lie ta partie à un e-mail dans Mon compte pour la garder."],
+  ["Salaire et faillite", "Toutes les 11 minutes, un salaire de 10 % de tes mises sur Aurelys (500 W au plus). Une position compte si elle est restée ouverte une heure d'Aurelys (2 min 30) ; une hausse et une baisse sur la même action s'annulent. C'est une aide pour remonter : salaire plein sous 20 000 W de patrimoine, de moins en moins au-dessus, plus rien à 100 000 W. Sous 2 000 W de patrimoine, tu peux repartir à " + CAP0_TXT + " depuis Mon compte. Le compteur de faillites est visible de tous."],
 ];
 
 export function HowTo({ onBack, first }) {
@@ -147,18 +144,17 @@ export function HowTo({ onBack, first }) {
   );
 }
 
-export function Account({ account, push, me, title, patrimoine, openStake, objects, canRestart, onRestart, onPseudo, demo, onBack }) {
+export function Account({ account, push, me, patrimoine, openStake, holds, canRestart, onRestart, onPseudo, demo, onBack }) {
   return (
     <section className="account">
       <SubHeader title="Mon compte" onBack={onBack} />
       <div className="panel">
-        <p className="acc-name"><b>{me.pseudo}</b>{title && <span className="title-tag">{title}</span>}</p>
+        <p className="acc-name"><b>{me.pseudo}</b></p>
         <div className="rows mono">
           <div className="row"><span>Patrimoine</span><b>{W(patrimoine)}</b></div>
           <div className="row"><span>Solde</span><b>{W(me.cash)}</b></div>
-          <div className="row"><span>Banque</span><b>{W(me.bank ?? 0)}</b></div>
           <div className="row"><span>Positions (valeur actuelle)</span><b>{W(openStake)}</b></div>
-          <div className="row"><span>Objets et logements du QG (60 %)</span><b>{W(objects)}</b></div>
+          <div className="row"><span>Actions</span><b>{W(holds)}</b></div>
           <div className="row"><span>Faillites</span><b>{me.bankruptcies}</b></div>
         </div>
       </div>
@@ -166,7 +162,7 @@ export function Account({ account, push, me, title, patrimoine, openStake, objec
       {account && <AccountLink account={account} pseudo={me.pseudo} />}
       {push && <PushPanel push={push} />}
       <div className="panel bk">
-        <p><b>Faillite</b>Sous 2 000 W (solde, valeur actuelle de tes positions et de tes actions, valeur de revente de tes objets et bonus), tu peux repartir à {CAP0_TXT} de patrimoine : tes logements gardés comptent à 60 %, avec au moins 2 000 W en caisse. Tes paris en cours sont perdus, tes objets restent à toi, et le compteur de faillites augmente.</p>
+        <p><b>Faillite</b>Sous 2 000 W de patrimoine (solde, valeur actuelle de tes positions et de tes actions), tu peux repartir à {CAP0_TXT}. Tes paris en cours sont perdus et le compteur de faillites augmente.</p>
         <button type="button" className="btn" disabled={!canRestart} onClick={onRestart}>Repartir</button>
       </div>
       {demo && <p className="fine">Mode démo locale : ta partie est enregistrée dans ce navigateur uniquement, sans compte.</p>}
@@ -183,28 +179,6 @@ function PseudoForm({ onPseudo }) {
       <input id="new-pseudo" autoComplete="off" value={v} onChange={e => setV(e.target.value)} minLength={2} maxLength={20} required />
       <button className="btn primary" type="submit" disabled={busy}>Changer de pseudo</button>
     </form>
-  );
-}
-
-// Banque : dépôt et retrait sans frais, 0,1 % d'intérêt à chaque jour d'Aurelys (1 h réelle) sur 100 000 W au plus (bank_move, aur_dividends).
-export function Bank({ me, onBank }) {
-  const [v, setV] = useState(""), [busy, setBusy] = useState(false), amt = Math.floor(+String(v).replace(",", ".") || 0), bank = me.bank ?? 0;
-  const go = async sign => { setBusy(true); if (await onBank(sign * amt)) setV(""); setBusy(false) };
-  return (
-    <div className="panel bank">
-      <p><b>Banque</b> · 0,1 % d'intérêt à chaque jour d'Aurelys (1 h réelle), sur {W(100000)} de dépôt au plus. Dépôt et retrait sans frais, à tout moment. L'argent déposé ne sert pas aux paris.</p>
-      <div className="rows mono">
-        <div className="row"><span>Dépôt</span><b>{W(bank)}</b></div>
-        <div className="row"><span>Solde disponible</span><b>{W(me.cash)}</b></div>
-      </div>
-      <p className="small muted">Intérêt du prochain jour : {W(Math.round(Math.min(bank, 100000) * 0.1) / 100)}</p>
-      <div className="add-row">
-        <input className="mono" inputMode="numeric" placeholder="Montant" value={v} onChange={e => setV(e.target.value)} aria-label="Montant" />
-        <button type="button" className="btn" disabled={busy || !(amt > 0) || amt > me.cash} onClick={() => go(1)}>Déposer</button>
-        <button type="button" className="btn" disabled={busy || !(amt > 0) || amt > bank} onClick={() => go(-1)}>Retirer</button>
-      </div>
-      <div className="chips"><button type="button" onClick={() => setV(String(Math.floor(me.cash)))}>Tout le solde</button><button type="button" onClick={() => setV(String(Math.floor(bank)))}>Tout le dépôt</button></div>
-    </div>
   );
 }
 

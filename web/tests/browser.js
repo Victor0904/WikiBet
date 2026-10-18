@@ -75,36 +75,6 @@ export const sticking = b => b.evaluate(`(() => { const W = document.documentEle
   const inScroller = e => { for (let a = e.parentElement; a && a !== main; a = a.parentElement) if (getComputedStyle(a).overflowX !== "visible") return true; return false };
   return [...main.querySelectorAll("*")].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > W + .5 && !inScroller(e) })
     .slice(0, 6).map(e => e.tagName.toLowerCase() + "." + String(e.className).replace(/ /g, ".") + " → " + Math.round(e.getBoundingClientRect().right)) })()`);
-// Joueur de démo connecté, sur l'écran Talents.
-export async function openTalents(b, url) {
-  await b.goto(url + "jouer");
-  await b.waitFor("document.readyState === 'complete' && !!document.querySelector('input')");
-  await b.evaluate(`localStorage.setItem("wb-howto", "1"); (() => { const i = document.querySelector("input"), set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
-    set.call(i, "Testeur"); i.dispatchEvent(new Event("input", { bubbles: true })); return true })()`);
-  await b.click("Entrer");
-  await b.waitFor("!!document.querySelector('.dock')", 120000); // première visite : la démo installe sa base
-  await b.click("QG", ".dock");
-  await b.waitFor("[...document.querySelectorAll('button')].some(x => x.textContent.trim() === 'Talents')");
-  await b.evaluate(`[...document.querySelectorAll("button")].find(x => x.textContent.trim() === "Talents").click()`);
-  await b.waitFor("!!document.querySelector('.talents .tal-card')");
-  await sleep(700); // fin du fondu d'entrée de l'écran
-}
 // Mesure du débordement horizontal de la page.
 export const overflow = b => b.evaluate("({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth })");
 // Données de démo forcées : niveau 20, 12 points en Prudence avec Phénix (ultime), 4 en Audace ; puis l'écran est relu.
-export async function forceTalents(b) {
-  await b.evaluate(`(async () => {
-    await window.__wbDemo.query("update profiles set tal_hwm = 112500 where not bot");
-    await window.__wbDemo.query("insert into talents select p.id, v.c, v.r from profiles p, (values ('amort', 5), ('frais', 5), ('sangfroid', 1), ('filet', 1), ('phenix', 1), ('discretion', 3), ('multitache', 1)) v(c, r) where not p.bot on conflict do nothing");
-    return true })()`);
-  // Rouvrir l'écran pour relire ; un rechargement lancé avant l'écriture peut arriver après : on réessaie.
-  for (let i = 0; ; i++) {
-    await b.evaluate(`[...document.querySelectorAll("button")].find(x => x.textContent.trim() === "QG").click()`);
-    await b.evaluate(`[...document.querySelectorAll("button")].find(x => x.textContent.trim() === "Talents").click()`);
-    // Niveau 20 et Phénix pris (pas le nombre de points : un succès peut s'y ajouter, ex. « Trader confirmé » à 100 000 W).
-    try { await b.waitFor("document.querySelector('.tal-lv b')?.textContent === '20' && !!document.querySelector('.tal-card.ult.on')", 10000); break } catch (e) {
-      if (i >= 5) throw new Error(e.message + " ; affiché : " + await b.evaluate("document.querySelector('.talents')?.innerText.slice(0, 200) ?? document.body.innerText.slice(0, 300)"));
-    }
-  }
-  await sleep(700); // fin du fondu d'entrée de l'écran
-}

@@ -82,16 +82,15 @@ test("aurelys : plafond par action, cotation suspendue, marché à l'arrêt", as
   await assert.rejects(open(db, "up", 1, 10), /indisponible/, "dernier cours trop ancien");
 });
 
-test("aurelys : liquidation sur le premier cours qui touche le seuil, assurance comprise", async () => {
+test("aurelys : liquidation sur le premier cours qui touche le seuil (plus d'assurance depuis H1)", async () => {
   const db = await freshDb(); await login(db, A, "alice"); await veteran(db);
-  await db.query("select buy_item('assurance')");
   await tick(db, 15, 10);
   const b = await open(db, "up", 10, 1000);                       // liquidée sous 9
   await db.query("update bets set created_at = now() - interval '12 seconds'");
   await tick(db, 10, 9.5); await tick(db, 5, 8.9); await tick(db, -3, 5);
   await db.query("select aur_settle()");
   const c = await row(db, b.id);
-  assert.equal(c.status, "lost"); near(c.exit, 9, "fermée au seuil"); assert.equal(c.insured, true); near(c.payout, 500, "assurance : 50 %");
+  assert.equal(c.status, "lost"); near(c.exit, 9, "fermée au seuil"); assert.equal(c.insured, false); near(c.payout, 0, "rien de rendu");
   const { rows: [k] } = await db.query("select * from aur_candles where tk = 'SLM' order by t desc limit 1");
   assert.ok(k.l >= 8.9, "les bougies ignorent les cours à venir");
 });
@@ -128,18 +127,13 @@ test("aurelys : une entreprise branchée sur un chiffre réel suit son écart à
   assert.ok(hot.n.some(n => n.cat === "reel" && n.tk === "GTR"), "le changement est annoncé dans les actualités");
 });
 
-test("aurelys : ×15 pour tous, ×20 avec un logement, ×25 dans une guilde qui a une salle des marchés", async () => {
+// Jusqu'aux niveaux de trader (H3) : ×15 au plus pour tous, comme un joueur sans logement avant H1.
+test("aurelys : ×15 au plus pour tous jusqu'aux niveaux de trader, ×20 et ×25 refusés", async () => {
   const db = await freshDb(); await login(db, A, "alice");
   await tick(db, 2, 10);
   assert.equal((await open(db, "up", 15, 100)).lev, 15);
-  await assert.rejects(open(db, "up", 20, 100), /logement/);
-  await db.query("update profiles set cash = 1e6 where id = $1", [A]); await db.query("select buy_item('studio')");
-  assert.equal((await open(db, "up", 20, 100)).lev, 20);
-  await assert.rejects(open(db, "up", 25, 100), /salle des marchés/);
-  const { rows: [g] } = await db.query("select * from guild_create('Les Taureaux', 'TOR')");
-  await db.query("update guilds set treasury = 1e6 where id = $1", [g.id]);
-  await db.query("select city_build('mairie')"); await db.query("select city_build('salle')");
-  assert.equal((await open(db, "up", 25, 100)).lev, 25);
+  await assert.rejects(open(db, "up", 20, 100), /×15 au plus/);
+  await assert.rejects(open(db, "up", 25, 100), /×15 au plus/);
   await assert.rejects(open(db, "up", 30, 100), /invalide/);
 });
 

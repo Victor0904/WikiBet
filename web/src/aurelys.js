@@ -15,7 +15,7 @@ function toCandle(cs, t, p, v) {
 }
 
 export function useAurelys(api, active) {
-  const [, render] = useState(0), data = useRef({ ticks: {}, candles: {}, quotes: {}, feeRate: FEE, cut: 1, kraken: false, ranks: {}, x: null, since: null, ok: false, news: [], young: [], rounds: [] });
+  const [, render] = useState(0), data = useRef({ ticks: {}, candles: {}, quotes: {}, feeRate: FEE, cut: 1, terms: null, x: null, since: null, ok: false, news: [], young: [], rounds: [] });
   // Historique : bougies des 3 dernières heures réelles (36 h d'Aurelys), au démarrage et après une longue absence.
   const loadHistory = async () => {
     const h = await api.aurHistory(null, 180), d = data.current;
@@ -51,7 +51,7 @@ export function useAurelys(api, active) {
     let alive = true;
     const load = () => Promise.all([api.aurStocks(), api.aurRounds().catch(() => []), api.aurTerms().catch(() => null)]).then(([rows, st, tm]) => {
       if (!alive) return;
-      if (tm) Object.assign(data.current, { feeRate: +tm.fee, cut: +tm.cut, kraken: !!tm.kraken }); // frais (salle des marchés, talent), impact (talents)
+      if (tm) Object.assign(data.current, { feeRate: +tm.fee, cut: +tm.cut, terms: tm }); // frais, levier, positions, ordres à déclenchement (my_terms)
       data.current.roundStats = Object.fromEntries(st.map(r => [r.tk, { investors: +r.investors, total: +r.total }]));
       for (const r of rows) if (r.meta && r.status !== "core") BY[r.tk] = { ...r.meta, status: r.status, roundEnds: r.round_ends && Date.parse(r.round_ends), ipoPrice: r.ipo_price };
       addNames(rows.map(r => r.name)); // jeunes pousses : leur nom reste tel quel en anglais
