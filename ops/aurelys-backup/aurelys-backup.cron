@@ -1,0 +1,2 @@
+# Sauvegarde de la base d'Aurelys chaque nuit à 03:30 UTC (voir /opt/aurelys-backup/backup.sh).
+30 3 * * * root /opt/aurelys-backup/backup.sh >> /opt/aurelys-backup/backup.log 2>&1
