@@ -1,4 +1,5 @@
-// Portefeuille d'actions (sans levier) : valeur dans le temps, répartition, une carte par ligne.
+// Portefeuille d'actions (sans levier) : valeur dans le temps (seule chose marquante), chiffres, répartition, une ligne
+// par société qui se déplie (détail, Renforcer, Vendre).
 import { useMemo, useRef, useState } from "react";
 import { BY, SPM } from "../supabase/functions/_shared/aurelys.js";
 import { TkIcon, px as aurPx } from "./AurelysUI.jsx";
@@ -39,7 +40,7 @@ function ValueChart({ pts, cost }) {
       </svg>
       <span className="ax ax-hi mono">{W(hi)}</span><span className="ax ax-lo mono">{W(lo)}</span>
       <span className="folio-cost mono" style={{ top: `${Y(cost) / H * 100}%` }}>investi {W(cost)}</span>
-      {h && <span className="tip mono">{clock(h[0] * 1000)} · {W(h[1])}</span>}
+      {h && <span className="tip mono">{`${clock(h[0] * 1000)}, ${W(h[1])}`}</span>}
     </div>
   );
 }
@@ -53,56 +54,57 @@ export default function Portfolio({ holds, aur, px, onSell, onBuy, onMarket }) {
   );
   const rows = holds.map(h => { const p = px(h), d = BY[h.tk] ?? {}; return { h, d, p, val: h.qty * p, gain: h.qty * p - h.cost } }).sort((a, b) => b.val - a.val);
   const tot = rows.reduce((a, r) => a + r.val, 0), cost = rows.reduce((a, r) => a + r.h.cost, 0), gain = tot - cost;
-  const divDay = rows.reduce((a, r) => a + (r.d.div ? r.val * r.d.div / 100 / 365 : 0), 0), maxG = Math.max(...rows.map(r => Math.abs(r.gain / r.h.cost)), .01);
+  const divDay = rows.reduce((a, r) => a + (r.d.div ? r.val * r.d.div / 100 / 365 : 0), 0);
   return (
     <section className="folio">
-      <div className="panel folio-top">
-        <div className="folio-total"><small>Valeur du portefeuille</small><b className="mono">{W(tot)}</b>
-          <span className={"mono " + cls(gain)}>{gain >= 0 ? "▲" : "▼"} {sW(gain)} · {pct(gain / cost)}</span></div>
-        <ValueChart pts={pts} cost={cost} />
-        <p className="muted small">Valeur des actions que tu détiens{pts.length > 1 ? `, sur les ${Math.max(1, Math.round((pts.at(-1)[0] - pts[0][0]) / (60 * SPM)))} dernières heures d'Aurelys` : ""}. Pointillé : ce que tu as investi.</p>
-      </div>
-      <div className="tiles">
-        <div className="tile"><small>Investi</small><b className="mono">{W(cost)}</b></div>
-        <div className="tile"><small>Plus-value</small><b className={"mono " + cls(gain)}>{sW(gain)}</b></div>
-        <div className="tile"><small>Dividendes / jour d'Aurelys</small><b className="mono up">{divDay ? `+${W(divDay)}` : "—"}</b></div>
-        <div className="tile"><small>Lignes</small><b className="mono">{rows.length}</b></div>
-      </div>
-      <div className="panel">
+      <div className="folio-total"><small>Valeur du portefeuille</small><b className="mono">{W(tot)}</b>
+        <span className={"mono " + cls(gain)}>{`${gain >= 0 ? "▲" : "▼"} ${sW(gain)}, ${pct(gain / cost)}`}</span></div>
+      <ValueChart pts={pts} cost={cost} />
+      <p className="muted small">Valeur des actions que tu détiens{pts.length > 1 ? `, sur les ${Math.max(1, Math.round((pts.at(-1)[0] - pts[0][0]) / (60 * SPM)))} dernières heures d'Aurelys` : ""}. Pointillé : ce que tu as investi.</p>
+      <dl className="p-figs three">
+        <div><dt>Investi</dt><dd className="mono">{W(cost)}</dd></div>
+        <div><dt>Plus-value</dt><dd className={"mono " + cls(gain)}>{sW(gain)}</dd></div>
+        <div><dt>Dividendes par jour</dt><dd className={"mono" + (divDay >= .5 ? " up" : "")}>{divDay >= .5 ? `+${W(divDay)}` : "—"}</dd></div>
+      </dl>
+      <section className="b-sec">
         <h2>Répartition</h2>
         <div className="alloc" role="img" aria-label="Répartition du portefeuille par entreprise">
-          {rows.map(r => <i key={r.h.tk} style={{ width: `${r.val / tot * 100}%`, background: r.d.color ?? "var(--muted)" }} title={`${r.d.name} ${pct(r.val / tot).replace("+", "")}`} />)}
+          {rows.map(r => <i key={r.h.tk} style={{ width: `${r.val / tot * 100}%`, background: r.d.color ?? "var(--muted)" }} />)}
         </div>
         <div className="alloc-legend">
           {rows.map(r => <span key={r.h.tk}><i style={{ background: r.d.color ?? "var(--muted)" }} />{r.d.name ?? r.h.tk}<b className="mono">{nf0.format(r.val / tot * 100)} %</b></span>)}
         </div>
-      </div>
-      <div className="folio-cards">
-        {rows.map(({ h, d, p, val, gain: g }) => {
-          const v = series(aur, h.tk).map(k => k[1]), rel = g / h.cost;
-          return (
-            <article key={h.tk} className={"panel folio-card " + (g >= 0 ? "gain" : "loss")}>
-              <div className="folio-h">
-                <TkIcon tk={h.tk} size={32} />
-                <span><b>{d.name ?? h.tk}</b><small className="muted">{h.status === "round" ? "levée en cours · cotation à venir" : h.status === "listed" ? "jeune pousse · risqué" : "cote principale"}{d.div ? ` · dividende ${nf2.format(d.div)} %/an` : ""}</small></span>
-                <span className="r mono"><b>{W(val)}</b><small className={cls(g)}>{sW(g)} · {pct(rel)}</small></span>
-              </div>
-              {v.length > 1 && <Spark path={v} t={v.length - 1} h={34} />}
-              <div className="gainbar" aria-hidden="true"><i className={g >= 0 ? "up" : "down"} style={{ width: `${Math.abs(rel) / maxG * 50}%`, [g >= 0 ? "left" : "right"]: "50%" }} /></div>
-              <div className="folio-facts mono">
-                <span><small>Actions</small>{nf2.format(h.qty)}</span>
-                <span><small>Achat moyen</small>{aurPx(h.cost / h.qty)}</span>
-                <span><small>Cours</small>{aurPx(p)}</span>
-                <span><small>Poids</small>{nf0.format(val / tot * 100)} %</span>
-              </div>
-              {h.status !== "round" && <div className="empty-acts">
-                <button type="button" className="btn" onClick={() => onBuy(h.tk)}>Renforcer</button>
-                <button type="button" className="btn" onClick={() => onSell(h)}>Vendre</button>
-              </div>}
-            </article>
-          );
-        })}
-      </div>
+      </section>
+      <section className="b-sec">
+        <h2>Mes actions</h2>
+        <div className="p-list">
+          {rows.map(({ h, d, p, val, gain: g }) => {
+            const v = series(aur, h.tk).map(k => k[1]);
+            return (
+              <details key={h.tk} className="h-row">
+                <summary>
+                  <TkIcon tk={h.tk} size={30} />
+                  <span className="h-n"><b>{d.name ?? h.tk}</b><small>{h.status === "round" ? "levée en cours, cotation à venir" : `${nf2.format(h.qty).replace(/,00$/, "")} actions${h.status === "listed" ? ", jeune pousse" : ""}`}</small></span>
+                  <span className="r mono"><b>{W(val)}</b><small className={cls(g)}>{pct(g / h.cost)}</small></span>
+                </summary>
+                <div className="h-more">
+                  {v.length > 1 && <Spark path={v} t={v.length - 1} h={34} />}
+                  <div className="plain">
+                    <div className="plain-row"><span>Plus-value</span><b className={"mono " + cls(g)}>{sW(g)}</b></div>
+                    <div className="plain-row"><span>Achat moyen, cours</span><b className="mono">{`${aurPx(h.cost / h.qty)}, ${aurPx(p)}`}</b></div>
+                    <div className="plain-row"><span>Poids</span><b className="mono">{nf0.format(val / tot * 100)} %</b></div>
+                    {d.div > 0 && <div className="plain-row"><span>Dividende</span><b className="mono">{nf2.format(d.div)} % par an</b></div>}
+                  </div>
+                  {h.status !== "round" && <div className="empty-acts">
+                    <button type="button" className="btn" onClick={() => onBuy(h.tk)}>Renforcer</button>
+                    <button type="button" className="btn" onClick={() => onSell(h)}>Vendre</button>
+                  </div>}
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      </section>
       <p className="fine">Pas de levier, pas de liquidation : la valeur suit le cours. Les jeunes pousses peuvent faire faillite (sous 15 % de leur prix d'introduction), et leurs actions sont alors perdues. Frais de 0,1 % à l'achat et à la vente ; un gros ordre fait bouger le cours.</p>
     </section>
   );

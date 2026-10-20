@@ -193,18 +193,20 @@ function PseudoForm({ onPseudo }) {
 }
 
 export function Privacy({ onBack }) {
-  return <section className="legal"><SubHeader title="Confidentialité" onBack={onBack} /><div className="panel"><PrivacyText /></div></section>;
+  return <section className="legal"><SubHeader title="Confidentialité" onBack={onBack} /><PrivacyText /></section>;
 }
 
+// Même forme que Comment jouer : des titres et du texte, sans encadré.
+const SOURCES = [
+  ["Bourse d'Aurelys", "Fictive : pays, entreprises, personnages, cours et actualités sont simulés par le serveur, identiques pour tous les joueurs. Toute ressemblance avec une société réelle serait fortuite."],
+  ["Chiffres réels utilisés par Aurelys", "Météo en Beauce et à Paris (Open-Meteo), consommation électrique française (RTE éCO2mix, open data), jours fériés (calendrier.api.gouv.fr). Relevés au plus tous les quarts d'heure ; ils influencent la valeur de 3 entreprises fictives."],
+  ["Monnaie", "Les W sont fictifs : ils ne s'achètent pas et ne se revendent pas. Tout se gagne en jouant."],
+];
 export function Legal({ onBack }) {
   return (
     <section className="legal">
       <SubHeader title="Sources des données" onBack={onBack} />
-      <div className="panel prose">
-        <p><b>Bourse d'Aurelys.</b> Fictive : pays, entreprises, personnages, cours et actualités sont simulés par le serveur, identiques pour tous les joueurs. Toute ressemblance avec une société réelle serait fortuite.</p>
-        <p><b>Chiffres réels utilisés par Aurelys.</b> Météo en Beauce et à Paris (Open-Meteo), consommation électrique française (RTE éCO2mix, open data), jours fériés (calendrier.api.gouv.fr). Relevés au plus tous les quarts d'heure ; ils influencent la valeur de 3 entreprises fictives.</p>
-        <p><b>Monnaie.</b> Les W sont fictifs : ils ne s'achètent pas et ne se revendent pas. Tout se gagne en jouant.</p>
-      </div>
+      <div className="guide">{SOURCES.map(([t, p]) => <section key={t}><h2>{t}</h2><p>{p}</p></section>)}</div>
     </section>
   );
 }

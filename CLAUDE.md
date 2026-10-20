@@ -125,6 +125,7 @@ Noir bleuté `#08090D`, panneaux `#0F1117`/`#161922`, filets `#222634`. Gain `#1
 - Listes et filets plutôt que cartes : liste groupée `.p-list` / `.p-row` (lignes cliquables, valeur à droite), liste simple `.plain` / `.plain-row` (libellé, chiffre), chiffres côte à côte séparés par des filets (`.p-figs`, `.macro`, `.t-figs`). Une carte seulement pour un vrai objet (position, pari du jour).
 - Pas de libellés en majuscules, pas de « · » pour joindre des informations (virgules, ou une ligne par message dans les bandeaux), chasse fixe (Plex Mono) pour les chiffres seulement. Les détails secondaires se replient (`<details class="t-more">` : détail de l'ordre, frais et impact).
 - Une colonne lisible sur grand écran : 560 px (Profil, Mon compte), 640 px (Comment jouer), 760 px (Marché).
+- Le Marché s'ouvre sur « Actions » (toutes les sociétés, ▲ ▼), l'Aperçu (indice, macro) vient ensuite : choix de Victor, octobre 2026.
 - Onglets du Marché soulignés (`.tabs`) ; les grands onglets de section gardent le contrôle segmenté en verre.
 - Texte d'une phrase assemblée : un seul nœud de texte (gabarit) ou `t("… {x} …", { x })`, sinon la traduction anglaise ne le trouve pas.
 - Juger le rendu : `node scripts/capture-ecrans.mjs <dossier> [375|1280] [écran…]`, `node scripts/capture-accueil.mjs <dossier>`, `node scripts/capture-plus.mjs <dossier>`.

@@ -41,17 +41,22 @@ charges, fichiers touchés, résultats des tests.
 - Basse priorité : renommer `tal_hwm` / `tal_cum` (gain net de trading) dans une migration séparée, si c'est sans risque.
 - La ligne `brag-output*/` de `web/.gitignore` n'est pas commitée.
 
-## Refonte visuelle : écrans pas encore repris
+## Refonte visuelle : terminée (20 octobre 2026)
 
-Principes dans `CLAUDE.md` (« Refonte visuelle »), écrans refaits le 19 octobre 2026 (Plus, Marché, fiche, ticket,
-positions, quêtes, succès, compte, guilde, Comment jouer, accueil). Reste, écrans secondaires :
-- Portefeuille quand il contient des actions (tuiles `.tiles`, graphique, cartes).
-- Feuilles d'investissement (`InvestSheet`) et de clôture (`CloseSheet`).
-- Écran d'inscription (`Onboarding`) et présentation de l'essai (`Intro`, 4 diapositives).
-- Amis, Sources des données, Confidentialité.
-- Carte thermique : laissée telle quelle (visualisation), à revoir seulement si besoin.
-Méthode : capture avant (`node web/scripts/capture-ecrans.mjs`), critique, plan court, code, capture après, traduction
-anglaise (`i18n-keys.mjs` puis `i18n-add.mjs`), tests, push.
+Principes dans `CLAUDE.md` (« Refonte visuelle »). Le 19 octobre : Plus, Marché, fiche, ticket, positions, quêtes,
+succès, compte, guilde, Comment jouer, accueil. Le 20 octobre :
+- Marché : « Actions » en premier onglet et ouvert d'office (demande de Victor : toutes les sociétés dès l'arrivée),
+  lignes sur une ligne de nom, étiquette « réel » sous le nom ; lien « Toutes les actions » dans l'Aperçu.
+- Portefeuille : valeur et courbe en tête, 3 chiffres côte à côte, répartition, liste « Mes actions » qui se déplie
+  (détail, Renforcer, Vendre), 760 px au plus. Anciennes classes `.tiles`, `.folio-card`, `.gainbar` supprimées.
+- Feuilles Investir et Clôturer : modèle du ticket (chiffres clés, « Détail de l'ordre » replié), plus de « · ».
+- Inscription : pseudo seul en avant, mot de passe et parrainage repliés (ouverts si un code est arrivé par lien) ;
+  une erreur de connexion reste dans le formulaire, qui relance la connexion (message pour le joueur, pas pour l'admin).
+- Sources des données et Confidentialité : titres et texte comme Comment jouer, sans encadré.
+- Amis : « · » retirés (même liste que le Classement). Présentation de l'essai : déjà dans le style, inchangée.
+- Carte thermique : laissée telle quelle.
+Captures : `node web/scripts/capture-ecrans.mjs <dossier> [375|1280] [écran…]` (ajoutés : investir, cloture, amis,
+sources, confidentialite ; le portefeuille de la capture contient 3 lignes d'actions).
 
 ## Cahier des charges des phases restantes (texte de Victor)
 

@@ -63,9 +63,10 @@ function Play() {
     }).catch(e => setErr(e.message));
     import("./Game.jsx").catch(() => {}); // préchargé pendant l'accueil
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  if (err) return <main className="center"><p className="error">{err}</p></main>;
+  // Inscription : l'erreur s'affiche dans le formulaire, qui relance la connexion (getApi se retente) ; ailleurs, plein écran.
+  if (err && profile !== false) return <main className="center"><p className="error">{err}</p></main>;
   if (intro) return <Intro ready={!!api && profile !== undefined} onDone={() => setIntro(false)} />;
-  if (profile === false) return <Onboarding api={api} onDone={() => setProfile(true)} />;
+  if (profile === false) return <Onboarding api={api} err0={err} onDone={a => { setErr(null); if (a) setApi(a); setProfile(true) }} />;
   if (!api || profile === undefined) return <Wait />;
   return <Suspense fallback={<Wait />}><Game api={api} trial={TRIAL} onNoProfile={() => setProfile(false)} /></Suspense>;
 }
@@ -97,10 +98,11 @@ function Intro({ ready, onDone }) {
   );
 }
 
-function Onboarding({ api, onDone }) {
+function Onboarding({ api, err0, onDone }) {
   const online = api ? !!api.account : ONLINE, saved = !!api?.account?.saved; // arrivé par Discord : pas de mot de passe à choisir
   const [pseudo, setPseudo] = useState(""), [pw, setPw] = useState(""), [err, setErr] = useState(null), [login, setLogin] = useState(false);
   // Retour de Discord : message d'erreur éventuel, pseudo prérempli avec le nom Discord (modifiable).
+  useEffect(() => { if (err0) setErr(err0) }, [err0]);
   useEffect(() => {
     const ac = api?.account; if (!ac) return;
     if (ac.oauth) setErr(ac.oauth.text);
@@ -113,8 +115,8 @@ function Onboarding({ api, onDone }) {
     let a;
     try { a = api ?? await getApi(); await a.createProfile(pseudo, ref.trim()) } catch (x) { return setErr(x.message) }
     try { localStorage.removeItem("wb-ref") } catch { }
-    if (!a.account || a.account.saved || !pw) return onDone(); // sans mot de passe : partie anonyme, à sauvegarder plus tard
-    try { await a.account.register(pseudo.trim(), pw) } catch (x) { setErr(`Partie créée, mais mot de passe refusé : ${x.message} Tu pourras le choisir dans Mon compte.`); setTimeout(onDone, 4000) }
+    if (!a.account || a.account.saved || !pw) return onDone(a); // sans mot de passe : partie anonyme, à sauvegarder plus tard
+    try { await a.account.register(pseudo.trim(), pw) } catch (x) { setErr(`Partie créée, mais mot de passe refusé : ${x.message} Tu pourras le choisir dans Mon compte.`); setTimeout(() => onDone(a), 4000) }
   };
   return (
     <main className="center">
@@ -124,13 +126,17 @@ function Onboarding({ api, onDone }) {
         <p className="muted">Une bourse inventée, Aurelys, dont les cours naissent des ordres des joueurs et des bots. Tu démarres avec {W(CAP0)}.</p>
         <label htmlFor="pseudo">Ton pseudo</label>
         <input id="pseudo" name="username" autoComplete="username" value={pseudo} onChange={e => setPseudo(e.target.value)} minLength={2} maxLength={20} required autoFocus />
-        {online && !saved && <>
-          <label htmlFor="pw">Mot de passe <span className="muted">(facultatif)</span></label>
-          <input id="pw" name="password" type="password" autoComplete="new-password" placeholder="8 caractères au moins" value={pw} onChange={e => setPw(e.target.value)} minLength={8} />
-          <p className="muted small">Sans mot de passe, ta partie reste dans ce navigateur. Tu pourras la sauvegarder plus tard, avec Discord ou un mot de passe.</p>
-        </>}
-        <label htmlFor="ref">Code de parrainage <span className="muted">(facultatif)</span></label>
-        <input id="ref" name="ref" autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="ex. VAYK-7Q2" value={ref} onChange={e => setRef(e.target.value)} maxLength={40} />
+        {/* Facultatif : replié, sauf si un code de parrainage est arrivé par lien. */}
+        <details className="t-more" open={!!ref || undefined}>
+          <summary>{online && !saved ? "Mot de passe et code de parrainage (facultatifs)" : "Code de parrainage (facultatif)"}</summary>
+          {online && !saved && <>
+            <label htmlFor="pw">Mot de passe</label>
+            <input id="pw" name="password" type="password" autoComplete="new-password" placeholder="8 caractères au moins" value={pw} onChange={e => setPw(e.target.value)} minLength={8} />
+            <p className="muted small">Sans mot de passe, ta partie reste dans ce navigateur. Tu pourras la sauvegarder plus tard, avec Discord ou un mot de passe.</p>
+          </>}
+          <label htmlFor="ref">Code de parrainage</label>
+          <input id="ref" name="ref" autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="ex. VAYK-7Q2" value={ref} onChange={e => setRef(e.target.value)} maxLength={40} />
+        </details>
         {err && <p className="error">{err}</p>}
         <button className="btn primary" type="submit">Entrer sur le marché</button>
       </form>

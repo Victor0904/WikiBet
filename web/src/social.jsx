@@ -158,7 +158,7 @@ export function Friends({ api, say, onBack }) {
     <div key={f.id} className="brow frow">
       <span className="fname">
         <b>{f.pseudo}{f.guild && <> <i className="gtag">{f.guild}</i></>}</b>
-        {f.state === "ami" && <small className="mono">jour <span className={cls(f.today)}>{sW(f.today)}</span> · total <span className={cls(f.total)}>{sW(f.total)}</span></small>}
+        {f.state === "ami" && <small className="mono">jour <span className={cls(f.today)}>{sW(f.today)}</span>, total <span className={cls(f.total)}>{sW(f.total)}</span></small>}
       </span>
       <span className="f-acts">{acts}</span>
     </div>

@@ -44,7 +44,7 @@ export async function connect() {
   if (session && (await sb.auth.getUser()).error?.status === 403) { await sb.auth.signOut({ scope: "local" }); session = null }
   if (!session) {
     const r = await sb.auth.signInAnonymously({ options: { captchaToken: await captchaToken() } });
-    if (r.error) throw new Error(`Connexion impossible : active « Anonymous sign-ins » dans Supabase (Authentication → Sign In / Providers). ${r.error.message}`);
+    if (r.error) throw new Error(`Connexion au marché impossible (${authMsg(r.error)}). Réessaie dans un instant.`);
     session = r.data.session;
   }
   const uid = session.user.id;
@@ -188,6 +188,7 @@ function authMsg(e) {
     : /email_exists|already been registered|already registered/i.test(m) ? "Cet e-mail a déjà un compte : connecte-toi."
     : /weak_password|at least 6/i.test(m) ? "Mot de passe trop court : 8 caractères au moins."
     : /email_not_confirmed|not confirmed/i.test(m) ? "Confirme d'abord ton e-mail avec le lien reçu."
+    : /Failed to fetch|NetworkError|Load failed/i.test(m) ? "pas de réseau"
     : /rate_limit|security purposes|rate limit/i.test(m) ? "Trop de demandes : réessaie dans une minute."
     : /email_address_invalid|invalid format|Unable to validate email/i.test(m) ? "Adresse e-mail invalide."
     : e.message;

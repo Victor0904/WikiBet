@@ -239,6 +239,7 @@ button.brow:hover { background: var(--panel2) }
 .onboard p { margin: 0 }
 .onboard label { font-size: 13px; color: var(--muted); margin-top: 6px }
 .onboard input { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; font-size: 16px }
+.onboard .t-more label { display: block; margin: 10px 0 6px } .onboard .t-more input { width: 100%; box-sizing: border-box } .onboard .t-more p { margin-top: 6px }
 
 .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 60; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; font-size: 14px; font-weight: 500; max-width: calc(100% - 32px); box-shadow: 0 12px 30px -10px #000; animation: rise .25s ease-out }
 .captcha { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 90 } /* Turnstile, s'il demande une case */
@@ -423,10 +424,6 @@ button:active:not(:disabled) { transform: scale(.96) }
 .aur-board { display: grid; gap: 10px }
 .aur-board .spark { height: 80px; margin: 8px 0 }
 .aur-board h2 .btn { font-size: 12.5px }
-.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
-.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px }
-.tile small { font-size: 12.5px; color: var(--faint) }
-.tile b { font-size: 17px; font-weight: 600 }
 .row.wide { width: 100%; align-items: center }
 .row.wide .who { color: var(--ink); gap: 8px }
 .news-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden }
@@ -485,7 +482,7 @@ button:active:not(:disabled) { transform: scale(.96) }
 .rsi { position: relative; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 70px 18px 10px; height: 74px }
 .rsi svg { width: 100%; height: 100%; display: block; overflow: visible }
 .rsi span { position: absolute; left: 10px; bottom: 2px; font-size: 11px; color: var(--muted) }
-@media (min-width: 640px) { .tiles { grid-template-columns: repeat(4, 1fr) } .heat { grid-template-columns: repeat(4, minmax(0, 1fr)) } }
+@media (min-width: 640px) { .heat { grid-template-columns: repeat(4, minmax(0, 1fr)) } }
 .detail > * { flex-shrink: 0 } /* la fiche défile au lieu d'écraser ses blocs */
 /* Bandeau de séance simplifié : état, temps restant, une phrase d'explication */
 .session { grid-template-columns: auto minmax(0, 1fr); margin: 0 0 12px }
@@ -544,11 +541,6 @@ button:active:not(:disabled) { transform: scale(.96) }
 .round-h span:nth-child(2) { display: flex; flex-direction: column; min-width: 0 }
 .round-h .r small { display: block; font-size: 11px; color: var(--faint) }
 .invest-btn { width: 100%; margin-top: 6px }
-.folio-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px }
-.folio-head span { font-size: 12px; color: var(--faint) }
-.folio-head b { font-size: 24px }
-.folio-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px }
-.folio-acts { grid-column: 1 / -1; display: flex; gap: 6px; justify-content: flex-end }
 .paper-mast { display: flex; justify-content: space-between; align-items: baseline; border-top: 3px double var(--ink); border-bottom: 1px solid var(--ink); padding: 8px 2px; margin-bottom: 10px }
 .paper-mast b { font: italic 700 22px Georgia, "Times New Roman", serif; letter-spacing: .01em }
 .paper-mast span { font-size: 11px; color: var(--muted) }
@@ -568,12 +560,22 @@ button:active:not(:disabled) { transform: scale(.96) }
 .round-stats span { display: flex; flex-direction: column; background: var(--panel2); border-radius: 8px; padding: 6px 8px }
 .round-stats small { font: 11px var(--f-body); color: var(--faint) }
 .round-stats b { font-size: 15px }
-.folio { display: flex; flex-direction: column; gap: 10px }
-.folio-top { display: flex; flex-direction: column; gap: 8px }
-.folio-top p { margin: 0 }
 .folio-total { display: flex; flex-direction: column; gap: 2px }
 .folio-total small { font-size: 12.5px; color: var(--faint) }
 .folio-total b { font-size: 30px }
+.folio { display: flex; flex-direction: column; gap: 14px; max-width: 760px }
+.p-figs.three { grid-template-columns: repeat(3, minmax(0, 1fr)) }
+.p-figs.three dd { font-size: 17px }
+.h-row { border-top: 1px solid var(--line) } .h-row:first-child { border-top: 0 }
+.h-row summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 58px; padding: 8px 16px; list-style: none; cursor: pointer }
+.h-row summary::-webkit-details-marker { display: none }
+.h-row summary:active { background: var(--panel2) }
+.h-n { display: flex; flex-direction: column; gap: 2px; min-width: 0 }
+.h-n b { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.h-n small { color: var(--muted); font-size: 12.5px } .h-row .r small { font-size: 12.5px }
+.h-row .r { display: flex; flex-direction: column; align-items: flex-end }
+.h-more { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 10px }
+.h-more .spark { width: 100%; height: 34px; display: block }
 .folio-chart { position: relative; height: 140px; touch-action: pan-y }
 .folio-chart svg { width: 100%; height: 100%; display: block }
 .folio-chart .ax { position: absolute; right: 0; font-size: 10px; color: var(--faint) } .folio-chart .ax-hi { top: 0 } .folio-chart .ax-lo { bottom: 0 }
@@ -585,18 +587,6 @@ button:active:not(:disabled) { transform: scale(.96) }
 .alloc-legend span { display: flex; align-items: center; gap: 6px }
 .alloc-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block }
 .alloc-legend b { color: var(--muted); font-weight: 600 }
-.folio-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px }
-.folio-card { display: flex; flex-direction: column; gap: 8px }
-.folio-card.gain { box-shadow: inset 3px 0 0 var(--up) } .folio-card.loss { box-shadow: inset 3px 0 0 var(--down) }
-.folio-h { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center }
-.folio-h span:nth-child(2) { display: flex; flex-direction: column; min-width: 0 }
-.folio-h .r small { display: block; font-size: 12px }
-.gainbar { position: relative; height: 6px; background: var(--panel2); border-radius: 3px }
-.gainbar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--faint) }
-.gainbar i { position: absolute; top: 0; bottom: 0; border-radius: 3px } .gainbar i.up { background: var(--up) } .gainbar i.down { background: var(--down) }
-.folio-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; font-size: 12.5px }
-.folio-facts span { display: flex; flex-direction: column } .folio-facts small { font: 10.5px var(--f-body); color: var(--faint) }
-.folio-card .spark { width: 100%; height: 40px; display: block }
 .obs { margin: 0; color: var(--muted); border-left: 2px solid var(--accent); padding-left: 6px }
 .stake-chips button { font-variant-numeric: tabular-nums }
 
@@ -813,10 +803,11 @@ a.btn.primary { color: var(--accent-ink) }
 .srow { display: flex; align-items: center; border-top: 1px solid var(--line); padding-right: 12px }
 .srow:first-child { border-top: 0 }
 .srow.mine { box-shadow: inset 3px 0 0 var(--accent) }
-.srow-open { flex: 1; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 64px; padding: 8px 4px 8px 16px; background: none; border: 0; text-align: left; color: inherit }
+.srow-open { flex: 1; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 58px; padding: 8px 4px 8px 14px; background: none; border: 0; text-align: left; color: inherit }
 .srow-open:active { background: var(--panel2) }
 .srow-n { display: flex; flex-direction: column; gap: 2px; min-width: 0 }
-.srow-n b { font: 700 16px/1.2 var(--f-cond); overflow-wrap: anywhere }
+.srow-n b { font: 700 16px/1.2 var(--f-cond); white-space: nowrap; overflow: hidden; text-overflow: ellipsis } /* une ligne : toute la cote tient presque sur un écran */
+.srow-n small .real-tag, .srow-n small .risk-tag { margin: 0 6px 0 0 }
 .srow-n small { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 .srow .spark { display: none; height: 26px }
 .srow .r { display: flex; flex-direction: column; align-items: flex-end; text-align: right }
@@ -824,7 +815,7 @@ a.btn.primary { color: var(--accent-ink) }
 .srow .r small { font-size: 12.5px }
 /* Trader sans ouvrir la fiche : deux petits boutons carrés aux couleurs de la hausse et de la baisse. */
 .srow-q { flex: none; display: flex; gap: 6px; margin-left: 8px }
-.srow-q button { width: 36px; height: 36px; border-radius: 10px; font-size: 13px; display: grid; place-items: center; border: 1px solid; transition: transform .15s }
+.srow-q button { width: 34px; height: 34px; border-radius: 10px; font-size: 13px; display: grid; place-items: center; border: 1px solid; transition: transform .15s }
 .srow-q .q-up { color: var(--up); background: var(--up-soft); border-color: color-mix(in srgb, var(--up) 40%, transparent) }
 .srow-q .q-down { color: var(--down); background: var(--down-soft); border-color: color-mix(in srgb, var(--down) 40%, transparent) }
 .srow-q button:active { transform: scale(.94) }
@@ -897,7 +888,7 @@ a.btn.primary { color: var(--accent-ink) }
 .q-list .ach:first-child { border-top: 0 }
 
 /* Comment jouer (texte simple, sans numéros : les sujets ne sont pas une suite), largeur du Marché */
-.howto { max-width: 640px }
+.howto, .legal { max-width: 640px }
 .guide { display: flex; flex-direction: column; gap: 22px; margin: 6px 0 22px }
 .guide section { display: flex; flex-direction: column; gap: 6px }
 .guide h2 { font-size: 19px }

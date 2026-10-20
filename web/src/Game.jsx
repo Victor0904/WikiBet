@@ -460,17 +460,23 @@ function InvestSheet({ api, tk, mode, qty: q0, aur, me, hold, onClose, onDone })
           <div className="stake"><input id="inv-amount" className="mono" type="number" inputMode="numeric" min="1" value={amount} onChange={e => setAmount(Math.max(0, Math.floor(+e.target.value || 0)))} /><span>W</span></div>
           <StakeChips value={amount} set={setAmount} cash={me.cash} max={round ? Math.min(maxRound, Math.floor(me.cash)) : Math.floor(me.cash / (1 + FEE))} />
         </>}
-        <div className="rows mono">
-          <div className="row"><span>{round ? "Prix de la levée" : "Cours actuel"}</span><b>{aurPx(p)}</b></div>
-          {!round && <div className="row"><span>Impact de ton ordre (estimé)</span><b>{sell ? "−" : "+"}{nf2.format(sl * 100)} %</b></div>}
-          <div className="row"><span>{sell ? "Actions vendues" : "Actions obtenues (environ)"}</span><b>{nf2.format(sell ? qty : amount / (exec || 1))}</b></div>
-          {!round && <div className="row"><span>Frais (0,1 %)</span><b>{W(fee)}</b></div>}
-          {sell && <div className="row"><span>Tu recevras (environ)</span><b>{W(qty * exec - fee)}</b></div>}
-          {round && <div className="row"><span>Encore possible (20 % du disponible)</span><b>{W(maxRound)}</b></div>}
-        </div>
+        <dl className="t-figs">
+          <div><dt>{sell ? "Actions vendues" : "Actions obtenues (environ)"}</dt><dd className="mono">{nf2.format(sell ? qty : amount / (exec || 1))}</dd></div>
+          {sell ? <div><dt>Tu recevras (environ)</dt><dd className="mono">{W(qty * exec - fee)}</dd></div>
+            : round ? <div><dt>Encore possible (20 % du disponible)</dt><dd className="mono">{W(maxRound)}</dd></div>
+            : <div><dt>{round ? "Prix de la levée" : "Cours actuel"}</dt><dd className="mono">{aurPx(p)}</dd></div>}
+        </dl>
+        <details className="t-more">
+          <summary>Détail de l'ordre</summary>
+          <div className="plain">
+            <div className="plain-row"><span>{round ? "Prix de la levée" : "Cours actuel"}</span><b className="mono">{aurPx(p)}</b></div>
+            {!round && <div className="plain-row"><span>Impact de ton ordre (estimé)</span><b className="mono">{sell ? "−" : "+"}{nf2.format(sl * 100)} %</b></div>}
+            {!round && <div className="plain-row"><span>Frais (0,1 %)</span><b className="mono">{W(fee)}</b></div>}
+          </div>
+        </details>
         <p className="muted small">{round ? "Le premier cours sera fixé par le marché à l'introduction en bourse : il peut être bien au-dessus du prix de la levée… ou en dessous. Une jeune pousse peut aussi faire faillite."
           : "Sans levier : ta mise suit le cours, sans liquidation. Le prix exact est calculé par le serveur."}</p>
-        <button type="submit" className={"btn big " + (sell ? "sell" : "buy")} disabled={!ok}>{round ? `Souscrire · ${W(amount)}` : sell ? `Vendre · ${W(qty * exec - fee)}` : `Acheter · ${W(amount)}`}</button>
+        <button type="submit" className={"btn big " + (sell ? "sell" : "buy")} disabled={!ok}>{round ? `Souscrire pour ${W(amount)}` : sell ? `Vendre pour ${W(qty * exec - fee)}` : `Acheter pour ${W(amount)}`}</button>
       </form>
     </div>
   );

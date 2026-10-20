@@ -75,9 +75,10 @@ const MAJOR = new Set(["resultats", "essai", "scandale", "produit", "taux", "cri
 const isMajor = n => MAJOR.has(n.cat) || Math.abs(n.sent) >= .7;
 
 // Le Marché : tableau de bord, liste des actions, journal, carte et rumeurs.
-const VIEWS = [["board", "Aperçu"], ["list", "Actions"], ["news", "Journal"], ["heat", "Carte"], ["rumors", "Rumeurs"]];
+// Actions d'abord (demande de Victor, octobre 2026) : toutes les sociétés dès l'arrivée, l'Aperçu (indice, macro) ensuite.
+const VIEWS = [["list", "Actions"], ["board", "Aperçu"], ["news", "Journal"], ["heat", "Carte"], ["rumors", "Rumeurs"]];
 export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscribe }) {
-  const [view, setView] = useState("board"), [read, setRead] = useState(null), onList = () => setView("list");
+  const [view, setView] = useState("list"), [read, setRead] = useState(null), onList = () => setView("list");
   // Rumeurs : relues toutes les 10 s (pastille sur l'onglet quand une nouvelle arrive, dernière vue gardée dans le navigateur).
   const [rum, setRum] = useState(null), [seen, setSeen] = useState(() => { try { return +localStorage.getItem("wb-rumeurs") || 0 } catch { return 0 } });
   useEffect(() => {
@@ -189,6 +190,7 @@ function Board({ aur, now, onDetail, onNews, onRead, onList }) {
       <section className="b-sec">
         <h2>Le jour d'Aurelys <span className="muted">depuis 00:00</span></h2>
         <div className="p-list">{movers.slice(0, 3).map(mover)}<span className="p-gap" aria-hidden="true" />{movers.slice(-3).map(mover)}</div>
+        <button type="button" className="link b-more" onClick={onList}>{`Toutes les actions (${STOCKS.length})`}</button>
       </section>
       <section className="b-sec">
         <h2>À venir</h2>
@@ -214,7 +216,7 @@ function List({ aur, now, bets, onPick, onDetail, onSubscribe, onRead }) {
       <div key={s.tk} className={"srow" + (mine(s.tk) ? " mine" : "")}>
         <button type="button" className="srow-open" onClick={() => onDetail(s.tk)} aria-label={`Fiche de ${s.name}`}>
           <TkIcon tk={s.tk} />
-          <span className="srow-n"><b>{s.name}{LINKS[s.tk] && <i className="real-tag" title={LINKS[s.tk].src}>réel</i>}{young && <i className="risk-tag">risqué</i>}</b><small>{q?.halt ? "cotation suspendue" : info(s.tk).what}</small></span>
+          <span className="srow-n"><b>{s.name}</b><small>{LINKS[s.tk] && <i className="real-tag" title={LINKS[s.tk].src}>réel</i>}{young && <i className="risk-tag">risqué</i>}{q?.halt ? "cotation suspendue" : info(s.tk).what}</small></span>
           {v.length > 1 ? <Spark path={v} t={v.length - 1} /> : <span />}
           <span className="r mono"><b>{px(q?.p)}</b><small className={cls(c)}>{q ? pct(c) : ""}</small></span>
         </button>
@@ -579,11 +581,11 @@ function CloseSheet({ b, x, busy, onConfirm, onCancel }) {
       <div className="sheet" role="dialog" aria-modal="true" aria-label="Clôturer la position">
         <div className="sheet-h"><b>Clôturer {BY[b.aur]?.name ?? b.aur} {b.dir === "up" ? "▲" : "▼"} ×{b.lev}</b><button type="button" className="x" onClick={onCancel} aria-label="Fermer">×</button></div>
         <div className="row"><span>Cours</span><b className="mono">{px(x.px)}</b></div>
-        <div className="row"><span>Impact de ton ordre ({pct(-x.sl)})</span><b className="mono">{px(x.exitPx)} · −{W(n * x.sl)}</b></div>
+        <div className="row"><span>Impact de ton ordre ({pct(-x.sl)})</span><b className="mono">{`${px(x.exitPx)}, −${W(n * x.sl)}`}</b></div>
         <div className="row"><span>Frais de clôture</span><b className="mono">−{W(x.closeFee)}</b></div>
         <div className="row"><span>Tu recevras (environ)</span><b className={"mono " + cls(x.net)}>{W(x.value)} ({sW(x.net)})</b></div>
         <p className="muted small">Le montant suit le cours jusqu'à l'exécution par le serveur.</p>
-        <button type="button" className="btn primary big" disabled={busy || x.halt} onClick={onConfirm}>Clôturer · {W(x.value)}</button>
+        <button type="button" className="btn primary big" disabled={busy || x.halt} onClick={onConfirm}>{`Clôturer pour ${W(x.value)}`}</button>
       </div>
     </div>,
     document.body
