@@ -1729,7 +1729,6 @@ export default {
   "Rester sur cette partie": "Stay on this game",
   "Compte Discord lié : tu peux te connecter avec Discord.": "Discord account linked: you can log in with Discord.",
   "Lier mon compte Discord": "Link my Discord account",
-  "Ta partie n'est pas sauvegardée : elle reste dans ce navigateur. Sauvegarde-la avec Discord, ou choisis un mot de passe, pour la retrouver sur un autre appareil.": "Your game isn't saved: it stays in this browser. Save it with Discord, or choose a password, to find it on another device.",
   "Connexion au marché impossible ({0}). Réessaie dans un instant.": "Can't connect to the market ({0}). Try again in a moment.",
   "pas de réseau": "no network",
   "Mot de passe et code de parrainage (facultatifs)": "Password and referral code (optional)",
@@ -1761,4 +1760,5 @@ export default {
   "Ceci te déconnecte et efface la partie d'essai. Une partie sauvegardée (mot de passe ou Discord) reste sur le serveur ; une partie non sauvegardée est perdue.": "This logs you out and deletes the trial game. A saved game (password or Discord) stays on the server; an unsaved game is lost.",
   "Ta partie n'est pas sauvegardée : si tu te déconnectes, tu la perds définitivement, avec ton solde et tes positions.": "Your game isn't saved: if you log out, you lose it for good, along with your cash and positions.",
   "Me déconnecter et perdre ma partie": "Log out and lose my game",
+  "Partie non sauvegardée : elle sera supprimée après {0} jours sans visite. Sauvegarde-la avec Discord ou un mot de passe.": "Unsaved game: it will be deleted after 90 days without a visit. Save it with Discord or a password.",
 };

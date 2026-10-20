@@ -103,7 +103,7 @@ export function AccountLink({ account, pseudo }) {
         <LoginPanel account={account} warn />
         <button type="button" className="link" onClick={() => setLogin(false)}>Retour</button>
       </> : <>
-        <p className="muted">Ta partie n'est pas sauvegardée : elle reste dans ce navigateur. Sauvegarde-la avec Discord, ou choisis un mot de passe, pour la retrouver sur un autre appareil.</p>
+        <p className="muted">Partie non sauvegardée : elle sera supprimée après 90 jours sans visite. Sauvegarde-la avec Discord ou un mot de passe.</p>
         <DiscordButton account={account} link />
         <PasswordForm account={account} pseudo={pseudo} label="Enregistrer" />
         <button type="button" className="link" onClick={() => setLogin(true)}>Déjà un compte ? Se connecter</button>
