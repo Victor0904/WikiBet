@@ -87,6 +87,22 @@ export default function Game({ api, trial = false, onNoProfile }) {
   // Alertes de prix (Aurelys) : gardées dans ce navigateur.
   const [alerts, setAlerts] = useState(() => { try { return JSON.parse(localStorage.getItem("wb-alerts")) ?? [] } catch { return [] } });
   useEffect(() => { try { localStorage.setItem("wb-alerts", JSON.stringify(alerts)) } catch { } }, [alerts]);
+  // Retour de Discord : déjà lié ailleurs → Mon compte (choix de basculer) ; annulé ou autre erreur → bandeau.
+  useEffect(() => {
+    const o = api.account?.oauth; if (!o) return;
+    if (o.kind === "taken") { setTab("more"); setMore("account") } else setToast({ text: o.text, tone: o.kind === "error" ? "down" : "", long: true, at: Date.now() });
+  }, [api]);
+  // Partie anonyme : proposer de la sauvegarder avec Discord, 8 s après la première position ou au bout de 5 min de jeu,
+  // au plus une fois tous les 3 jours. Jamais dans l'essai ni une fois sauvegardée.
+  const hasBet = bets.length > 0;
+  useEffect(() => {
+    const ac = api.account; if (trial || !ac || ac.saved) return;
+    const id = setTimeout(() => {
+      try { if (Date.now() - Number(localStorage.getItem("wb-discord") || 0) < 3 * 864e5) return; localStorage.setItem("wb-discord", String(Date.now())) } catch { return }
+      setToast({ text: "Sauvegarde ta progression avec Discord", long: true, at: Date.now(), action: { label: "Sauvegarder", go: () => ac.linkDiscord().catch(e => say(e.message)) } });
+    }, hasBet ? 8000 : 5 * 60e3);
+    return () => clearTimeout(id);
+  }, [api, trial, hasBet, say]);
   // Succès débloqués par le serveur depuis la dernière visite : un bandeau, avec un lien vers les succès.
   const unlockCheck = useRef(null);
   useEffect(() => {

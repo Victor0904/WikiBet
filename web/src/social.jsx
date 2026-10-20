@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { W, sW, cls, BOTS } from "./format.js";
 import { Segmented, SubHeader, Loading } from "./nav.jsx";
+import { discordOf } from "./discord.js";
 
 // ===== Comptes =====
 // Petit formulaire : un état « en cours », un message de réussite ou d'erreur.
@@ -23,6 +24,31 @@ export function LoginPanel({ account, warn }) {
       <button className="btn primary" type="submit" disabled={busy}>Se connecter</button>
       {out}
     </form>
+  );
+}
+
+// Discord : se connecter (retrouver une partie liée, ou en créer une) ou sauvegarder la partie en cours (link).
+export function DiscordButton({ account, link, label }) {
+  const [act, busy, out] = useAct();
+  return <>
+    <button type="button" className="btn discord" disabled={busy} onClick={() => act(link ? account.linkDiscord : account.discord)}>
+      {label ?? (link ? "Sauvegarder ma partie avec Discord" : "Se connecter avec Discord")}</button>
+    {out}
+  </>;
+}
+
+// Retour de Discord : ce compte Discord a déjà une autre partie. Basculer dessus, en prévenant si la partie en cours sera perdue.
+function DiscordTaken({ account, saved }) {
+  const [gone, setGone] = useState(false);
+  if (gone) return null;
+  return (
+    <div className="discord-taken" role="alert">
+      <p>Ce compte Discord a déjà une partie Aurelys. Basculer dessus ?</p>
+      <p className="muted small">{saved ? "Tu pourras revenir sur ta partie actuelle avec ton pseudo et ton mot de passe."
+        : "Ta partie actuelle n'est pas sauvegardée : elle sera perdue."}</p>
+      <DiscordButton account={account} label="Basculer sur ce compte" />
+      <button type="button" className="link" onClick={() => setGone(true)}>Rester sur cette partie</button>
+    </div>
   );
 }
 
@@ -58,11 +84,16 @@ export function AccountLink({ account, pseudo }) {
   const [u, setU] = useState(undefined), [login, setLogin] = useState(false), [change, setChange] = useState(false), [act, busy, out] = useAct();
   useEffect(() => { account.user().then(setU).catch(() => setU(null)) }, [account]);
   if (!u) return null;
+  const discord = discordOf(u), oauth = account.oauth;
   return (
     <div className="panel auth-panel">
       <b>Compte</b>
-      {u.email ? <>
+      {oauth?.kind === "taken" ? <DiscordTaken account={account} saved={!!u.email} /> : oauth && <p className="error" role="status">{oauth.text}</p>}
+      {discord && <p className="discord-me">{discord.avatar && <img src={discord.avatar} alt="" width="28" height="28" referrerPolicy="no-referrer" />}
+        <span>Compte Discord lié : tu peux te connecter avec Discord.<br /><b>{discord.name}</b></span></p>}
+      {u.email || discord ? <>
         <p className="muted">Connecté en tant que {pseudo}. Ta partie est sauvegardée.</p>
+        {!discord && <DiscordButton account={account} link label="Lier mon compte Discord" />}
         <EmailForm account={account} />
         {change ? <PasswordForm account={account} pseudo={pseudo} label="Changer le mot de passe" />
           : <button type="button" className="link" onClick={() => setChange(true)}>Changer de mot de passe</button>}
@@ -72,7 +103,8 @@ export function AccountLink({ account, pseudo }) {
         <LoginPanel account={account} warn />
         <button type="button" className="link" onClick={() => setLogin(false)}>Retour</button>
       </> : <>
-        <p className="muted">Ta partie n'a pas de mot de passe. Choisis-en un pour la retrouver avec ton pseudo, ici ou sur un autre appareil.</p>
+        <p className="muted">Ta partie n'est pas sauvegardée : elle reste dans ce navigateur. Sauvegarde-la avec Discord, ou choisis un mot de passe, pour la retrouver sur un autre appareil.</p>
+        <DiscordButton account={account} link />
         <PasswordForm account={account} pseudo={pseudo} label="Enregistrer" />
         <button type="button" className="link" onClick={() => setLogin(true)}>Déjà un compte ? Se connecter</button>
       </>}

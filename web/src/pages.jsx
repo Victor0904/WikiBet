@@ -35,11 +35,11 @@ export function PushPanel({ push, compact }) {
 // le reste est une liste sobre. Les données déjà chargées s'affichent tout de suite, guilde / amis / succès ensuite.
 const initials = p => (p ?? "?").split(/[\s._-]+/).filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?";
 const ordinal = n => n === 1 ? "1er" : `${n}e`;
-export const Avatar = ({ pseudo, size = 56, accent }) => (
-  <span className="avatar" style={{ width: size, height: size, fontSize: size * .38, background: accent }} aria-hidden="true">{initials(pseudo)}</span>
-);
+export const Avatar = ({ pseudo, size = 56, accent, img }) => img
+  ? <img className="avatar" src={img} alt="" style={{ width: size, height: size }} referrerPolicy="no-referrer" /> // avatar Discord, si lié
+  : <span className="avatar" style={{ width: size, height: size, fontSize: size * .38, background: accent }} aria-hidden="true">{initials(pseudo)}</span>;
 // Anneau de progression vers le niveau suivant (même calcul que trader_level en SQL : le niveau de départ est un plancher).
-function LevelRing({ pseudo, xp, floor }) {
+function LevelRing({ pseudo, xp, floor, img }) {
   const lvl = Math.max(levelOf(xp), floor ?? 1), from = XP_TOTAL[lvl], to = XP_TOTAL[lvl + 1];
   const part = to ? Math.min(1, Math.max(0, (xp - from) / (to - from))) : 1, R = 33, C = 2 * Math.PI * R;
   return (
@@ -48,7 +48,7 @@ function LevelRing({ pseudo, xp, floor }) {
         <circle cx="38" cy="38" r={R} className="track" />
         <circle cx="38" cy="38" r={R} className="fill" style={{ strokeDasharray: C, "--off": C * (1 - part), "--c": C }} />
       </svg>
-      <Avatar pseudo={pseudo} size={58} />
+      <Avatar pseudo={pseudo} size={58} img={img} />
       <b className="lv-badge mono">{lvl}</b>
     </div>
   );
@@ -83,7 +83,7 @@ export function Profile({ api, me, board, patrimoine, refs, trial, say, go, hasP
   return (
     <div className="profile">
       <header className="p-id">
-        <LevelRing pseudo={me.pseudo} xp={xp} floor={me.lvl_floor} />
+        <LevelRing pseudo={me.pseudo} xp={xp} floor={me.lvl_floor} img={api.account?.discordInfo?.avatar} />
         <div className="p-name">
           <h1>{me.pseudo}{guild && <span className="gtag">{guild.tag}</span>}</h1>
           <p>{toNext != null ? `Niveau ${lvl}, encore ${toNext} XP pour le ${lvl + 1}` : `Niveau ${lvl}`}</p>

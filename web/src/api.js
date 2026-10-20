@@ -2,6 +2,7 @@
 // Sans clés : mode démo, la même base SQL tourne dans le navigateur (voir demo.js).
 import { createClient } from "@supabase/supabase-js";
 import { BOTS } from "./format.js";
+import { oauthReturn, discordOf } from "./discord.js";
 
 // Les identifiants bigint et les cotes numeric arrivent parfois en texte : on normalise une fois ici.
 export const normBet = b => ({ ...b, id: Number(b.id), odds: b.odds == null ? null : Number(b.odds) });
@@ -34,6 +35,9 @@ export async function connect() {
   const url = import.meta.env.VITE_SUPABASE_URL, key = import.meta.env.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) return (await import("./demo.js")).demoApi();
 
+  // Retour de Discord en échec (déjà lié, annulé…) : lu puis retiré de l'adresse avant que supabase-js la lise ; la session reste.
+  const oauth = oauthReturn(location.hash, location.search);
+  if (oauth) history.replaceState(null, "", location.pathname);
   const sb = createClient(url, key); // session gardée dans le navigateur (localStorage) : on reste connecté
   let { data: { session } } = await sb.auth.getSession();
   // Session gardée d'un compte supprimé côté serveur : on l'oublie et on repart sur une partie neuve.
@@ -66,6 +70,9 @@ export async function connect() {
   // Comptes : pseudo + mot de passe. La partie anonyme devient un compte (même identifiant, rien n'est perdu).
   const home = location.origin + location.pathname;
   const auth = async (p, reload) => { const { data, error } = await p; if (error) throw new Error(authMsg(error)); if (reload) location.replace(home); return data };
+  // Discord (Supabase → Authentication → Providers → Discord) : retour sur /jouer. Pas de captcha : Supabase ne le demande
+  // ni pour linkIdentity (session déjà ouverte, donc déjà passée par Turnstile) ni pour signInWithOAuth (Discord filtre).
+  const discordOpts = { redirectTo: location.origin + "/jouer" };
   const signIn = async (pseudo, password) => {
     const email = await rpc("login_email", { p_pseudo: pseudo });
     if (!email) throw new Error("Pseudo ou mot de passe incorrect.");
@@ -100,6 +107,10 @@ export async function connect() {
     account: {
       user: async () => (await sb.auth.getUser()).data.user,
       signIn, // pseudo ou e-mail
+      // Partie sauvegardée : mot de passe (adresse interne) ou Discord. Sinon, compte anonyme : perdu avec ce navigateur.
+      saved: !!session.user.email || !!discordOf(session.user), discordInfo: discordOf(session.user), oauth,
+      discord: () => auth(sb.auth.signInWithOAuth({ provider: "discord", options: discordOpts })), // la page part vers Discord
+      linkDiscord: () => auth(sb.auth.linkIdentity({ provider: "discord", options: discordOpts })), // même compte, rien n'est perdu
       loginEmail: () => rpc("my_login_email"),
       setLoginEmail: email => rpc("set_login_email", { p_email: email }),
       // Crée le compte ou change le mot de passe (côté serveur), puis se reconnecte : le navigateur propose d'enregistrer le mot de passe.
