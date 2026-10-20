@@ -73,12 +73,11 @@ avertissement à la déconnexion d'une partie anonyme.
   du HTML). Réécrire seulement `/` et `/jouer`, page 404 au style du jeu.
 - Statistiques de fréquentation : Vercel Web Analytics (sans cookie) ou équivalent, à mentionner dans Confidentialité.
 - Suivi des erreurs en prod : `onerror` / `unhandledrejection` vers une table `client_errors` (tronqué, débit limité),
-  lu dans le tableau de bord admin ; ou Sentry (tiers).
+  lue avec `npx supabase db query --linked` ; ou Sentry (tiers).
 - Premier parcours d'un vrai compte : les bulles `Coach` de l'essai au lieu du « Comment jouer » ouvert d'office.
 - Messages d'erreur : table de traduction centrale dans `api.js` (JWT expiré, droits refusés, contraintes).
 - Mot de passe oublié : proposer Discord aux comptes à mot de passe sans Discord ; plus tard, code de secours.
 - Hygiène SQL : 30 fonctions invoker sans `search_path`, `pg_net` dans le schéma public.
-- Tableau de bord admin : sa connexion par mot de passe passe désormais par le captcha Turnstile (à vérifier).
 
 ### Volet légal (si ouverture au public)
 CGU (jeu sans argent réel), Confidentialité complète (responsable, durées de conservation, transferts hors UE :

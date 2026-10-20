@@ -10,8 +10,7 @@
     "seed": "node scripts/seed.mjs",
     "visuels": "node scripts/visuels.mjs",
     "db:push": "npm test && npx supabase db push --yes",
-    "fn:deploy": "npm test && npx supabase functions deploy aurelys --use-api",
-    "admin": "npm --prefix ../admin install --no-audit --no-fund --silent && npm --prefix ../admin run dev"
+    "fn:deploy": "npm test && npx supabase functions deploy aurelys --use-api"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

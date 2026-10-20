@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { basename, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { freshDb, migrateFrom, login } from "./db.js";
 
 const A = "00000000-0000-0000-0000-00000000000a", B = "00000000-0000-0000-0000-00000000000b";
@@ -38,4 +41,16 @@ test("public_profiles : lecture seule, même avec les droits par défaut de Supa
   await assert.rejects(db.query("delete from public_profiles where pseudo = 'bea'"), /permission denied/);
   assert.equal((await db.query("select count(*)::int n from public_profiles")).rows[0].n, 2, "la lecture reste possible");
   await db.exec("reset role");
+});
+
+// La clé service_role ne doit jamais se trouver dans le code servi du jeu.
+test("aucune clé service_role dans le code du jeu", () => {
+  const hits = [];
+  const walk = p => {
+    if (/node_modules|dist|models|fonts/.test(basename(p)) || !existsSync(p)) return;
+    if (statSync(p).isDirectory()) readdirSync(p).forEach(f => walk(join(p, f)));
+    else if (/service_role/i.test(readFileSync(p, "utf8"))) hits.push(p);
+  };
+  for (const p of ["../src", "../public", "../index.html", "../vite.config.js"]) walk(fileURLToPath(new URL(p, import.meta.url)));
+  assert.deepEqual(hits, []);
 });
