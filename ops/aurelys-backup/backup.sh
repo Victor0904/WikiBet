@@ -7,6 +7,10 @@ cd "$(dirname "$0")"
 set -a; . ./.env; set +a
 : "${PGPASSWORD:?PGPASSWORD vide dans /opt/aurelys-backup/.env}"
 mkdir -p dumps
+# Disque presque plein (moins de 2 Go libres) : pas de sauvegarde, pour ne pas remplir le VPS (les autres projets
+# en dépendent). Le message va dans backup.log (sortie du cron).
+libre=$(df -Pm dumps | awk 'NR == 2 { print $4 }')
+if [ "$libre" -lt 2048 ]; then echo "$(date -u +%FT%TZ) ÉCHEC : seulement $libre Mo libres (2 048 au moins), pas de sauvegarde"; exit 1; fi
 f="aurelys-$(date -u +%Y%m%d-%H%M).dump"
 docker run --rm -e PGPASSWORD -v "$PWD/dumps:/dumps" postgres:17-alpine \
   pg_dump "$PGURL" -Fc -n public -n auth --no-unlogged-table-data -f "/dumps/$f.part"
