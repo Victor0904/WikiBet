@@ -19,14 +19,15 @@ test("order_gate : 8 ordres par 10 s, le 9e refusé sans être compté, puis nou
     assert.equal((await db.query(`select has_function_privilege('${r}', 'order_gate(uuid)', 'execute') ok`)).rows[0].ok, false, r);
 });
 
-// Fonctions DEFINER : rien pour anon (sauf login_email, connexion du tableau de bord admin), tout pour authenticated.
-test("fonctions DEFINER : anon n'exécute que login_email", async () => {
+// Fonctions DEFINER : rien pour anon (le jeu ouvre toujours une session avant d'appeler), tout pour authenticated.
+test("fonctions DEFINER : anon n'en exécute aucune", async () => {
   const db = await freshDb();
   const { rows } = await db.query(`select p.proname n, has_function_privilege('anon', p.oid, 'execute') anon,
     has_function_privilege('authenticated', p.oid, 'execute') auth from pg_proc p join pg_namespace s on s.oid = p.pronamespace
     where s.nspname = 'public' and p.prosecdef`);
-  assert.deepEqual(rows.filter(r => r.anon).map(r => r.n), ["login_email"]);
-  for (const f of ["create_profile", "leaderboard", "aur_feed", "push_subscribe"]) assert.ok(rows.find(r => r.n === f).auth, f);
+  assert.deepEqual(rows.filter(r => r.anon).map(r => r.n), []);
+  for (const f of ["create_profile", "leaderboard", "aur_feed", "push_subscribe", "login_email"]) assert.ok(rows.find(r => r.n === f).auth, f);
+  assert.ok(!rows.some(r => /^admin_/.test(r.n)), "plus de fonctions du tableau de bord admin");
 });
 
 // tick : refusé sans le secret de pg_cron, vérifié avant toute autre action.
