@@ -127,7 +127,12 @@ Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
     const body = await req.json().catch(() => ({}));
-    if (body.action === "tick") return json(await tick(Number(body.lead) || 20));
+    // Avancer le marché : pg_cron seulement, avec le secret du Vault (aurelys_tick = TICK_SECRET). Sans secret posé : refusé.
+    if (body.action === "tick") {
+      const secret = Deno.env.get("TICK_SECRET");
+      if (!secret || req.headers.get("x-tick-secret") !== secret) return json({ error: "Réservé au serveur." }, 403);
+      return json(await tick(Number(body.lead) || 20));
+    }
     // Texte de la notification, demandé par le service worker avec son adresse d'abonnement (secrète).
     if (body.action === "push_info") {
       const rows = must(await admin.rpc("push_info", { p_endpoint: String(body.endpoint ?? "") })) as { kind: string; aur: string; dir: string; lev: number; stake: number; lq: number }[];
@@ -157,6 +162,11 @@ Deno.serve(async req => {
       return error ? json({ error: error.message }, 400) : json({ ok: true });
     }
 
+    // Rafales : 8 ordres au plus par 10 s et par joueur (order_gate), avant de charger l'état du marché.
+    if (["open", "buy", "sell", "close"].includes(body.action)) {
+      const { error } = await admin.rpc("order_gate", { p_user: user.id });
+      if (error) return json({ error: error.message }, 429);
+    }
     const row = await loadState();
     if (!row || !usable(row.state)) return json({ error: "Marché indisponible, réessaie dans un instant." }, 503);
 

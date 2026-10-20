@@ -43,3 +43,11 @@ test("actualités du moteur : toutes traduites (10 jours d'Aurelys, graine jamai
   }
   assert.deepEqual([...miss], [], "lancer scripts/i18n-keys.mjs puis traduire les nouvelles clés");
 });
+
+// Lieu de fondation : nom propre inventé gardé, groupe de mots français traduit (test d'écran instable sinon :
+// il ne tombait sur Kestrel Aéro que si elle figurait au palmarès du jour).
+test("fiche : lieu de fondation traduit quand ce n'est pas un nom propre", () => {
+  assert.equal(t("Kestrel Aéro (Avions et hélicoptères, fondée en 1934 à Aérodrome d'Orme). Texte."), "Kestrel Aéro (planes and helicopters, founded in 1934 in Orme Airfield). Text.".replace("Text.", t("Texte.")));
+  assert.match(t("Granterre Agro (Céréales et farine, fondée en 1975 à Plaines du Sud). Texte."), /founded in 1975 in the Southern Plains\)/);
+  assert.match(t("Banque Castellane (Banque et crédit, fondée en 1847 à Castellane). Texte."), /founded in 1847 in Castellane\)/);
+});

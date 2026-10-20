@@ -41,7 +41,7 @@ export const PATTERNS = [
   [/^(.+?) et (.+?) ont fondé (.+?) à (.+?)\. Leur pari : (.+?)\. La société n'a encore jamais gagné d'argent ; elle lève des fonds pour grandir\.$/,
     (a, b, c, d, e) => `${a} and ${b} founded ${c} in ${d}. Their bet: ${low(t(cap(e)))}. The company has never made money yet; it is raising funds to grow.`],
   [/^([^,.()«]{2,40}) \((?:jeune pousse|(.+?), fondée en (\d+) à ([^,()]+?))\)\. (.+)$/s,
-    (n, w, y, c, rest) => `${n} (${w ? `${low(t(cap(w)))}, founded in ${y} in ${c}` : "start-up"}). ${t(rest)}`],
+    (n, w, y, c, rest) => `${n} (${w ? `${low(t(cap(w)))}, founded in ${y} in ${t(c)}` : "start-up"}). ${t(rest)}`],
   [/^(« .+? ») ?, (commente|prévient|juge|note|estime) (.+?)\.( .+)?$/s, (q, v, a, rest) => `${t(q)}, ${VERBS[v]} ${t(a)}.${rest ? " " + t(rest.trim()) : ""}`],
   [/^Sont concernées : (.+)\.$/, l => `Affected: ${l}.`],
   [/^([^.]+?) et ([^.]+?) ont fondé ([^.]+?) à ([^.]+?)\.$/, (a, b, c, d) => `${a} and ${b} founded ${c} in ${d}.`],
