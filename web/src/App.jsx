@@ -20,7 +20,13 @@ try {
 // Déjà connecté : « / » mène droit au jeu.
 const LANDING = PATH === "/" && !(ONLINE && hasSession());
 if (PATH === "/" && !LANDING) history.replaceState(null, "", "/jouer");
-let apiP; const getApi = () => apiP ??= TRIAL ? import("./demo.js").then(m => m.demoApi()) : import("./api.js").then(m => m.connect());
+// Le module se charge d'abord (seul dans le wrapper de préchargement de Vite), connect() s'appelle ensuite : sinon une erreur
+// de connexion passait pour un échec de chargement, que NewVersion avalait (getApi rendait undefined). Échec : on pourra réessayer.
+const loadApi = async () => {
+  if (TRIAL) { const m = await import("./demo.js"); return m.demoApi() }
+  const m = await import("./api.js"); return m.connect();
+};
+let apiP; const getApi = () => apiP ??= loadApi().catch(e => { apiP = null; throw e });
 const Wait = () => <main className="center"><LogoLoader size={72} ariaLabel={TRIAL ? "Préparation du marché d'essai, dans ton navigateur…" : "Connexion au marché…"} /></main>;
 
 export default function App() {
@@ -30,10 +36,12 @@ export default function App() {
 
 // Page chargée avant une mise à jour : une fonction du serveur n'existe plus (api.js, « wb-version »), ou un morceau
 // du site n'est plus en ligne (Vite, « vite:preloadError »). Le service worker ne met rien en cache : recharger suffit.
+const CHUNK = /dynamically imported module|Importing a module script failed|Unable to preload CSS/i;
 function NewVersion() {
   const [on, setOn] = useState(false);
   useEffect(() => {
-    const show = e => { setOn(true); e?.preventDefault?.() };
+    // preventDefault seulement pour un vrai morceau introuvable : toute autre erreur doit remonter à l'appelant.
+    const show = e => { if (e.type === "vite:preloadError" && !CHUNK.test(e.payload?.message ?? "")) return; setOn(true); e.preventDefault() };
     addEventListener("wb-version", show); addEventListener("vite:preloadError", show);
     return () => { removeEventListener("wb-version", show); removeEventListener("vite:preloadError", show) };
   }, []);
