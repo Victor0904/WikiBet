@@ -1720,4 +1720,5 @@ export default {
   "▲ ou ▼ pour prendre position tout de suite ; touche une société pour voir sa fiche.": "▲ or ▼ to take a position right away; tap a company to see its page.",
   "Vérification anti-robot indisponible. Vérifie ta connexion et réessaie.": "Anti-bot check unavailable. Check your connection and try again.",
   "Vérification anti-robot échouée. Recharge la page.": "Anti-bot check failed. Reload the page.",
+  "jeune pousse": "startup",
 };

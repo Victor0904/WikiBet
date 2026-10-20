@@ -497,7 +497,7 @@ export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onClose
     <div className="scrim" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet detail" role="dialog" aria-modal="true" aria-label={s.name}>
         <div className="sheet-h">
-          <span className="who"><TkIcon tk={tk} size={38} /><span><b className="detail-name">{s.name}</b><small className="muted">{`${tk}, ${SECTORS[s.sector].name}${!STORIES[tk] ? ", jeune pousse" : ""}`}</small></span></span>
+          <span className="who"><TkIcon tk={tk} size={38} /><span><b className="detail-name">{s.name}</b><small className="muted">{tk}, <span>{SECTORS[s.sector].name}</span>{!STORIES[tk] && <>, <span>jeune pousse</span></>}</small></span></span>
           <button type="button" className="x" onClick={onClose} aria-label="Fermer">×</button>
         </div>
         <div className="detail-price"><b className="mono">{px(q?.p)}</b><span className={"mono " + cls(c)}>{q?.halt ? "cotation suspendue" : `${c >= 0 ? "▲" : "▼"} ${pct(c)} jour`}</span></div>
