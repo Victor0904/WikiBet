@@ -241,6 +241,7 @@ button.brow:hover { background: var(--panel2) }
 .onboard input { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; font-size: 16px }
 
 .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 60; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; font-size: 14px; font-weight: 500; max-width: calc(100% - 32px); box-shadow: 0 12px 30px -10px #000; animation: rise .25s ease-out }
+.captcha { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 90 } /* Turnstile, s'il demande une case */
 .toast.up { border-color: var(--up) } .toast.down { border-color: var(--down) }
 .toast.update { top: calc(12px + env(safe-area-inset-top, 0px)); bottom: auto; border-color: var(--accent); z-index: 80 } /* nouvelle version : en haut, au-dessus des bandeaux */
 @keyframes drop { from { transform: translate(-50%, -10px); opacity: 0 } }

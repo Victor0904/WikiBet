@@ -8,6 +8,28 @@ export const normBet = b => ({ ...b, id: Number(b.id), odds: b.odds == null ? nu
 export const normBoard = r => ({ ...r, cash: Number(r.cash), patrimoine: Number(r.patrimoine) });
 export const normGuild = g => ({ ...g, id: Number(g.id) });
 
+// Anti-robots : Cloudflare Turnstile, vérifié par Supabase (Authentication → Attack Protection) à chaque ouverture de session.
+// Invisible sauf si Cloudflare doute : la case s'affiche alors au centre. Un jeton ne sert qu'une fois. Sans clé : rien.
+const SITE = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+let tsP;
+async function captchaToken() {
+  if (!SITE) return undefined;
+  tsP ??= new Promise((ok, ko) => {
+    const s = document.createElement("script");
+    s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    s.onload = ok; s.onerror = () => { tsP = null; ko(new Error("Vérification anti-robot indisponible. Vérifie ta connexion et réessaie.")) };
+    document.head.append(s);
+  });
+  await tsP;
+  const box = document.body.appendChild(document.createElement("div"));
+  box.className = "captcha";
+  let id;
+  try {
+    return await new Promise((ok, ko) => { id = turnstile.render(box, { sitekey: SITE, appearance: "interaction-only", callback: ok,
+      "error-callback": () => ko(new Error("Vérification anti-robot échouée. Recharge la page.")) }) });
+  } finally { turnstile.remove(id); box.remove() }
+}
+
 export async function connect() {
   const url = import.meta.env.VITE_SUPABASE_URL, key = import.meta.env.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) return (await import("./demo.js")).demoApi();
@@ -17,7 +39,7 @@ export async function connect() {
   // Session gardée d'un compte supprimé côté serveur : on l'oublie et on repart sur une partie neuve.
   if (session && (await sb.auth.getUser()).error?.status === 403) { await sb.auth.signOut({ scope: "local" }); session = null }
   if (!session) {
-    const r = await sb.auth.signInAnonymously();
+    const r = await sb.auth.signInAnonymously({ options: { captchaToken: await captchaToken() } });
     if (r.error) throw new Error(`Connexion impossible : active « Anonymous sign-ins » dans Supabase (Authentication → Sign In / Providers). ${r.error.message}`);
     session = r.data.session;
   }
@@ -47,7 +69,7 @@ export async function connect() {
   const signIn = async (pseudo, password) => {
     const email = await rpc("login_email", { p_pseudo: pseudo });
     if (!email) throw new Error("Pseudo ou mot de passe incorrect.");
-    return auth(sb.auth.signInWithPassword({ email, password }), true);
+    return auth(sb.auth.signInWithPassword({ email, password, options: { captchaToken: await captchaToken() } }), true);
   };
 
   // Notifications de liquidation (Web Push). Sur iPhone, seulement depuis le site ajouté à l'écran d'accueil.
@@ -70,7 +92,7 @@ export async function connect() {
     },
   };
   // Abonnement déjà accordé : on le rattache au compte du moment (après une connexion, l'identifiant change).
-  rows(sb.from("profiles").select("id").eq("bot", true)).then(r => r.forEach(x => BOTS.add(x.id))).catch(() => { });
+  rows(sb.from("public_profiles").select("id").eq("bot", true)).then(r => r.forEach(x => BOTS.add(x.id))).catch(() => { });
   if (canPush && Notification.permission === "granted") push.status().then(s => s === "on" && push.enable()).catch(() => { });
 
   return {
@@ -137,7 +159,7 @@ export async function connect() {
     guildLeave: () => rpc("guild_leave"),
     guildKick: id => rpc("guild_kick", { p_user: id }),
     trophies: user => rpc("trophies", { p_user: user }),
-    profileOf: async user => (await rows(sb.from("profiles").select("id,pseudo,cash,bankruptcies").eq("id", user).maybeSingle())) ?? null,
+    profileOf: async user => (await rows(sb.from("public_profiles").select("id,pseudo,cash,bankruptcies").eq("id", user).maybeSingle())) ?? null,
     onChange(cb) {
       const ch = sb.channel("wikibourse")
         .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `id=eq.${uid}` }, cb) // mon profil seulement (le classement se rafraîchit toutes les 60 s)
