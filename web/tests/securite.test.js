@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { freshDb, login } from "./db.js";
+import { freshDb, migrateFrom, login } from "./db.js";
 
 const A = "00000000-0000-0000-0000-00000000000a", B = "00000000-0000-0000-0000-00000000000b";
 
@@ -20,5 +20,22 @@ test("profiles : chacun ne lit que sa ligne, les autres par public_profiles sans
   await db.exec("reset role; select set_config('app.uid', '', false); set role anon");
   assert.equal((await db.query("select count(*)::int n from profiles")).rows[0].n, 0, "sans compte : rien");
   await assert.rejects(db.query("select * from public_profiles"), /permission denied/);
+  await db.exec("reset role");
+});
+
+// Audit d'octobre 2026 : Supabase donne ALL à authenticated sur toute nouvelle vue (droits par défaut, absents de PGlite).
+// public_profiles passe la RLS (vue du propriétaire) : un UPDATE ou un DELETE par elle touchait le profil de n'importe qui.
+test("public_profiles : lecture seule, même avec les droits par défaut de Supabase", async () => {
+  const FIX = "20261029100000";
+  const db = await freshDb({ until: FIX });
+  await login(db, B, "bea"); await login(db, A, "victor");
+  await db.exec("grant usage on schema public to authenticated; grant all on public_profiles to authenticated"); // comme en prod
+  await migrateFrom(db, FIX);
+  for (const p of ["INSERT", "UPDATE", "DELETE", "TRUNCATE"])
+    assert.equal((await db.query(`select has_table_privilege('authenticated', 'public_profiles', '${p}') ok`)).rows[0].ok, false, p);
+  await db.exec("set role authenticated");
+  await assert.rejects(db.query("update public_profiles set cash = 1e9 where pseudo = 'bea'"), /permission denied/);
+  await assert.rejects(db.query("delete from public_profiles where pseudo = 'bea'"), /permission denied/);
+  assert.equal((await db.query("select count(*)::int n from public_profiles")).rows[0].n, 2, "la lecture reste possible");
   await db.exec("reset role");
 });
