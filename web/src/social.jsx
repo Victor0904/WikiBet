@@ -81,7 +81,7 @@ function EmailForm({ account }) {
 
 // Encadré « Compte » de Mon compte : choisir un mot de passe, se connecter, se déconnecter.
 export function AccountLink({ account, pseudo }) {
-  const [u, setU] = useState(undefined), [login, setLogin] = useState(false), [change, setChange] = useState(false), [act, busy, out] = useAct();
+  const [u, setU] = useState(undefined), [login, setLogin] = useState(false), [change, setChange] = useState(false), [quit, setQuit] = useState(false), [act, busy, out] = useAct();
   useEffect(() => { account.user().then(setU).catch(() => setU(null)) }, [account]);
   if (!u) return null;
   const discord = discordOf(u), oauth = account.oauth;
@@ -107,6 +107,13 @@ export function AccountLink({ account, pseudo }) {
         <DiscordButton account={account} link />
         <PasswordForm account={account} pseudo={pseudo} label="Enregistrer" />
         <button type="button" className="link" onClick={() => setLogin(true)}>Déjà un compte ? Se connecter</button>
+        {/* Partie anonyme : se déconnecter la perd pour de bon (rien pour la retrouver), on le dit avant. */}
+        {quit ? <div className="quit-warn" role="alert">
+          <p>Ta partie n'est pas sauvegardée : si tu te déconnectes, tu la perds définitivement, avec ton solde et tes positions.</p>
+          <button type="button" className="btn danger" disabled={busy} onClick={() => act(() => account.signOut())}>Me déconnecter et perdre ma partie</button>
+          <button type="button" className="link" onClick={() => setQuit(false)}>Annuler</button>
+          {out}
+        </div> : <button type="button" className="link muted" onClick={() => setQuit(true)}>Se déconnecter</button>}
       </>}
     </div>
   );

@@ -1758,4 +1758,7 @@ export default {
   "Trop d'ordres d'un coup : attends quelques secondes.": "Too many orders at once: wait a few seconds.",
   "Aérodrome d'Orme": "Orme Airfield",
   "Plaines du Sud": "the Southern Plains",
+  "Ceci te déconnecte et efface la partie d'essai. Une partie sauvegardée (mot de passe ou Discord) reste sur le serveur ; une partie non sauvegardée est perdue.": "This logs you out and deletes the trial game. A saved game (password or Discord) stays on the server; an unsaved game is lost.",
+  "Ta partie n'est pas sauvegardée : si tu te déconnectes, tu la perds définitivement, avec ton solde et tes positions.": "Your game isn't saved: if you log out, you lose it for good, along with your cash and positions.",
+  "Me déconnecter et perdre ma partie": "Log out and lose my game",
 };

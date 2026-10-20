@@ -100,7 +100,7 @@ function Intro({ ready, onDone }) {
 
 function Onboarding({ api, err0, onDone }) {
   const online = api ? !!api.account : ONLINE, saved = !!api?.account?.saved; // arrivé par Discord : pas de mot de passe à choisir
-  const [pseudo, setPseudo] = useState(""), [pw, setPw] = useState(""), [err, setErr] = useState(null), [login, setLogin] = useState(false);
+  const [pseudo, setPseudo] = useState(""), [pw, setPw] = useState(""), [err, setErr] = useState(null), [login, setLogin] = useState(false), [busy, setBusy] = useState(false);
   // Retour de Discord : message d'erreur éventuel, pseudo prérempli avec le nom Discord (modifiable).
   useEffect(() => { if (err0) setErr(err0) }, [err0]);
   useEffect(() => {
@@ -110,8 +110,13 @@ function Onboarding({ api, err0, onDone }) {
   }, [api]);
   const [ref, setRef] = useState(() => { try { return localStorage.getItem("wb-ref") ?? "" } catch { return "" } });
   // En ligne, le compte se crée tout de suite avec un mot de passe : on se reconnecte avec son pseudo, le navigateur s'en souvient.
+  // En cours (captcha, connexion, profil, mot de passe) : bouton bloqué et libellé d'attente, pas de double envoi.
   const submit = async e => {
-    e.preventDefault();
+    e.preventDefault(); if (busy) return;
+    setBusy(true); setErr(null);
+    try { await create() } finally { setBusy(false) }
+  };
+  const create = async () => {
     let a;
     try { a = api ?? await getApi(); await a.createProfile(pseudo, ref.trim()) } catch (x) { return setErr(x.message) }
     try { localStorage.removeItem("wb-ref") } catch { }
@@ -138,7 +143,7 @@ function Onboarding({ api, err0, onDone }) {
           <input id="ref" name="ref" autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="ex. VAYK-7Q2" value={ref} onChange={e => setRef(e.target.value)} maxLength={40} />
         </details>
         {err && <p className="error">{err}</p>}
-        <button className="btn primary" type="submit">Entrer sur le marché</button>
+        <button className="btn primary" type="submit" disabled={busy} aria-busy={busy}>{busy ? "Connexion au marché…" : "Entrer sur le marché"}</button>
       </form>
       {online && !saved && <div className="onboard">
         {api && <Suspense fallback={null}><DiscordButton account={api.account} /></Suspense>}

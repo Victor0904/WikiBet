@@ -248,6 +248,8 @@ button.brow:hover { background: var(--panel2) }
 .discord-me img { border-radius: 50%; flex: none }
 .discord-taken { border: 1px solid var(--accent); border-radius: 8px; padding: 12px; display: grid; gap: 8px }
 .discord-taken p { margin: 0 }
+.quit-warn { border: 1px solid var(--down); border-radius: 8px; padding: 12px; display: grid; gap: 8px } .quit-warn p { margin: 0 }
+.btn.danger { color: var(--down); border-color: color-mix(in srgb, var(--down) 50%, transparent); background: var(--down-soft) }
 .toast.up { border-color: var(--up) } .toast.down { border-color: var(--down) }
 .toast.update { top: calc(12px + env(safe-area-inset-top, 0px)); bottom: auto; border-color: var(--accent); z-index: 80 } /* nouvelle version : en haut, au-dessus des bandeaux */
 @keyframes drop { from { transform: translate(-50%, -10px); opacity: 0 } }
