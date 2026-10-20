@@ -58,6 +58,33 @@ succès, compte, guilde, Comment jouer, accueil. Le 20 octobre :
 Captures : `node web/scripts/capture-ecrans.mjs <dossier> [375|1280] [écran…]` (ajoutés : investir, cloture, amis,
 sources, confidentialite ; le portefeuille de la capture contient 3 lignes d'actions).
 
+## Audit « prêt pour de vrais joueurs » (20 octobre 2026)
+
+Jeu réservé aux proches pour l'instant (décision de Victor). Fait : vue `public_profiles` en lecture seule (faille
+critique), `tick` réservé à pg_cron, `anon` sans fonctions DEFINER (sauf `login_email`), rafales d'ordres limitées,
+sauvegarde quotidienne sur le VPS (`/opt/aurelys-backup`, voir `ops/aurelys-backup/`), attente sur l'inscription,
+avertissement à la déconnexion d'une partie anonyme.
+
+### Plus tard
+- Pseudos : unicité sans tenir compte des majuscules (« vayk » à côté de « Vayk »), caractères autorisés (pas
+  d'invisibles ni d'homoglyphes), noms réservés (admin, Aurelys, noms des bots), mots interdits. Vérifier les pseudos
+  existants avant d'activer la règle.
+- Page 404 : `vercel.json` réécrit tout vers `index.html` (une adresse inconnue ouvre le jeu, un .js absent renvoie
+  du HTML). Réécrire seulement `/` et `/jouer`, page 404 au style du jeu.
+- Statistiques de fréquentation : Vercel Web Analytics (sans cookie) ou équivalent, à mentionner dans Confidentialité.
+- Suivi des erreurs en prod : `onerror` / `unhandledrejection` vers une table `client_errors` (tronqué, débit limité),
+  lu dans le tableau de bord admin ; ou Sentry (tiers).
+- Premier parcours d'un vrai compte : les bulles `Coach` de l'essai au lieu du « Comment jouer » ouvert d'office.
+- Messages d'erreur : table de traduction centrale dans `api.js` (JWT expiré, droits refusés, contraintes).
+- Mot de passe oublié : proposer Discord aux comptes à mot de passe sans Discord ; plus tard, code de secours.
+- Hygiène SQL : 30 fonctions invoker sans `search_path`, `pg_net` dans le schéma public.
+- Tableau de bord admin : sa connexion par mot de passe passe désormais par le captcha Turnstile (à vérifier).
+
+### Volet légal (si ouverture au public)
+CGU (jeu sans argent réel), Confidentialité complète (responsable, durées de conservation, transferts hors UE :
+Vercel, Cloudflare, Discord), vrai contact (e-mail ou serveur Discord), éditeur, bouton « Supprimer mon compte »
+(action serveur `auth.admin.deleteUser`, cascade ; transférer d'abord une guilde fondée).
+
 ## Cahier des charges des phases restantes (texte de Victor)
 
 ### Règles de travail
