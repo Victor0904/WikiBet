@@ -1,0 +1,7 @@
+# Secrets et données : jamais dans le dépôt.
+stack/.env
+stack/.env.bak*
+stack/volumes/db/data/
+cloud.env
+dumps/
+sauvegardes/

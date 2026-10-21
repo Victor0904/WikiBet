@@ -1,0 +1,13 @@
+# API d'Aurelys (Supabase allégé). À ajouter au Caddyfile du VPS, remplacer les deux valeurs « <...> ».
+# Caddy obtient et renouvelle lui-même le certificat Let's Encrypt (ports 80 et 443 nécessaires).
+# WebSocket (/realtime/v1/) : transmis tel quel par reverse_proxy, rien à ajouter.
+<API_DOMAIN> {
+	reverse_proxy 127.0.0.1:<API_GW_PORT> {
+		# Adresse réelle du joueur pour les limites de GoTrue (GOTRUE_RATE_LIMIT_HEADER), écrasée à chaque requête.
+		header_up X-Real-IP {remote_host}
+		# Les fonctions peuvent répondre lentement (moteur du marché) : comme le gateway, 150 s au plus.
+		transport http {
+			read_timeout 150s
+		}
+	}
+}

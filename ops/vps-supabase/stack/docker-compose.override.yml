@@ -1,0 +1,39 @@
+# Ajouts d'Aurelys au compose officiel de Supabase (docker-compose.yml, copié tel quel, voir README.md).
+# Services lancés : db api-gw auth rest realtime functions (jamais studio, meta, storage, imgproxy, supavisor).
+# Compose 2.24.4 au moins (balises !reset / !override).
+
+name: aurelys-supabase
+
+services:
+  api-gw:
+    # Le compose officiel fait attendre studio : sans ça, « up api-gw » démarrerait aussi studio.
+    depends_on: !reset {}
+    # Écoute locale seulement : le reverse proxy de la machine sert https://API_DOMAIN vers ce port.
+    ports: !override
+      - "127.0.0.1:${API_GW_PORT:?API_GW_PORT manquant dans .env}:8000/tcp"
+
+  auth:
+    environment:
+      # Discord (portail Discord → OAuth2 → Redirects : https://API_DOMAIN/auth/v1/callback).
+      GOTRUE_EXTERNAL_DISCORD_ENABLED: ${DISCORD_ENABLED}
+      GOTRUE_EXTERNAL_DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      GOTRUE_EXTERNAL_DISCORD_SECRET: ${DISCORD_SECRET}
+      GOTRUE_EXTERNAL_DISCORD_REDIRECT_URI: https://${API_DOMAIN}/auth/v1/callback
+      # « Sauvegarder ma partie avec Discord » (linkIdentity dans web/src/api.js).
+      GOTRUE_SECURITY_MANUAL_LINKING_ENABLED: "true"
+      # Captcha Cloudflare Turnstile sur signInAnonymously et signInWithPassword (comme Supabase → Attack Protection).
+      GOTRUE_SECURITY_CAPTCHA_ENABLED: ${CAPTCHA_ENABLED}
+      GOTRUE_SECURITY_CAPTCHA_PROVIDER: turnstile
+      GOTRUE_SECURITY_CAPTCHA_SECRET: ${TURNSTILE_SECRET}
+      # Limites par joueur : sans cet en-tête (posé par le reverse proxy), tous les joueurs auraient l'adresse
+      # du gateway et partageraient la même limite (30 parties anonymes par heure pour tout le site).
+      GOTRUE_RATE_LIMIT_HEADER: X-Real-IP
+
+  functions:
+    # Fonction « aurelys » : moteur du marché (tick appelé par pg_cron), inscription, ordres achat / vente / clôture.
+    volumes:
+      - ${FUNCTIONS_SRC:?FUNCTIONS_SRC manquant dans .env}/aurelys:/home/deno/functions/aurelys:ro,z
+      - ${FUNCTIONS_SRC}/_shared:/home/deno/functions/_shared:ro,z
+    environment:
+      TICK_SECRET: ${TICK_SECRET}
+      VAPID_PRIVATE: ${VAPID_PRIVATE}

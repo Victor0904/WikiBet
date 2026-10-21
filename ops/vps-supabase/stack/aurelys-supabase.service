@@ -1,0 +1,19 @@
+# Supabase allégé d'Aurelys au démarrage du VPS.
+# Installation : remplacer <INSTALL_DIR> (dossier qui contient stack/, ex. /opt/aurelys-supabase), puis
+#   cp aurelys-supabase.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now aurelys-supabase
+[Unit]
+Description=Aurelys : Supabase allégé (db, api-gw, auth, rest, realtime, functions)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=<INSTALL_DIR>/stack
+ExecStart=/usr/bin/docker compose up -d --wait db api-gw auth rest realtime functions
+ExecStop=/usr/bin/docker compose stop
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
