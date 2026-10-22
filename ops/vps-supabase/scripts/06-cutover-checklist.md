@@ -31,6 +31,9 @@ Les commandes SQL « Cloud » se tapent dans Supabase → SQL Editor du projet `
 5. [ ] `cd stack && docker compose exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 < ../scripts/04-post-migration.sql`
 6. [ ] Attendre 1 à 2 min (premiers passages du moteur et de settle), puis `scripts/05-smoke-tests.sh`
        et `scripts/05-smoke-tests.sh --url https://<API_DOMAIN>` : tout vert.
+   - [ ] **Nouvelle paire VAPID** (la clé privée du Cloud est perdue) : `git apply ops/vps-supabase/scripts/vapid-public.diff`
+         (clé publique dans `web/src/api.js` et la fonction `aurelys`), pousser, mettre à jour la copie `FUNCTIONS_SRC` du VPS,
+         `docker compose restart functions`. Le redéploiement de l'étape 8 emporte le front. Les joueurs réactivent les notifications.
 7. [ ] **Vercel** → projet → Settings → Environment Variables, environnements Production et Preview :
        - `VITE_SUPABASE_URL` = `https://<API_DOMAIN>`
        - `VITE_SUPABASE_ANON_KEY` = `ANON_KEY` de `stack/.env` (`grep ^ANON_KEY= stack/.env | cut -d= -f2-`)

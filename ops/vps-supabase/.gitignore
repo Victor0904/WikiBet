@@ -1,6 +1,7 @@
 # Secrets et données : jamais dans le dépôt.
 stack/.env
 stack/.env.bak*
+stack/duckdns.token
 stack/volumes/db/data/
 cloud.env
 dumps/
