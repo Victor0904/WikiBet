@@ -28,6 +28,13 @@ services:
       # Limites par joueur : sans cet en-tête (posé par le reverse proxy), tous les joueurs auraient l'adresse
       # du gateway et partageraient la même limite (30 parties anonymes par heure pour tout le site).
       GOTRUE_RATE_LIMIT_HEADER: X-Real-IP
+      # Signe en HS256 (JWT_SECRET), vérifie aussi les sessions ES256 émises par le Cloud (00-gen-secrets.sh).
+      GOTRUE_JWT_KEYS: ${JWT_KEYS:?JWT_KEYS manquant, relancer 00-gen-secrets.sh}
+
+  # rest : PGRST_JWT_SECRET vaut déjà ${JWT_JWKS} dans le compose officiel.
+  realtime:
+    environment:
+      API_JWT_JWKS: ${JWT_JWKS:?JWT_JWKS manquant, relancer 00-gen-secrets.sh}
 
   functions:
     # Fonction « aurelys » : moteur du marché (tick appelé par pg_cron), inscription, ordres achat / vente / clôture.
@@ -37,3 +44,5 @@ services:
     environment:
       TICK_SECRET: ${TICK_SECRET}
       VAPID_PRIVATE: ${VAPID_PRIVATE}
+      # Le routeur des fonctions vérifie les jetons ES256 du Cloud avec ce JWKS (HS256 : JWT_SECRET).
+      SUPABASE_JWKS: ${JWT_JWKS}

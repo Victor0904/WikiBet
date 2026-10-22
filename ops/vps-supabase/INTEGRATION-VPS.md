@@ -73,6 +73,8 @@ Ces noms de conteneurs doivent être libres : aucune autre stack Supabase sur la
    `ops/vps-supabase/` et `web/supabase/functions/` (le compose monte `aurelys/` et `_shared/` depuis ce dossier :
    variable `FUNCTIONS_SRC` de `stack/.env`, relative à `stack/` ou absolue).
 2. `scripts/00-gen-secrets.sh --jwt-cloud`, puis compléter `stack/.env` (placeholders ci-dessous), `chmod 600`.
+   Le script écrit aussi `JWT_JWKS` et `JWT_KEYS` à partir de `stack/cloud-jwks.json` (sessions ES256 du Cloud
+   acceptées, voir « Sessions des joueurs » dans README.md). Le relancer si ce fichier change.
 3. Unité systemd : `stack/aurelys-supabase.service`, remplacer `<INSTALL_DIR>` (dossier qui contient `stack/`),
    copier dans `/etc/systemd/system/`, `systemctl daemon-reload && systemctl enable aurelys-supabase`.
    Les conteneurs ont aussi `restart: unless-stopped`.
@@ -107,6 +109,7 @@ Ces noms de conteneurs doivent être libres : aucune autre stack Supabase sur la
 | `stack/.env` | `FUNCTIONS_SRC` | chemin de `web/supabase/functions` (défaut `../../../web/supabase/functions`) |
 | `stack/.env` | `SITE_URL`, `ADDITIONAL_REDIRECT_URLS` | `https://aurelys-trade.vercel.app`, `https://aurelys-trade.vercel.app/**` (fournis par Victor) |
 | `stack/.env` | `DISCORD_CLIENT_ID`, `DISCORD_SECRET`, `TURNSTILE_SECRET`, `VAPID_PRIVATE` | fournis par Victor |
+| `stack/.env` | `JWT_JWKS`, `JWT_KEYS` | écrits par `00-gen-secrets.sh` (JSON entre apostrophes), jamais à la main |
 | `aurelys-supabase.service` | `<INSTALL_DIR>` | dossier qui contient `stack/` |
 | `Caddyfile.snippet` / `nginx.conf.snippet` / labels Traefik | `<API_DOMAIN>`, `<API_GW_PORT>` | comme dans `stack/.env` |
 | crons | `<INSTALL_DIR>` | idem |

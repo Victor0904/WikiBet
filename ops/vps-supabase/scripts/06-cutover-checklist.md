@@ -12,11 +12,17 @@ Les commandes SQL « Cloud » se tapent dans Supabase → SQL Editor du projet `
       répond (401 sans clé, c'est normal), unité systemd installée.
 - [ ] `stack/.env` complet : `00-gen-secrets.sh --jwt-cloud` (garde les sessions), puis à la main API_DOMAIN, API_GW_PORT,
       DISCORD_CLIENT_ID, DISCORD_SECRET, TURNSTILE_SECRET, VAPID_PRIVATE, SITE_URL, ADDITIONAL_REDIRECT_URLS.
+- [ ] **Clé de session du Cloud** : `stack/cloud-jwks.json` identique à
+      `https://urivyzajsfcbtbfrvjcs.supabase.co/auth/v1/.well-known/jwks.json` ; sinon le reprendre et relancer
+      `00-gen-secrets.sh` (`JWT_JWKS`, `JWT_KEYS`). À revérifier le matin du jour J.
 - [ ] **Discord** (portail développeur → l'application → OAuth2 → Redirects) : **ajouter**
       `https://<API_DOMAIN>/auth/v1/callback`, sans retirer l'adresse du Cloud (retour arrière).
 - [ ] `cloud.env` (PGURL, PGPASSWORD du Session pooler) posé à côté de `scripts/`, chmod 600.
 - [ ] **Répétition sur le VPS**, sans toucher à Vercel : `01` → `02` → `03` → `04` → `05` tous verts. Le moteur du VPS
-      tourne alors sur une copie : sans effet pour les joueurs. Puis repartir de zéro :
+      tourne alors sur une copie : sans effet pour les joueurs. Avant `01`, ouvrir une partie anonyme en navigation
+      privée, copier `localStorage["sb-urivyzajsfcbtbfrvjcs-auth-token"]` dans `dumps/session.json`, fermer la
+      fenêtre ; après `05` : `node scripts/08-test-jwt-cloud.mjs dumps/session.json` tout vert, puis supprimer
+      `dumps/session.json`. Puis repartir de zéro :
       `cd stack && docker compose down && rm -rf volumes/db/data` (le volume `db-config` peut rester).
 
 ## Jour J (indisponibilité attendue : 15 à 25 min)

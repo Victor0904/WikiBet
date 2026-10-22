@@ -41,6 +41,7 @@ Tout se lance depuis `ops/vps-supabase/` (sur le VPS : `<INSTALL_DIR>`). Chaque 
 | Restauration | `scripts/03-restore.sh` | 45 s |
 | Index et ménage | `cd stack && docker compose exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 < ../scripts/04-post-migration.sql` | 1 s |
 | Vérification | `scripts/05-smoke-tests.sh` (puis `--url https://<API_DOMAIN>`) | 10 s |
+| Sessions du Cloud | `node scripts/08-test-jwt-cloud.mjs dumps/session.json` (voir « Sessions des joueurs ») | 5 s |
 | Bascule | `scripts/06-cutover-checklist.md` | voir ci-dessous |
 | Sauvegarde | `scripts/07-backup.sh` (cron), `scripts/07-backup.sh --test` | 4 s, test 12 s |
 
@@ -54,12 +55,10 @@ tests à la main). Le marché est figé pendant ce temps ; au redémarrage, le m
 - **Discord** : l'ID client et le secret de l'application (ceux du Cloud conviennent), et **ajouter** sur le portail
   Discord (OAuth2 → Redirects) la nouvelle adresse de retour `https://<API_DOMAIN>/auth/v1/callback`.
 - **Turnstile** : la clé secrète (Cloudflare → Turnstile → le site). La clé de site du front ne change pas.
-- **VAPID_PRIVATE** : la clé privée des notifications de liquidation (JWK). Supabase ne la réaffiche pas : il faut
-  ta copie. Sans elle, pas de notification push, le reste fonctionne.
-- **Legacy JWT secret** du Cloud (Settings → JWT Keys), saisi par `00-gen-secrets.sh --jwt-cloud` : les sessions
-  ouvertes restent valides après la bascule. Sans lui, un joueur dont le jeton (1 h) n'a pas expiré est déconnecté ;
-  pour une partie anonyme, c'est la partie perdue. Vérifier d'abord que le projet signe encore ses jetons avec ce secret
-  (et non avec une clé asymétrique).
+- **VAPID_PRIVATE** : la clé privée du Cloud est perdue ; une nouvelle paire est dans `stack/.env`, sa clé publique
+  dans `scripts/vapid-public.diff`, appliqué le jour J (les joueurs réactivent les notifications).
+- **Legacy JWT secret** du Cloud (Settings → JWT Keys), comme `JWT_SECRET` (`00-gen-secrets.sh --jwt-cloud`) : les
+  clés anon et service_role restent valables. Voir « Sessions des joueurs » plus bas.
 - **Secrets Vault** : rien à fournir. Le seul secret, `aurelys_tick`, est refait (`TICK_SECRET`), côté fonction et
   côté Vault à la fois.
 - **Session pooler** : `cloud.env` (PGURL, PGPASSWORD), comme `ops/aurelys-backup/env.example`.
@@ -73,10 +72,13 @@ INTEGRATION-VPS.md          pour la session qui refond le VPS (ports, volumes, p
 stack/docker-compose.yml    compose officiel, copié sans modification (supabase/supabase@9ac3f4d78b48888226405bbf08e4339f430a8427,
                             dossier docker/, 2026-10-21) ; images épinglées par tag dedans
 stack/volumes/              fichiers officiels du même commit (init de la base, envoy, routeur des fonctions)
-stack/docker-compose.override.yml   ajouts d'Aurelys (port local, Discord, captcha, linking, fonctions, en-tête X-Real-IP)
+stack/docker-compose.override.yml   ajouts d'Aurelys (port local, Discord, captcha, linking, clés JWT, fonctions, en-tête X-Real-IP)
 stack/.env.template         toutes les variables, commentées, sans secret
+stack/cloud-jwks.json       clé publique (ES256) qui signe les sessions du Cloud, pour les vérifier sur le VPS
 stack/Caddyfile.snippet, nginx.conf.snippet, duckdns-update.sh, aurelys-supabase.service
 scripts/00 … 07             scripts idempotents, messages en français ; _commun.sh : fonctions partagées
+scripts/08-test-jwt-cloud.mjs   une session du Cloud acceptée partout, puis rafraîchie en HS256
+scripts/vapid-public.diff   nouvelle clé publique VAPID (api.js, fonction aurelys), à appliquer le jour J
 scripts/front-storagekey.diff   changement du front indispensable avant la bascule (voir plus bas)
 scripts/ops-backup.diff     ce qui change dans ops/aurelys-backup/backup.sh (remplacé par 07-backup.sh)
 ```
@@ -91,6 +93,24 @@ supabase-js range la session sous une clé dérivée de l'adresse de l'API (`sb-
 Avec la nouvelle adresse, la clé change : chaque joueur repartirait sur une partie anonyme neuve et perdrait la sienne
 s'il n'a ni mot de passe ni Discord. `scripts/front-storagekey.diff` fixe la clé à l'ancienne valeur (3 lignes dans
 `web/src/api.js`). Sans effet tant que l'adresse est celle du Cloud : il peut partir avant la bascule.
+
+## Sessions des joueurs
+
+Le projet Cloud est passé aux JWT Signing Keys : il signe les sessions en **ES256** (clé P-256, kid `5b482c56…`),
+dont on n'a que la clé publique ; le Legacy JWT secret (HS256) ne sert plus qu'aux clés anon et service_role.
+La stack vérifie donc les deux, et signe ses propres jetons en HS256 :
+
+- `00-gen-secrets.sh` refait à chaque passage `JWT_JWKS` (HS256 kid `aurelys-hs256` + clés de `stack/cloud-jwks.json`,
+  vérification seule) et `JWT_KEYS` (même chose, la clé HS256 pouvant signer).
+- `JWT_KEYS` → auth (`GOTRUE_JWT_KEYS`) ; `JWT_JWKS` → rest (`PGRST_JWT_SECRET`, compose officiel), realtime
+  (`API_JWT_JWKS`) et functions (`SUPABASE_JWKS`). La fonction `aurelys` vérifie le joueur par GoTrue (`getUser`).
+- Une session du Cloud reste donc valable jusqu'à son expiration (1 h) ; son refresh token (dans `auth.refresh_tokens`,
+  copié avec la base) donne ensuite un jeton HS256 du VPS. Le joueur ne voit rien.
+- Testé en local le 22 octobre 2026 (`08-test-jwt-cloud.mjs`, session anonyme ouverte sur le Cloud juste avant l'export) :
+  jeton ES256 accepté par REST, auth, la fonction et Realtime ; signature abîmée refusée par les quatre ; rafraîchi en
+  HS256 (même joueur, même session), accepté par les quatre. Aucun correctif du front n'a été nécessaire.
+- Si le Cloud change de clé avant la bascule, reprendre `stack/cloud-jwks.json`
+  (`curl -fsS https://urivyzajsfcbtbfrvjcs.supabase.co/auth/v1/.well-known/jwks.json`) et relancer `00-gen-secrets.sh`.
 
 ## Après la bascule
 

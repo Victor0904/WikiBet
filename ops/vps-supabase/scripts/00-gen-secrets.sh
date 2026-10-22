@@ -60,6 +60,14 @@ elif not have("JWT_SECRET"): gen["JWT_SECRET"] = secrets.token_hex(32)
 secret = gen.get("JWT_SECRET", old.get("JWT_SECRET", ""))
 if "JWT_SECRET" in gen or not have("ANON_KEY") or not have("SERVICE_ROLE_KEY"):
     gen["ANON_KEY"], gen["SERVICE_ROLE_KEY"] = jwt("anon", secret), jwt("service_role", secret)
+# Clés de vérification, refaites à chaque passage (déduites de JWT_SECRET et de stack/cloud-jwks.json) : HS256 pour
+# signer et vérifier (kid fixe), plus les clés publiques du Cloud, qui signe ses sessions en ES256.
+jw = os.path.join(os.path.dirname(out), "cloud-jwks.json")
+cloud = [dict(k, key_ops=["verify"]) for k in json.load(open(jw, encoding="utf-8"))["keys"]] if os.path.exists(jw) else []
+hs = {"kty": "oct", "alg": "HS256", "kid": "aurelys-hs256", "k": b64(secret.encode())}
+enc = lambda v: "'" + json.dumps(v, separators=(",", ":")) + "'"
+gen["JWT_JWKS"] = enc({"keys": [dict(hs, key_ops=["verify"])] + cloud})
+gen["JWT_KEYS"] = enc([dict(hs, key_ops=["sign", "verify"])] + cloud)
 
 lines, seen = [], set()
 for l in open(tpl, encoding="utf-8"):
