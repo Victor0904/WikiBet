@@ -9,8 +9,8 @@
     "test": "node --test tests/*.test.js",
     "seed": "node scripts/seed.mjs",
     "visuels": "node scripts/visuels.mjs",
-    "db:push": "npm test && npx supabase db push --yes",
-    "fn:deploy": "npm test && npx supabase functions deploy aurelys --use-api"
+    "db:push": "node -e \"console.error('db:push désactivé : la base est sur le VPS. Migration ou fonction aurelys : par la session VPS, après accord de Victor (voir CLAUDE.md).');process.exit(1)\"",
+    "fn:deploy": "node -e \"console.error('fn:deploy désactivé : la base est sur le VPS. Migration ou fonction aurelys : par la session VPS, après accord de Victor (voir CLAUDE.md).');process.exit(1)\""
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
