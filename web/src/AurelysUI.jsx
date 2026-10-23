@@ -529,7 +529,7 @@ export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onClose
         </section>}
         <section className="d-sec">
           <h2>L'entreprise</h2>
-          <p><b>{info(tk).what}</b>{(([y, c]) => c ? t(", fondée en {y} à {c}.", { y, c }) : t(", fondée en {y}.", { y }))(String(info(tk).since ?? "").split(" · "))}</p>
+          <p><b>{info(tk).what}</b>{(([y, c]) => c ? t(", fondée en {y} à {c}.", { y, c: t(c) }) : t(", fondée en {y}.", { y }))(String(info(tk).since ?? "").split(" · "))}</p>
           <p>{info(tk).story}</p>
           <p className="muted">{s.desc}</p>
           {people.map(p => <p key={p.name}><b>{p.name}</b>, {p.role.toLowerCase()} : {p.bio}</p>)}
