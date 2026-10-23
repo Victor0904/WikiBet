@@ -38,7 +38,9 @@ export async function connect() {
   // Retour de Discord en échec (déjà lié, annulé…) : lu puis retiré de l'adresse avant que supabase-js la lise ; la session reste.
   const oauth = oauthReturn(location.hash, location.search);
   if (oauth) history.replaceState(null, "", location.pathname);
-  const sb = createClient(url, key); // session gardée dans le navigateur (localStorage) : on reste connecté
+  // Clé de session fixée à celle du projet Cloud : sans elle, supabase-js la dériverait de la nouvelle adresse (VPS)
+  // et chaque joueur perdrait sa session, donc sa partie anonyme. Identique au défaut tant que l'adresse est celle du Cloud.
+  const sb = createClient(url, key, { auth: { storageKey: "sb-urivyzajsfcbtbfrvjcs-auth-token" } }); // session gardée dans le navigateur (localStorage) : on reste connecté
   let { data: { session } } = await sb.auth.getSession();
   // Session gardée d'un compte supprimé côté serveur : on l'oublie et on repart sur une partie neuve.
   if (session && (await sb.auth.getUser()).error?.status === 403) { await sb.auth.signOut({ scope: "local" }); session = null }
@@ -80,7 +82,7 @@ export async function connect() {
   };
 
   // Notifications de liquidation (Web Push). Sur iPhone, seulement depuis le site ajouté à l'écran d'accueil.
-  const VAPID = "BAUKaJ7IlXOUt1biFxAMBI0Gda0eKPMtQdWJ2aoQmCuhleOuEBvcdZqf1_yEsHBo-BLEU_a7U0duu3HypFEHybE";
+  const VAPID = "BJZqBMRm_Kju6x3v_CB06gqMthA4G1UJef7fRrxG2MtRgox4tVMr5HG6yIeEU-XVAjnAEHihqqgVd8iABb_CVd8";
   const canPush = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
   const swReg = () => navigator.serviceWorker.register(`/sw.js?u=${encodeURIComponent(url)}&k=${encodeURIComponent(key)}`);
   const push = {
