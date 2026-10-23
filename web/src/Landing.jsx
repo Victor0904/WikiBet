@@ -48,11 +48,12 @@ function Candles({ cs }) {
   );
 }
 
-export default function Landing() {
-  const d = useSim(), chg = tk => d && d.open[tk] ? d.last[tk] / d.open[tk] - 1 : 0, reg = d && REGIMES[d.S.reg];
+export default function Landing({ deleted }) {
+  const [bye, setBye] = useState(deleted), d = useSim(), chg = tk => d && d.open[tk] ? d.last[tk] / d.open[tk] - 1 : 0, reg = d && REGIMES[d.S.reg];
   return (
     <div className="landing">
       <header className="land-top"><Logo /><LangSwitch /><a className="link" href="/jouer">Se connecter</a></header>
+      {bye && <div className="toast up" role="status" onClick={() => setBye(false)}>Ton compte a été supprimé, avec toutes ses données.</div>}
 
       <section className="land-hero">
         <div>

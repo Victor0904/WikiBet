@@ -216,7 +216,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
             : more === "friends" ? <Friends api={api} say={say} onBack={() => setMore(null)} />
             : more === "account" ? <Account account={api.account} push={api.push} me={me} patrimoine={patrimoine} openStake={openStake} holds={holdsValue} demo={api.mode === "demo"}
                 canRestart={patrimoine < BK_LIMIT} onRestart={() => run(() => api.restart(), p => `Nouveau départ : ${W(p?.cash ?? CAP0)} en caisse`)}
-                onPseudo={p => run(() => api.pseudoChange(p), r => `Ton pseudo est maintenant ${r.pseudo}.`)} onBack={() => setMore(null)} />
+                onPseudo={p => run(() => api.pseudoChange(p), r => `Ton pseudo est maintenant ${r.pseudo}.`)} onDelete={trial ? null : api.deleteAccount} onBack={() => setMore(null)} />
             : more === "legal" ? <Legal onBack={() => setMore(null)} />
             : more === "privacy" ? <Privacy onBack={() => setMore(null)} />
             : more === "notifs" && api.push ? <><SubHeader title="Notifications" onBack={() => setMore(null)} /><PushPanel push={api.push} /></>

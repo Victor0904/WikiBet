@@ -162,6 +162,12 @@ Deno.serve(async req => {
       return error ? json({ error: error.message }, 400) : json({ ok: true });
     }
 
+    // Suppression du compte : pseudo retapé, tout effacé en une transaction (account_delete, auth.users compris).
+    if (body.action === "delete_account") {
+      const { error } = await admin.rpc("account_delete", { p_user: user.id, p_pseudo: String(body.pseudo ?? "") });
+      return error ? json({ error: error.message }, 400) : json({ ok: true });
+    }
+
     // Rafales : 8 ordres au plus par 10 s et par joueur (order_gate), avant de charger l'état du marché.
     if (["open", "buy", "sell", "close"].includes(body.action)) {
       const { error } = await admin.rpc("order_gate", { p_user: user.id });

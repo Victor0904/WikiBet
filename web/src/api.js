@@ -1,7 +1,7 @@
 // Accès au jeu. Avec les clés Supabase (.env.local) : la vraie base partagée.
 // Sans clés : mode démo, la même base SQL tourne dans le navigateur (voir demo.js).
 import { createClient } from "@supabase/supabase-js";
-import { BOTS } from "./format.js";
+import { BOTS, leaveDeleted } from "./format.js";
 import { oauthReturn, discordOf } from "./discord.js";
 
 // Les identifiants bigint et les cotes numeric arrivent parfois en texte : on normalise une fois ici.
@@ -118,6 +118,11 @@ export async function connect() {
       // Crée le compte ou change le mot de passe (côté serveur), puis se reconnecte : le navigateur propose d'enregistrer le mot de passe.
       register: async (pseudo, password) => { await invoke("aurelys", { action: "register", password }); return signIn(pseudo, password) },
       signOut: async () => { await sb.removeAllChannels(); return auth(sb.auth.signOut(), true) }, // temps réel fermé avant de quitter la session
+    },
+    // Suppression du compte (pseudo retapé) : le serveur efface tout, puis ce navigateur oublie la session.
+    deleteAccount: async pseudo => {
+      await invoke("aurelys", { action: "delete_account", pseudo });
+      await sb.removeAllChannels(); await sb.auth.signOut({ scope: "local" }).catch(() => { }); leaveDeleted();
     },
     now: () => Date.now() + offset,
     me: async () => (await rows(sb.from("profiles").select("*").eq("id", uid).maybeSingle())) ?? null,

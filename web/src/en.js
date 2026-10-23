@@ -1762,4 +1762,14 @@ export default {
   "Ta partie n'est pas sauvegardée : si tu te déconnectes, tu la perds définitivement, avec ton solde et tes positions.": "Your game isn't saved: if you log out, you lose it for good, along with your cash and positions.",
   "Me déconnecter et perdre ma partie": "Log out and lose my game",
   "Partie non sauvegardée : elle sera supprimée après {0} jours sans visite. Sauvegarde-la avec Discord ou un mot de passe.": "Unsaved game: it will be deleted after 90 days without a visit. Save it with Discord or a password.",
+  // Suppression du compte
+  "Supprimer mon compte": "Delete my account",
+  "C'est définitif et irréversible. Ton compte et toutes ses données sont effacés : solde, positions, actions, quêtes, succès, amis et parrainages. Personne ne pourra les retrouver.": "This is permanent and cannot be undone. Your account and all its data are erased: balance, positions, shares, quests, achievements, friends and referrals. No one will be able to recover them.",
+  "Si tu diriges une guilde, elle passe à son membre le plus ancien.": "If you lead a guild, it passes to its longest-standing member.",
+  "Pour confirmer, tape ton pseudo :": "To confirm, type your username:",
+  "Supprimer définitivement": "Delete permanently",
+  "Ton compte a été supprimé, avec toutes ses données.": "Your account has been deleted, along with all its data.",
+  "Tu peux supprimer ton compte toi-même, tout en bas de Mon compte : c'est immédiat et définitif.": "You can delete your account yourself, at the very bottom of My account: it is immediate and permanent.",
+  "Le pseudo tapé ne correspond pas.": "The username you typed does not match.",
+  "Compte introuvable.": "Account not found.",
 };
