@@ -18,6 +18,9 @@ try {
   const q = new URLSearchParams(location.search), r = q.get("ref");
   if (r) { localStorage.setItem("wb-ref", r.slice(0, 40)); q.delete("ref"); history.replaceState(null, "", location.pathname + (q.size ? "?" + q : "")) }
 } catch { }
+// Retour après la suppression du compte (leaveDeleted) : message sur l'accueil, l'adresse est nettoyée.
+const DELETED = new URLSearchParams(location.search).get("compte") === "supprime";
+if (DELETED) history.replaceState(null, "", location.pathname);
 // Déjà connecté : « / » mène droit au jeu.
 const LANDING = PATH === "/" && !(ONLINE && hasSession());
 if (PATH === "/" && !LANDING) history.replaceState(null, "", "/jouer");
@@ -31,7 +34,7 @@ let apiP; const getApi = () => apiP ??= loadApi().catch(e => { apiP = null; thro
 const Wait = () => <main className="center"><LogoLoader size={72} ariaLabel={TRIAL ? "Préparation du marché d'essai, dans ton navigateur…" : "Connexion au marché…"} /></main>;
 
 export default function App() {
-  if (LANDING) return <Suspense fallback={<main className="center"><LogoLoader size={72} /></main>}><Landing /></Suspense>;
+  if (LANDING) return <Suspense fallback={<main className="center"><LogoLoader size={72} /></main>}><Landing deleted={DELETED} /></Suspense>;
   return <><Play /><NewVersion /></>;
 }
 

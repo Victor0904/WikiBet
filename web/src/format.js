@@ -15,4 +15,9 @@ export const clock = ms => Number.isFinite(+ms) ? hhmm.format(ms) : "—";
 export const HIST_DAYS = 30, ALERTS_MAX = 5, MAX_POS = 12;
 // Joueurs fictifs (profiles.bot), chargés au démarrage : toujours affichés comme tels.
 export const BOTS = new Set();
+// Compte supprimé : session et réglages du jeu effacés de ce navigateur (la langue reste), retour à l'accueil avec un message.
+export function leaveDeleted() {
+  try { for (const k of Object.keys(localStorage)) if (/^(sb-|wb-)/.test(k) && k !== "wb-lang") localStorage.removeItem(k); sessionStorage.clear() } catch { }
+  location.replace("/?compte=supprime");
+}
 export const CAP0_TXT = "10 000 W"; // capital de départ, pour les textes

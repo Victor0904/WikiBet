@@ -155,7 +155,7 @@ export function HowTo({ onBack, first }) {
   );
 }
 
-export function Account({ account, push, me, patrimoine, openStake, holds, canRestart, onRestart, onPseudo, demo, onBack }) {
+export function Account({ account, push, me, patrimoine, openStake, holds, canRestart, onRestart, onPseudo, onDelete, demo, onBack }) {
   return (
     <section className="account">
       <SubHeader title="Mon compte" onBack={onBack} />
@@ -176,7 +176,30 @@ export function Account({ account, push, me, patrimoine, openStake, holds, canRe
         <button type="button" className="btn acc-restart" disabled={!canRestart} onClick={onRestart}>Repartir à zéro</button>
       </section>
       {demo && <p className="fine">Mode démo locale : ta partie est enregistrée dans ce navigateur uniquement, sans compte.</p>}
+      {onDelete && <DeleteAccount pseudo={me.pseudo} onDelete={onDelete} />}
     </section>
+  );
+}
+
+// Supprimer son compte : discret, tout en bas ; confirmation en retapant son pseudo. Le serveur efface tout (account_delete).
+function DeleteAccount({ pseudo, onDelete }) {
+  const [open, setOpen] = useState(false), [v, setV] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState(null);
+  if (!open) return <button type="button" className="link muted acc-delete" onClick={() => setOpen(true)}>Supprimer mon compte</button>;
+  const same = v.trim().toLowerCase() === pseudo.toLowerCase();
+  return (
+    <form className="panel auth quit-warn acc-delete-form" role="alert" onSubmit={async e => {
+      e.preventDefault(); setBusy(true); setErr(null);
+      try { await onDelete(v.trim()) } catch (x) { setErr(x.message); setBusy(false) }
+    }}>
+      <b>Supprimer mon compte</b>
+      <p>C'est définitif et irréversible. Ton compte et toutes ses données sont effacés : solde, positions, actions, quêtes, succès, amis et parrainages. Personne ne pourra les retrouver.</p>
+      <p className="muted small">Si tu diriges une guilde, elle passe à son membre le plus ancien.</p>
+      <label className="muted small" htmlFor="del-pseudo">Pour confirmer, tape ton pseudo : <b translate="no">{pseudo}</b></label>
+      <input id="del-pseudo" autoComplete="off" value={v} onChange={e => setV(e.target.value)} />
+      <button className="btn danger" type="submit" disabled={busy || !same}>Supprimer définitivement</button>
+      <button type="button" className="link" disabled={busy} onClick={() => { setOpen(false); setV(""); setErr(null) }}>Annuler</button>
+      {err && <p className="error" role="status">{err}</p>}
+    </form>
   );
 }
 

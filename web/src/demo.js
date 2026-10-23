@@ -8,6 +8,7 @@ import { seedRows } from "./seed.js";
 import { createEngine } from "./engine.js";
 import data from "./pageviews.json"; // la démo remplit sa base locale (les tables du replay Wiki restent nécessaires à l'horloge des séances)
 import { normBet, normBoard, normGuild } from "./api.js";
+import { leaveDeleted } from "./format.js";
 import { initState, advance, slip } from "../supabase/functions/_shared/aurelys.js";
 
 const UID = "00000000-0000-4000-8000-000000000001";
@@ -55,10 +56,12 @@ export async function demoApi() {
   };
   await step(); setInterval(step, 2000);
 
+  // « Recommencer » (essai) : base locale effacée, la page se recharge sur une base neuve.
+  const reset = async () => { await db.close().catch(() => {}); for (const d of await indexedDB.databases()) if (d.name?.includes(name)) await new Promise(r => { const q = indexedDB.deleteDatabase(d.name); q.onsuccess = q.onerror = q.onblocked = r }) };
   return {
-    mode: "demo", uid: UID,
-    // « Recommencer » (essai) : base locale effacée, la page se recharge sur une base neuve.
-    reset: async () => { await db.close().catch(() => {}); for (const d of await indexedDB.databases()) if (d.name?.includes(name)) await new Promise(r => { const q = indexedDB.deleteDatabase(d.name); q.onsuccess = q.onerror = q.onblocked = r }) },
+    mode: "demo", uid: UID, reset,
+    // Même règle qu'en ligne (account_delete), puis base locale effacée.
+    deleteAccount: async pseudo => { await all("select account_delete($1, $2)", [UID, pseudo]); await reset(); leaveDeleted() },
     now: () => Date.now(),
     me: async () => (await all("select * from profiles where id = $1", [UID]))[0] ?? null,
     createProfile: (p, ref) => act("select * from create_profile($1, $2)", [p, ref || null]),
