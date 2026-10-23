@@ -102,7 +102,7 @@ async function tick(lead: number) {
 
 /* ===== Notifications de liquidation (Web Push) =====
    Sans contenu chiffré : seulement la signature VAPID (ES256, WebCrypto). Le service worker demande le détail (action push_info). */
-const VAPID_PUBLIC = "BAUKaJ7IlXOUt1biFxAMBI0Gda0eKPMtQdWJ2aoQmCuhleOuEBvcdZqf1_yEsHBo-BLEU_a7U0duu3HypFEHybE";
+const VAPID_PUBLIC = "BJZqBMRm_Kju6x3v_CB06gqMthA4G1UJef7fRrxG2MtRgox4tVMr5HG6yIeEU-XVAjnAEHihqqgVd8iABb_CVd8";
 const b64u = (b: ArrayBuffer | Uint8Array | string) => (typeof b === "string" ? btoa(unescape(encodeURIComponent(b))) : btoa(String.fromCharCode(...new Uint8Array(b as ArrayBuffer))))
   .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 let vapidKey: CryptoKey | null = null;
