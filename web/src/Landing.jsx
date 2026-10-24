@@ -97,8 +97,8 @@ export default function Landing({ deleted }) {
         <div className="land-cards">
           <article><b>Un marché qui réagit à tes ordres</b><p>Les prix naissent des ordres des joueurs, des bots et des baleines. Un gros ordre fait bouger le cours.</p></article>
           <article><b>Branché sur le vrai monde</b><p>Granterre suit la pluie en Beauce, Helvane la consommation d'électricité (RTE), Lumirue les jours fériés.</p></article>
-          <article><b>Niveaux, quêtes, pari du jour</b><p>Des quêtes chaque jour et chaque semaine, un pari gratuit : ton niveau monte, et chaque niveau débloque du levier.</p></article>
-          <article><b>Des guildes</b><p>Rejoins une guilde de 30 traders au plus et grimpe au classement des guildes avec les autres membres.</p></article>
+          <article><b>Des ligues chaque semaine</b><p>De Bronze à Maître : chaque lundi, les meilleurs rendements de ton groupe montent, les derniers descendent.</p></article>
+          <article><b>Des quêtes et des guildes</b><p>Des quêtes chaque jour, un pari gratuit, et une guilde qui se fixe un objectif commun chaque semaine.</p></article>
         </div>
       </section>
 

@@ -1,4 +1,4 @@
-# Refonte « progression » : où on en est, ce qui reste
+# Refonte « progression » : où on en est
 
 Cahier des charges de Victor (18 octobre 2026). On remplace le QG, la banque et les talents par : profil, niveaux de
 trader (XP) qui débloquent le levier, quêtes, pari du jour, ligues hebdomadaires et guildes à objectif collectif. On
@@ -15,29 +15,67 @@ garde les succès (trophées).
 
 Détail dans `CLAUDE.md` (sections « Refonte progression »). Valeurs partagées : `web/supabase/functions/_shared/progression.js`.
 
-## Ce qui reste : environ 12 à 15 h de travail (3 ou 4 sessions)
+## Fait le 24-25 octobre 2026 (branche `refonte-h2-h9`, pas encore en production)
 
-| Ordre | Phase | Estimation |
-|---|---|---|
-| 1 | H2 Profil | 3 à 4 h |
-| 2 | H6 Ligues | 3 à 4 h |
-| 3 | H7 Guildes à objectifs | 3 h |
-| 4 | H8 Succès en XP | 1 à 1,5 h |
-| 5 | H9 Rapport consolidé des simulations | 1 à 2 h |
+Victor a demandé de tout faire sans lui, dans l'ordre H8, H9, H7, H6, H2, et a validé : H6 avant H2 ; récompense de
+saison pour 5 trades valides et un compte de 48 h ou plus, ou lié à Discord (au lieu de l'e-mail confirmé).
 
-Après chaque phase : tests verts, sauvegarde de la production, puis Victor lance `! npm run db:push` (son terminal est
-déjà dans `web`, `!` en tout début de ligne ; Claude ne lance pas lui-même `db:push`), puis vérification en lecture seule
-et `git push` du front. Rapport après chaque phase : ce qui a été fait, chiffres de simulation, écarts avec le cahier des
-charges, fichiers touchés, résultats des tests.
+| Phase | Contenu | Migration | Commit |
+|---|---|---|---|
+| H8 | Succès en XP (25 / 75 / 150), 18 nouveaux, GUILDE_TOP3 retiré, rétroactif | `20261029600000_succes_xp.sql` | ddf8c3b |
+| H9 | Simulation des saisons et guildes, journal anti-abus | `20261029700000_anti_abus.sql` | 2f42fa5 |
+| H7 | Guildes à objectif hebdomadaire, niveaux, saison mensuelle | `20261029800000_guildes_objectifs.sql` | ae1de99 |
+| H6 | Saisons hebdomadaires et ligues | `20261029900000_ligues.sql` | 9547fc3 |
+| H2 | Profil complet | `20261030000000_profil.sql` | 677e030 |
+
+Tests : 125 verts (`npm test`), dont `succes-xp`, `anti-abus`, `guildes`, `guilde-ui`, `ligues`, `profil`, et Ligue,
+Ma page, Modifier mon profil ajoutés au test de débordement (360, 375, 414 px).
+
+### Déploiement (à faire par la session VPS, après accord de Victor)
+1. Sauvegarde de la base (`07-backup.sh`).
+2. Appliquer dans l'ordre les 5 migrations ci-dessus. La fonction `aurelys` n'a pas changé.
+3. Vérifier que `cron.job` contient `wikibourse-abus` (04 h 47 UTC) et `wikibourse-semaine` (minute 5 de chaque heure).
+4. Fusionner `refonte-h2-h9` dans `main` et pousser : Vercel déploie le front. Pas avant l'étape 2 : le nouveau front
+   appelle des fonctions qui n'existent pas encore (« Nouvelle version disponible » en boucle sinon).
+Retour arrière : restaurer la sauvegarde de l'étape 1, et revenir sur `main` d'avant la fusion.
+
+### Rapport H9 (simulation `node scripts/sim-saisons.mjs`, 1 000 comptes, 12 semaines)
+Modèle de trading calé sur la sauvegarde du 18 octobre (3 joueurs, 141 positions, levier moyen ×8, gain ÷ mise d'écart
+type 1,32) : valeur finale log-normale d'espérance nulle avant frais. À prendre comme ordre de grandeur, pas comme une
+prévision : avec 6 vrais joueurs, aucune mesure n'est possible aujourd'hui.
+- Injection de W par les saisons : 0,15 à 0,19 % de la masse en circulation par semaine, 1,4 % des W créés (le salaire
+  fait 77 %, les faillites le reste). Échelle du cahier des charges gardée telle quelle.
+- Guildes : avec 5 % du capital par membre, le minimum n'est atteint que 41 % des semaines ; ramené à 2 %
+  (`GUILD_BASE`), 49 % (une guilde médiane l'atteint environ une semaine sur deux). Objectif ×2 : 40 %. Le taux bouge
+  peu avec la base, car les contributions sont bornées en % de la cible. Niveau de guilde médian après 12 semaines : 3.
+- Il faut au moins 3 membres comptés pour atteindre un objectif (chacun est plafonné à 40 % de la cible).
+- Délais médians (jours) : casual ×5 au jour 7, ×10 au jour 34 ; régulier 3 et 13 ; hardcore 2 et 9. ×15 (niveau 25 et
+  Platine 1) : personne en 12 semaines ; sur 52 semaines, 5 % des casual, 31 % des réguliers, 44 % des hardcore.
+- Répartition après 12 semaines : 29 % en Bronze 1, personne au-dessus d'Or 3 ; après 52 semaines, 13 % en Platine ou plus.
+- Multi-comptes (5 comptes en miroir, levier maximal) : 87 W de récompense par compte et par semaine, contre 143 W pour un
+  compte honnête ; rien n'est transférable entre joueurs.
+- XP par jour (médiane) : casual 86, régulier 261, hardcore 331.
+
+### Écarts avec le cahier des charges (choix faits sans Victor, à revoir s'il le souhaite)
+- Avatars, emblèmes et bannières : dessinés dans le code (`src/avatars.jsx`, `src/Guilde.jsx`) plutôt qu'en fichiers SVG
+  dans `web/public/avatars/` générés par un script. Même résultat (originaux, aucun envoi, seul l'identifiant en base),
+  sans 384 fichiers ni requêtes en plus, et la couleur de guilde s'applique d'elle-même. 32 avatars × 12 couleurs.
+- Ligue : rangée dans l'onglet Quêtes (deuxième onglet) pour garder 5 entrées dans la barre du bas. Profil : Plus.
+- Le gain de la semaine ne compte que les positions (pas les achats d'actions « Investir »).
+- PARI_10 = 10 bonnes réponses au total (10 d'affilée était quasi impossible : 1 chance sur 1 000).
+- Pseudos existants : les nouvelles règles (3 à 16 caractères, unicité sans majuscules, mots interdits) s'appliquent
+  aux nouveaux pseudos et aux changements ; aucun pseudo actuel n'est renommé.
+- Page publique `/joueur/<pseudo>` : pour les joueurs connectés (un visiteur sans compte arrive sur l'inscription).
+- Coffre de quêtes : un avatar de coffre au hasard (5 avatars réservés aux coffres).
+- Titre « chef de la guilde du mois » : pour le chef d'une guilde première d'une saison de guilde.
+- La page Confidentialité dit encore « Chez Supabase, à Londres » : la base est sur le VPS Hostinger depuis le 23 octobre.
+  À corriger avec le pays du serveur (non modifié : à confirmer par Victor).
 
 ### Points ouverts
 - Proposition non tranchée : plafond ×10 sur les petites valeurs (PXF, SLM), voir `web/scripts/sim-levier.mjs`.
-- `player_division()` vaut 0 jusqu'à H6 : ×15 et ×20 sont fermés à tous d'ici là.
 - Écart accepté sur la courbe d'XP (calée sur le casual : ×5 au jour 6, ×10 au jour 31) : le joueur régulier atteint le
   niveau 12 au jour 13 au lieu de 21.
 - Avec 6 vrais joueurs, la règle des petits groupes de ligue (n < 10) s'appliquera presque toujours au début.
-- Dock (5 entrées au plus) : aujourd'hui Marché, Positions, Quêtes, Guilde, Plus. À revoir quand Ligue et Profil arrivent.
-- Coffres de quêtes gagnés (`quest_chests`) : à ouvrir en H2 (récompense cosmétique).
 - Basse priorité : renommer `tal_hwm` / `tal_cum` (gain net de trading) dans une migration séparée, si c'est sans risque.
 - La ligne `brag-output*/` de `web/.gitignore` n'est pas commitée.
 
