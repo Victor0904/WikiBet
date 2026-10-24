@@ -181,6 +181,7 @@ export async function connect() {
     guildTransfer: id => rpc("guild_transfer", { p_user: id }),
     guildInvite: pseudo => rpc("guild_invite", { p_pseudo: pseudo }),
     myGuildInvites: () => rpc("my_guild_invites"),
+    myLeague: () => rpc("my_league"),
     guildCreate: ({ name, tag, motto }) => rpc("guild_create", { p_name: name, p_tag: tag, p_motto: motto }),
     guildJoin: id => rpc("guild_join", { p_id: id }),
     guildLeave: () => rpc("guild_leave"),

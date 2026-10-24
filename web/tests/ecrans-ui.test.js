@@ -31,6 +31,7 @@ test("écrans principaux : aucun débordement horizontal à 360, 375 et 414 px",
       if (w === 360) { await b.waitFor("!!document.querySelector('.sheet')", 20000); await check("Message de la refonte"); await press("Compris", ".sheet") }
       for (const v of ["Aperçu", "Actions", "Journal", "Carte", "Rumeurs"]) { await press(v); await check(`Marché · ${v}`) }
       await press("Quêtes", ".dock"); await b.waitFor("!!document.querySelector('.quest-head')", 20000); await check("Quêtes");
+      await press("Ligue"); await b.waitFor("!!document.querySelector('.lg-head')", 20000); await check("Ligue"); await press("Quêtes");
       await press("Positions", ".dock"); await check("Positions · en cours");
       await press("Historique");
       await b.waitFor("[...document.querySelectorAll('.history .hrow')].some(r => r.textContent.includes('Remboursement QG'))", 20000); // écran noir si History plante

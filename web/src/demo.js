@@ -119,6 +119,7 @@ export async function demoApi() {
     guildTransfer: id => act("select guild_transfer($1)", [id]),
     guildInvite: pseudo => act("select guild_invite($1)", [pseudo]),
     myGuildInvites: async () => (await all("select my_guild_invites() as r"))[0].r,
+    myLeague: async () => (await all("select my_league() as r"))[0].r,
     guildCreate: ({ name, tag, motto }) => act("select * from guild_create($1, $2, $3)", [name, tag, motto]),
     guildJoin: id => act("select guild_join($1)", [id]),
     guildLeave: () => act("select guild_leave()"),

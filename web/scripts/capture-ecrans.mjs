@@ -20,6 +20,18 @@ const SCREENS = {
   portefeuille: async () => { await press("Positions", ".dock"); await sleep(500); await press("Portefeuille") },
   historique: async () => { await press("Positions", ".dock"); await sleep(500); await press("Historique") },
   quetes: () => press("Quêtes", ".dock"),
+  // Groupe de ligue de 12 joueurs (Or 2), dont le joueur, et une saison passée.
+  ligue: async () => {
+    await sql(`with u as (insert into auth.users select gen_random_uuid() from generate_series(1, 11) returning id),
+      p as (insert into profiles (id, pseudo, division) select id, 'Trader' || row_number() over (), 7 from u returning id)
+      insert into bets (user_id, session, day, kind, stake, status, payout, fee_open, aur, dir, lev, entry, created_at, closed_at)
+      select p.id, 0, 0, 'aurelys', 1000, 'won', 1000 + (random() * 3000 - 1000)::int, 0, 'SLM', 'up', 1, 10, now() - interval '1 hour', now() - interval '50 minutes' from p, generate_series(1, 5)`);
+    await sql("update profiles set division = 7 where not bot");
+    await sql("select league_enter(user_id) from (select distinct user_id from bets) b");
+    await sql(`insert into league_members (week, user_id, group_id, division, rank, n, move, eligible, reward, div_after, ret)
+      select paris_date(paris_week(now()) - interval '7 days'), p.id, (select min(id) from league_groups), 6, 3, 41, 1, true, 550, 7, .084 from profiles p where not bot`);
+    await press("Quêtes", ".dock"); await sleep(600); await press("Ligue");
+  },
   guilde: () => press("Guilde", ".dock"),
   // Membre (et chef) d'une guilde de niveau 4 avec un objectif en cours et un objectif passé.
   "guilde-ma": async () => {

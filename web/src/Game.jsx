@@ -7,6 +7,7 @@ import { useAurelys } from "./aurelys.js";
 import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
 import { Achievements } from "./Succes.jsx";
 import { Quests } from "./Quetes.jsx";
+import { League } from "./Ligue.jsx";
 import { BY as AUR, slip, FEE } from "../supabase/functions/_shared/aurelys.js";
 import { Dock, Segmented, SubHeader, Logo, LangSwitch, LogoLoader } from "./nav.jsx";
 import { Profile, HowTo, Account, Legal, Privacy, PushPanel } from "./pages.jsx";
@@ -43,7 +44,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
 
   const [me, setMe] = useState(undefined), [bets, setBets] = useState([]), [board, setBoard] = useState([]);
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
-  const [aurDetail, setAurDetail] = useState(null), [aurHl, setAurHl] = useState(null), [posView, setPosView] = useState("open"), [more, setMore] = useState(null);
+  const [aurDetail, setAurDetail] = useState(null), [aurHl, setAurHl] = useState(null), [posView, setPosView] = useState("open"), [more, setMore] = useState(null), [qtab, setQtab] = useState("quests");
   // « Comment jouer » s'ouvre tout seul à la première visite.
   const [firstVisit, setFirstVisit] = useState(() => { if (trial) return false; try { return !localStorage.getItem("wb-howto") } catch { return false } }); // l'essai a ses bulles
   const [pref, setPref] = useState({ lev: 5, shorizon: "15", stake: 500 });
@@ -135,6 +136,16 @@ export default function Game({ api, trial = false, onNoProfile }) {
           const got = []; for (let l = n.body.from + 1; l <= n.body.to; l++) got.push(...unlocksAt(l));
           lines.push(t("Niveau {n} !", { n: n.body.to }) + (got.length ? " " + t("Tu débloques : {list}.", { list: got.map(x => t(x)).join(", ") }) : ""));
         }
+        // Fin de saison de ligue (lundi 0 h) : division, rang, récompense.
+        if (n.kind === "season") {
+          const b = n.body, msg = [b.to > b.from ? t("Saison finie : tu montes en {d} !", { d: t(DIVISIONS[b.to]) })
+            : b.to < b.from ? t("Saison finie : tu descends en {d}.", { d: t(DIVISIONS[b.to]) }) : t("Saison finie : tu restes en {d}.", { d: t(DIVISIONS[b.to]) }),
+            t("Rang {r} sur {n}, +{xp} XP.", { r: b.rank, n: b.n, xp: b.xp })];
+          if (b.reward) msg.push(t("Récompense de saison : +{w}.", { w: W(b.reward) }));
+          else if (!b.eligible) msg.push(t("Pas de récompense : il fallait 5 trades valides."));
+          setToast({ text: msg.join("\n"), tone: b.to < b.from ? "down" : "up", long: true, at: Date.now(),
+            action: { label: "Voir ma ligue", go: () => { setTab("quests"); setQtab("league") } } });
+        }
         // Bilan de l'objectif de guilde de la semaine écoulée (lundi 0 h).
         if (n.kind === "guild") {
           const b = n.body, msg = [b.status === "reached" ? t("Objectif de guilde atteint : +{xp} XP de guilde.", { xp: b.xp })
@@ -216,7 +227,9 @@ export default function Game({ api, trial = false, onNoProfile }) {
             </> : <History bets={withExtras(bets.filter(b => b.status !== "open"), refs, refunds)} />}
           </>}
 
-          {tab === "quests" && <Quests api={api} now={now} say={say} />}
+          {tab === "quests" && <>
+            <Segmented label="Progression" value={qtab} onChange={setQtab} options={[["quests", "Quêtes"], ["league", "Ligue"]]} />
+            {qtab === "quests" ? <Quests api={api} now={now} say={say} /> : trial ? <Locked what="Les ligues" /> : <League api={api} now={now} say={say} />}</>}
           {tab === "guild" && (trial ? <><SubHeader title="Guilde" /><Locked what="Les guildes" /></> : <Guilds api={api} me={me} say={say} />)}
 
           {tab === "more" && (
@@ -388,7 +401,7 @@ function refNotes(rf) {
 function withExtras(list, refs, refunds) {
   const lines = [...(refs?.mine ?? []).filter(r => r.status === "validé").map(r => ({ id: "ref-" + r.id, kind: "parrainage", at: r.validated_at, text: `Parrainage : ${r.pseudo} validé`, gain: r.paid, note: r.paid ? "bonus" : "plafond atteint" })),
     ...(refs?.sponsor?.status === "validé" ? [{ id: "ref-me", kind: "parrainage", at: refs.sponsor.validated_at, text: `Parrainage : bienvenue de ${refs.sponsor.pseudo}`, gain: refs.sponsor.paid, note: "bonus" }] : []),
-    ...refunds.map(r => ({ id: "h1-" + r.kind, kind: "parrainage", at: r.at, text: r.kind === "banque" ? "Banque fermée : dépôt rendu" : "Remboursement QG", gain: r.amount, note: r.kind === "banque" ? "transfert" : "remboursement" }))];
+    ...refunds.map(r => ({ id: "h1-" + r.kind + r.at, kind: "parrainage", at: r.at, text: r.kind === "banque" ? "Banque fermée : dépôt rendu" : r.kind === "saison" ? "Récompense de saison" : "Remboursement QG", gain: r.amount, note: r.kind === "banque" ? "transfert" : r.kind === "saison" ? "ligue" : "remboursement" }))];
   const out = [...list];
   for (const l of lines.sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) {
     const i = out.findIndex(b => b.kind !== "parrainage" && Date.parse(b.created_at) < Date.parse(l.at));
