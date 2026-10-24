@@ -112,7 +112,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
       const r = await api.myUnlocks?.(since).catch(() => null); if (!alive || !r) return;
       try { localStorage.setItem(KEY, r.now) } catch { }
       if (!r.list.length) return;
-      const text = r.list.length === 1 ? `Succès débloqué : ${r.list[0].name}` : `${r.list.length} succès débloqués${since ? "" : " d'après ton historique"}`;
+      const text = r.list.length === 1 ? (r.list[0].xp ? `Succès débloqué : ${r.list[0].name} (+${r.list[0].xp} XP)` : `Succès débloqué : ${r.list[0].name}`) : `${r.list.length} succès débloqués${since ? "" : " d'après ton historique"}`;
       setToast({ text, tone: "up", long: true, at: Date.now(), action: { label: "Voir mes succès", go: () => { setTab("more"); setMore("succes") } } });
     };
     check(); const id = setInterval(check, 30000);

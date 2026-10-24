@@ -49,6 +49,7 @@ export const XP = {
   streak: { 3: 50, 7: 150, 30: 500 },     // série de jours avec au moins une quête
   pari: { vote: 10, right: 25, three: 40 },
   tuto: { howto: 10, fiche: 10, ordre: 20 }, // première séance : niveau 2
+  ach: { 0: 25, 1: 75, 2: 150 },              // succès, selon ses points (H8, ach_xp)
 };
 
 // ===== Quêtes =====

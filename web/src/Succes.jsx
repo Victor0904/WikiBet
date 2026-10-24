@@ -1,5 +1,5 @@
 // Succès (trophées). Tout est décidé par le serveur (my_achievements) ; les secrets restent « ??? » avec leur indice
-// jusqu'au déblocage. Ils rapportaient des points de talent ; ils rapporteront de l'XP de trader (H8).
+// jusqu'au déblocage. Chacun rapporte de l'XP de trader, une fois (H8).
 import { LOCALE } from "./i18n.js";
 import { useEffect, useState } from "react";
 import { W } from "./format.js";
@@ -15,6 +15,7 @@ export function Achievements({ api }) {
     <section className="talents">
       <header className="ach-head">
         <p><b className="mono">{got}</b>{` succès débloqué${got > 1 ? "s" : ""} sur ${data.total}`}</p>
+        {data.xp_total > 0 && <p className="muted">{`${data.xp} XP gagnés sur ${data.xp_total}`}</p>}
         <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={data.total} aria-valuenow={got} aria-label="Succès débloqués"><i style={{ width: `${100 * got / Math.max(1, data.total)}%` }} /></div>
       </header>
       {cats.map(c => (
@@ -26,7 +27,7 @@ export function Achievements({ api }) {
               <article key={a.code} className={"ach" + (done ? " done" : "")}>
                 <span className="ach-ico" aria-hidden="true">{done ? "★" : a.secret ? "?" : "☆"}</span>
                 <div className="ach-b">
-                  <div className="ach-h"><b>{a.name}</b></div>
+                  <div className="ach-h"><b>{a.name}</b>{a.xp > 0 && <small className="mono muted">{`+${a.xp} XP`}</small>}</div>
                   <p>{a.descr ?? <>Indice : « {a.hint} »</>}</p>
                   {bar && <div className="tal-gauge">
                     <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={a.goal} aria-valuenow={Math.min(a.cur, a.goal)} aria-label={`Progression : ${a.name}`}><i style={{ width: `${100 * Math.min(1, a.cur / a.goal)}%` }} /></div>

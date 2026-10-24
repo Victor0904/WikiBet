@@ -74,7 +74,7 @@ test("succès : rétroactif sur l'historique, secrets masqués, classement de la
   await db.query("select ach_history($1)", [A]);
   for (const c of ["FIRST_TRADE", "SCALPEUR", "SERIE_10", "TOUS_SECTEURS", "AGRONOME"]) assert.equal(await has(db, c), 1, c);
   const list = (await db.query("select my_achievements() r")).rows[0].r;
-  assert.equal(list.total, 47); // 51 moins PROPRIO, BANQUIER, SPECIALISTE, POLYVALENT (H1)
+  assert.equal(list.total, 64); // 51 moins PROPRIO, BANQUIER, SPECIALISTE, POLYVALENT (H1), moins GUILDE_TOP3, plus 18 (H8)
   const noct = list.list.find(a => a.code === "NOCTAMBULE");
   assert.equal(noct.name, "???"); assert.equal(noct.descr, null); assert.equal(noct.hint, "Les marchés ne dorment jamais");
   assert.equal(list.list.find(a => a.code === "VETERAN").cur, 65, "progression : 65 / 500 trades valides");
