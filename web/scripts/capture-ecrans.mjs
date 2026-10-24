@@ -21,6 +21,15 @@ const SCREENS = {
   historique: async () => { await press("Positions", ".dock"); await sleep(500); await press("Historique") },
   quetes: () => press("Quêtes", ".dock"),
   guilde: () => press("Guilde", ".dock"),
+  // Membre (et chef) d'une guilde de niveau 4 avec un objectif en cours et un objectif passé.
+  "guilde-ma": async () => {
+    await sql(`insert into guilds (name, tag, motto, owner, xp, banner, emblem) select 'Les Taureaux', 'TAU', 'On trade la météo', id, 4200, 2, 6 from profiles where not bot on conflict do nothing`);
+    await sql("insert into guild_members (user_id, guild_id, joined_at) select p.id, g.id, now() - interval '20 days' from profiles p, guilds g where not p.bot and g.tag = 'TAU' on conflict do nothing");
+    await sql("select guild_lock(paris_week(now()), now())");
+    await sql(`insert into guild_goals (guild_id, week, members, level, min, target, total, status, xp)
+      select id, paris_date(paris_week(now()) - interval '7 days'), 1, 3, 240, 480, 512, 'reached', 70 from guilds where tag = 'TAU' on conflict do nothing`);
+    await press("Guilde", ".dock"); await sleep(1500);
+  },
   classement: async () => { await press("Plus", ".dock"); await sleep(500); await press("Classements") },
   succes: async () => { await press("Plus", ".dock"); await sleep(500); await press("Succès") },
   compte: async () => { await press("Plus", ".dock"); await sleep(500); await press("Mon compte") },

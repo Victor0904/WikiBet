@@ -10,7 +10,8 @@ import { Quests } from "./Quetes.jsx";
 import { BY as AUR, slip, FEE } from "../supabase/functions/_shared/aurelys.js";
 import { Dock, Segmented, SubHeader, Logo, LangSwitch, LogoLoader } from "./nav.jsx";
 import { Profile, HowTo, Account, Legal, Privacy, PushPanel } from "./pages.jsx";
-import { Ranking, Friends, Guilds, LoginPanel, BotTag } from "./social.jsx";
+import { Ranking, Friends, LoginPanel, BotTag } from "./social.jsx";
+import { Guilds } from "./Guilde.jsx";
 import Portfolio from "./Portfolio.jsx";
 
 /* ===== Formats ===== */
@@ -133,6 +134,15 @@ export default function Game({ api, trial = false, onNoProfile }) {
         if (n.kind === "level") {
           const got = []; for (let l = n.body.from + 1; l <= n.body.to; l++) got.push(...unlocksAt(l));
           lines.push(t("Niveau {n} !", { n: n.body.to }) + (got.length ? " " + t("Tu débloques : {list}.", { list: got.map(x => t(x)).join(", ") }) : ""));
+        }
+        // Bilan de l'objectif de guilde de la semaine écoulée (lundi 0 h).
+        if (n.kind === "guild") {
+          const b = n.body, msg = [b.status === "reached" ? t("Objectif de guilde atteint : +{xp} XP de guilde.", { xp: b.xp })
+            : b.status === "partial" ? t("Objectif de guilde presque atteint : +{xp} XP de guilde.", { xp: b.xp }) : t("Objectif de guilde manqué cette semaine.")];
+          if (b.me) msg.push(t("+{xp} XP pour toi.", { xp: b.me }));
+          if (b.level) msg.push(t("La guilde passe niveau {n} !", { n: b.level }));
+          setToast({ text: msg.join("\n"), tone: b.status === "missed" ? "down" : "up", long: true, at: Date.now(),
+            action: { label: "Voir ma guilde", go: () => setTab("guild") } });
         }
         api.noticeRead(n.id).catch(() => {});
       }

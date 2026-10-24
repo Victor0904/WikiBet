@@ -55,7 +55,7 @@ test("guildes : une seule à la fois, sigle unique, exclusion par le fondateur, 
   await assert.rejects(db.query("select guild_create('les taureaux', 'XX')"), /déjà pris/);
   await db.query("select guild_join($1)", [g.id]);
   await as(db, C); await db.query("select guild_join($1)", [g.id]);
-  await assert.rejects(db.query("select guild_kick($1)", [B]), /Seul le fondateur/);
+  await assert.rejects(db.query("select guild_kick($1)", [B]), /Seul le chef/);
   const list = (await db.query("select name, members, gain, mine from guild_list('today')")).rows;
   assert.deepEqual(list, [{ name: "Les Taureaux", members: 3, gain: 500, mine: true }]);
   assert.deepEqual((await db.query("select pseudo from gains_board('today', 'guild')")).rows.map(r => r.pseudo), ["bob"]);
