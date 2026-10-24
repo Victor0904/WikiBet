@@ -94,3 +94,52 @@ export const QUESTS = [
   ["w_win_20", "week", "hard", 20, null, "Clôturer 20 trades valides gagnants"],
 ].map(([code, period, tier, goal, needs, text]) => ({ code, period, tier, goal, needs, text }));
 export const QUEST_BY = Object.fromEntries(QUESTS.map(q => [q.code, q]));
+
+// ===== Saisons hebdomadaires et ligues (H6) =====
+// Semaine = lundi 0 h → lundi 0 h, heure de Paris. Rendement de la semaine = gain net de trading ÷ max(patrimoine du
+// début de semaine, capital de départ). Groupes de 100 joueurs au plus par division, remplis dans l'ordre d'arrivée
+// (premier trade valide clôturé de la semaine).
+export const START_CAPITAL = 10000, GROUP_MAX = 100, MAX_DIV = DIVISIONS.length - 1, ELIGIBLE_TRADES = 5;
+export const SEASON_XP = { play: 60, perDiv: 100 };
+// Récompense de saison en % du capital de départ, par division (Bronze 1 → Maître). Échelle du cahier des charges,
+// gardée après scripts/sim-saisons.mjs (injection soutenable : voir le rapport de H9 dans refonte-progression.md).
+export const SEASON_REWARD_PCT = [1, 1.5, 2, 3, 3.5, 4, 5, 5.5, 6, 7, 8, 9, 10, 11, 12, 15];
+export const seasonReward = div => Math.round(START_CAPITAL * SEASON_REWARD_PCT[div] / 100);
+// Mouvement selon le rang (1 = meilleur) dans un groupe de n joueurs : 5 % → +2, 15 % → +1, 60 % → 0, 20 % → −1
+// (arrondis vers le bas). Petit groupe (n < 10) : personne ne descend, seul le 1er monte d'une division si n ≥ 3.
+// Égalités : chacun prend le rang le meilleur de son ex æquo (rank() en SQL).
+export function seasonMove(rank, n) {
+  if (n < 10) return rank === 1 && n >= 3 ? 1 : 0;
+  const a = Math.floor(n * .05), b = Math.floor(n * .15), c = Math.floor(n * .2);
+  return rank <= a ? 2 : rank <= a + b ? 1 : rank > n - c ? -1 : 0;
+}
+// Moins de 5 trades valides : classé, peut descendre, ne peut ni monter ni toucher la récompense.
+export const nextDivision = (div, move, eligible) => Math.max(0, Math.min(MAX_DIV, div + (eligible ? move : Math.min(0, move))));
+
+// ===== Guildes à objectifs (H7) =====
+export const GUILD_MAX_LEVEL = 20, GUILD_TRADES = 3, GUILD_MEMBER_XP = 50;
+export const guildCap = level => Math.min(50, 10 + 5 * Math.floor((level - 1) / 2)); // membres au plus
+// Minimum de l'objectif = membres au verrouillage × base(niveau) ; base = GUILD_BASE du capital de départ × (1 + 0,1 ×
+// (niveau − 1)). Cahier des charges : 5 % ; ramené à 2 % par scripts/sim-saisons.mjs (minimum atteint environ une semaine sur deux). Cible autorisée : du minimum à 5 × le minimum.
+export const GUILD_BASE = 0.02;
+export const guildMin = (members, level) => Math.round(members * START_CAPITAL * GUILD_BASE * (1 + 0.1 * (level - 1)));
+export const GUILD_MAX_RATIO = 5;
+// Contribution d'un membre bornée à [−10 %, +40 %] de la cible.
+export const guildContribution = (pnl, target) => Math.max(-0.1 * target, Math.min(0.4 * target, pnl));
+// XP de guilde si l'objectif est atteint : Xbase × g(cible ÷ minimum) ; entre 75 % et 100 % de la cible, 25 % de cette XP.
+const G_KNOTS = [[1, .1], [1.5, .4], [2, .7], [3, 1], [5, 1.4]];
+export function guildG(r) {
+  const k = G_KNOTS.findIndex(([x]) => x >= r);
+  if (k <= 0) return k === 0 ? G_KNOTS[0][1] : G_KNOTS.at(-1)[1];
+  const [x0, y0] = G_KNOTS[k - 1], [x1, y1] = G_KNOTS[k];
+  return y0 + (y1 - y0) * (r - x0) / (x1 - x0);
+}
+export const GUILD_XBASE = 100; // XP de guilde par membre au verrouillage, avant g(r)
+export function guildXp(members, target, min, total) {
+  const full = Math.round(GUILD_XBASE * members * guildG(target / min));
+  return total >= target ? full : total >= 0.75 * target ? Math.round(full / 4) : 0;
+}
+// XP de guilde pour passer du niveau n au suivant : 500 × n (niveau 5 : 5 000 XP, niveau 20 : 95 000).
+export const GUILD_XP_TOTAL = [null, 0];
+for (let n = 1; n < GUILD_MAX_LEVEL; n++) GUILD_XP_TOTAL.push(GUILD_XP_TOTAL[n] + 500 * n);
+export const guildLevelOf = xp => { let n = 1; while (n < GUILD_MAX_LEVEL && GUILD_XP_TOTAL[n + 1] <= xp) n++; return n };

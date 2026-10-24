@@ -2,6 +2,10 @@
 // Sans clés : mode démo, la même base SQL tourne dans le navigateur (voir demo.js).
 import { createClient } from "@supabase/supabase-js";
 import { BOTS, leaveDeleted } from "./format.js";
+// Identifiant d'appareil tiré au hasard (journal anti-abus : plusieurs comptes sur un même appareil, rien n'est bloqué).
+function device() {
+  try { let d = localStorage.getItem("wb-appareil"); if (!d) localStorage.setItem("wb-appareil", d = crypto.randomUUID()); return d } catch { return null }
+}
 import { oauthReturn, discordOf } from "./discord.js";
 
 // Les identifiants bigint et les cotes numeric arrivent parfois en texte : on normalise une fois ici.
@@ -154,7 +158,7 @@ export async function connect() {
     myHoldings: () => rpc("my_holdings"),
     aurRounds: () => rpc("aur_round_stats"),
     myWealth: () => rpc("my_wealth"),
-    touch: () => rpc("touch"),
+    touch: () => rpc("touch", { p_device: device() }),
     souvenirs: user => rpc("souvenirs", { p_user: user }),
     guildUpdate: (color, motto) => rpc("guild_update", { p_color: color, p_motto: motto }),
     aurNews: () => rows(sb.from("aur_news").select("*").order("id", { ascending: false }).limit(150)),
