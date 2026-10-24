@@ -7,10 +7,11 @@ const A = "00000000-0000-0000-0000-00000000000a", B = "00000000-0000-0000-0000-0
 test("pseudo : jamais une adresse e-mail, à l'inscription comme au changement", async () => {
   const db = await freshDb();
   for (const p of ["bob@exemple.fr", "bob.dupont@gmail", "bobdupont.com", "MonHotmail", "x"])
-    await assert.rejects(login(db, A, p), /e-mail|2 à 20/, p);
+    await assert.rejects(login(db, A, p), /e-mail|3 à 16/, p);
   await login(db, A, "Bob.Le.Bricoleur");
   await assert.rejects(db.query("update profiles set pseudo = 'a@b.fr' where id = $1", [A]), /profiles_pseudo_email/);
-  await assert.rejects(db.query("select pseudo_change('Robert')"), /indisponible/); // pas de renommage d'office : pas de changement gratuit
+  await db.query("select pseudo_change('Robert')"); // un changement par 30 jours (H2)
+  await assert.rejects(db.query("select pseudo_change('Roberto')"), /30 jours/);
 });
 
 test("pseudo en forme d'e-mail : renommé Joueur-XXXX, prévenu, connexion gardée, code de parrainage refait", async () => {
@@ -44,7 +45,7 @@ test("pseudo en forme d'e-mail : renommé Joueur-XXXX, prévenu, connexion gard�
   await assert.rejects(db.query("select pseudo_change('jean@exemple.fr')"), /e-mail/);
   await db.query("select pseudo_change(' Jeannot ')");
   assert.equal((await db.query("select pseudo from profiles where id = $1", [A])).rows[0].pseudo, "Jeannot");
-  await assert.rejects(db.query("select pseudo_change('Jean2')"), /indisponible/); // une seule fois
+  await assert.rejects(db.query("select pseudo_change('Jean2')"), /30 jours/); // puis un par 30 jours
   // Un autre joueur ne lit pas les messages des autres.
   await login(db, B);
   assert.equal((await db.query("select * from my_notices()")).rows.length, 0);

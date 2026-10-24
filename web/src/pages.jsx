@@ -2,7 +2,8 @@
 import { PrivacyText } from "./privacy.jsx";
 import { t } from "./i18n.js";
 import { W, CAP0_TXT } from "./format.js";
-import { levelOf, XP_TOTAL } from "../supabase/functions/_shared/progression.js";
+import { levelOf, XP_TOTAL, DIVISIONS } from "../supabase/functions/_shared/progression.js";
+import { PlayerAvatar } from "./avatars.jsx";
 import { SubHeader } from "./nav.jsx";
 import { AccountLink } from "./social.jsx";
 import { useEffect, useState } from "react";
@@ -39,7 +40,7 @@ export const Avatar = ({ pseudo, size = 56, accent, img }) => img
   ? <img className="avatar" src={img} alt="" style={{ width: size, height: size }} referrerPolicy="no-referrer" /> // avatar Discord, si lié
   : <span className="avatar" style={{ width: size, height: size, fontSize: size * .38, background: accent }} aria-hidden="true">{initials(pseudo)}</span>;
 // Anneau de progression vers le niveau suivant (même calcul que trader_level en SQL : le niveau de départ est un plancher).
-function LevelRing({ pseudo, xp, floor, img }) {
+function LevelRing({ pseudo, xp, floor, img, avatar, division }) {
   const lvl = Math.max(levelOf(xp), floor ?? 1), from = XP_TOTAL[lvl], to = XP_TOTAL[lvl + 1];
   const part = to ? Math.min(1, Math.max(0, (xp - from) / (to - from))) : 1, R = 33, C = 2 * Math.PI * R;
   return (
@@ -48,21 +49,22 @@ function LevelRing({ pseudo, xp, floor, img }) {
         <circle cx="38" cy="38" r={R} className="track" />
         <circle cx="38" cy="38" r={R} className="fill" style={{ strokeDasharray: C, "--off": C * (1 - part), "--c": C }} />
       </svg>
-      <Avatar pseudo={pseudo} size={58} img={img} />
+      {avatar ? <PlayerAvatar avatar={avatar} pseudo={pseudo} size={58} division={division} /> : <Avatar pseudo={pseudo} size={58} img={img} />}
       <b className="lv-badge mono">{lvl}</b>
     </div>
   );
 }
 
 export function Profile({ api, me, board, patrimoine, refs, trial, say, go, hasPush }) {
-  const [guild, setGuild] = useState(undefined), [friends, setFriends] = useState(null), [ach, setAch] = useState(null);
+  const [guild, setGuild] = useState(undefined), [friends, setFriends] = useState(null), [ach, setAch] = useState(null), [title, setTitle] = useState(null);
   useEffect(() => {
     let alive = true;
     api.guildList?.("today").then(l => { if (!alive) return; const i = l.findIndex(g => g.mine); setGuild(i < 0 ? null : { ...l[i], rank: i + 1 }) }).catch(() => alive && setGuild(null));
     api.myFriends?.().then(f => alive && setFriends(f.filter(x => x.state === "ami"))).catch(() => {});
     api.myAchievements?.().then(a => alive && setAch(a)).catch(() => {});
+    if (me.title && !trial) api.myCosmetics?.().then(c => alive && setTitle(c.titles.find(x => x.code === me.title)?.text ?? null)).catch(() => {});
     return () => { alive = false };
-  }, [api, me.id]);
+  }, [api, me.id, me.title]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const xp = me.xp ?? 0, lvl = Math.max(levelOf(xp), me.lvl_floor ?? 1), toNext = XP_TOTAL[lvl + 1] != null ? XP_TOTAL[lvl + 1] - xp : null;
   const rank = board.findIndex(r => r.id === me.id) + 1 || null, delta = rank && refs?.rank_day ? refs.rank_day - rank : 0;
@@ -83,10 +85,12 @@ export function Profile({ api, me, board, patrimoine, refs, trial, say, go, hasP
   return (
     <div className="profile">
       <header className="p-id">
-        <LevelRing pseudo={me.pseudo} xp={xp} floor={me.lvl_floor} img={api.account?.discordInfo?.avatar} />
+        <LevelRing pseudo={me.pseudo} xp={xp} floor={me.lvl_floor} img={api.account?.discordInfo?.avatar} avatar={me.avatar} division={me.division ?? 0} />
         <div className="p-name">
           <h1>{me.pseudo}{guild && <span className="gtag">{guild.tag}</span>}</h1>
+          {title && <p className="accent">{title}</p>}
           <p>{toNext != null ? `Niveau ${lvl}, encore ${toNext} XP pour le ${lvl + 1}` : `Niveau ${lvl}`}</p>
+          {!trial && <p className="muted small">{`Ligue ${DIVISIONS[me.division ?? 0]}`}</p>}
         </div>
       </header>
 
@@ -97,6 +101,8 @@ export function Profile({ api, me, board, patrimoine, refs, trial, say, go, hasP
       </dl>
 
       <nav className="p-list" aria-label="Mon jeu">
+        {!trial && row("me", "Ma page", null)}
+        {!trial && row("edit", "Modifier mon profil", null)}
         {row("board", "Classements", board[0] && board[0].id !== me.id ? `1er : ${board[0].pseudo}` : null)}
         {row("succes", "Succès", ach ? `${ach.list.filter(a => a.at).length} sur ${ach.total}` : null)}
         {row("guilds", "Guilde", guild === undefined ? null : guild ? guild.name : "Rejoindre")}

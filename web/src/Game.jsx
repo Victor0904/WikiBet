@@ -11,6 +11,7 @@ import { League } from "./Ligue.jsx";
 import { BY as AUR, slip, FEE } from "../supabase/functions/_shared/aurelys.js";
 import { Dock, Segmented, SubHeader, Logo, LangSwitch, LogoLoader } from "./nav.jsx";
 import { Profile, HowTo, Account, Legal, Privacy, PushPanel } from "./pages.jsx";
+import { PlayerPage, ProfileEdit } from "./Joueur.jsx";
 import { Ranking, Friends, LoginPanel, BotTag } from "./social.jsx";
 import { Guilds } from "./Guilde.jsx";
 import Portfolio from "./Portfolio.jsx";
@@ -45,6 +46,15 @@ export default function Game({ api, trial = false, onNoProfile }) {
   const [me, setMe] = useState(undefined), [bets, setBets] = useState([]), [board, setBoard] = useState([]);
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
   const [aurDetail, setAurDetail] = useState(null), [aurHl, setAurHl] = useState(null), [posView, setPosView] = useState("open"), [more, setMore] = useState(null), [qtab, setQtab] = useState("quests");
+  // Page d'un joueur ouverte (pseudo) et guilde à ouvrir dans l'onglet Guilde ; liens /joueur/<pseudo> et /guilde/<nom>.
+  const [player, setPlayer] = useState(null), [guildOpen, setGuildOpen] = useState(null);
+  useEffect(() => {
+    const m = /^\/(joueur|guilde)\/([^/]+)/.exec(location.pathname); if (!m) return;
+    history.replaceState(null, "", "/jouer");
+    const name = decodeURIComponent(m[2]);
+    if (m[1] === "joueur") { setPlayer(name); setTab("more"); setMore("player") }
+    else api.guildPage?.({ name }).then(g => { if (g) { setGuildOpen(g.id); setTab("guild") } }).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // « Comment jouer » s'ouvre tout seul à la première visite.
   const [firstVisit, setFirstVisit] = useState(() => { if (trial) return false; try { return !localStorage.getItem("wb-howto") } catch { return false } }); // l'essai a ses bulles
   const [pref, setPref] = useState({ lev: 5, shorizon: "15", stake: 500 });
@@ -183,6 +193,8 @@ export default function Game({ api, trial = false, onNoProfile }) {
 
   // Un appui sur l'onglet déjà ouvert ramène à sa racine (Plus : retour au Profil depuis Classement, Mon compte…).
   const go = t => { if (t !== "more" || t === tab) setMore(null); setTab(t); window.scrollTo({ top: 0 }) };
+  const openPlayer = name => { setPlayer(name); setTab("more"); setMore("player"); window.scrollTo({ top: 0 }) };
+  const openGuild = id => { setGuildOpen(id); setMore(null); setTab("guild"); window.scrollTo({ top: 0 }) };
   const onAuto = (id, sl, tp) => run(() => api.aurSetAuto(id, sl, tp), () => sl == null && tp == null ? "Ordres retirés." : "Ordres enregistrés."), canStop = true; // stop et objectif pour tous
   const cancelTrigger = id => run(() => api.aurTriggerCancel(id), () => "Ordre annulé.");
   const closeTrade = b => run(() => b.kind === "aurelys" ? api.aurOrder({ action: "close", id: b.id }).finally(() => { setTimeout(() => unlockCheck.current?.(), 1500) }) : api.closeTrade(b.id),
@@ -229,12 +241,15 @@ export default function Game({ api, trial = false, onNoProfile }) {
 
           {tab === "quests" && <>
             <Segmented label="Progression" value={qtab} onChange={setQtab} options={[["quests", "Quêtes"], ["league", "Ligue"]]} />
-            {qtab === "quests" ? <Quests api={api} now={now} say={say} /> : trial ? <Locked what="Les ligues" /> : <League api={api} now={now} say={say} />}</>}
-          {tab === "guild" && (trial ? <><SubHeader title="Guilde" /><Locked what="Les guildes" /></> : <Guilds api={api} me={me} say={say} />)}
+            {qtab === "quests" ? <Quests api={api} now={now} say={say} /> : trial ? <Locked what="Les ligues" /> : <League api={api} now={now} say={say} onPlayer={openPlayer} />}</>}
+          {tab === "guild" && (trial ? <><SubHeader title="Guilde" /><Locked what="Les guildes" /></> : <Guilds key={guildOpen ?? "g"} api={api} me={me} say={say} open={guildOpen} onPlayer={openPlayer} />)}
 
           {tab === "more" && (
             more === "succes" ? <><SubHeader title="Succès" onBack={() => setMore(null)} />{trial ? <Locked what="Les succès" /> : <Achievements api={api} />}</>
-            : more === "board" ? <><SubHeader title="Classement" onBack={() => setMore(null)} /><Ranking api={api} me={me} wealth={<Board board={board} me={me} />} /></>
+            : more === "board" ? <><SubHeader title="Classement" onBack={() => setMore(null)} /><Ranking api={api} me={me} onPlayer={trial ? null : openPlayer} wealth={<Board board={board} me={me} />} /></>
+            : more === "player" && player ? <PlayerPage api={api} name={player} onBack={() => setMore(null)} onEdit={() => setMore("edit")} onGuild={openGuild} />
+            : more === "edit" && !trial ? <ProfileEdit api={api} me={me} say={say} onBack={() => setMore(null)}
+                onPseudo={p => run(() => api.pseudoChange(p), r => `Ton pseudo est maintenant ${r.pseudo}.`)} />
             : trial && more === "friends" ? <><SubHeader title="Amis" onBack={() => setMore(null)} /><Locked what="Les amis" /></>
             : more === "friends" ? <Friends api={api} say={say} onBack={() => setMore(null)} />
             : more === "account" ? <Account account={api.account} push={api.push} me={me} patrimoine={patrimoine} openStake={openStake} holds={holdsValue} demo={api.mode === "demo"}
@@ -244,7 +259,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
             : more === "privacy" ? <Privacy onBack={() => setMore(null)} />
             : more === "notifs" && api.push ? <><SubHeader title="Notifications" onBack={() => setMore(null)} /><PushPanel push={api.push} /></>
             : <Profile api={api} me={me} board={board} patrimoine={patrimoine} refs={trial ? null : refs} trial={trial}
-                say={say} go={t => t === "guilds" ? go("guild") : setMore(t)} hasPush={!!api.push} />)}
+                say={say} go={t => t === "guilds" ? go("guild") : t === "me" ? openPlayer(me.pseudo) : setMore(t)} hasPush={!!api.push} />)}
           </>}
           </div>
         </main>

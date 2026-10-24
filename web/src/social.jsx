@@ -127,9 +127,12 @@ const useLoad = (load, deps) => {
   return [rows, reload];
 };
 const sub = (...a) => a.filter(Boolean).join(", ");
+// Ligne d'un joueur : un appui ouvre sa page (pas pour un bot).
+export const PlayerRow = ({ p, onPlayer, className, children }) => onPlayer && !BOTS.has(p.id) && !p.bot
+  ? <button type="button" className={className} onClick={() => onPlayer(p.pseudo)}>{children}</button> : <div className={className}>{children}</div>;
 export const BotTag = ({ id }) => BOTS.has(id) ? <i className="gtag bot" title="Joueur fictif, géré par le jeu">bot</i> : null;
 
-export function Ranking({ api, me, wealth }) {
+export function Ranking({ api, me, wealth, onPlayer }) {
   const [period, setPeriod] = useState("today"), [scope, setScope] = useState("all");
   const [rows] = useLoad(() => period === "wealth" ? Promise.resolve([]) : api.gainsBoard(period, scope), [api, period, scope]);
   return (
@@ -142,11 +145,11 @@ export function Ranking({ api, me, wealth }) {
         {rows === null ? <Loading size={48} /> : !rows.length ? <p className="muted">{period === "today" ? "Aucun pari clôturé aujourd'hui pour l'instant." : "Aucun pari clôturé."}</p> : (
           <div className="board">
             {rows.map((p, i) => (
-              <div key={p.id} className={"brow" + (p.id === me.id ? " me" : "")}>
+              <PlayerRow key={p.id} p={p} onPlayer={onPlayer} className={"brow" + (p.id === me.id ? " me" : "")}>
                 <span className="rk mono">{i + 1}</span>
                 <span><b>{p.pseudo}<BotTag id={p.id} />{p.guild && <> <i className="gtag">{p.guild}</i></>}</b><small>{sub(p.level != null ? `niveau ${p.level}` : null, sub(p.title, `${p.bets} pari${p.bets > 1 ? "s" : ""} clôturé${p.bets > 1 ? "s" : ""}`))}</small></span>
                 <span className={"r mono " + cls(p.gain)}>{sW(p.gain)}</span>
-              </div>
+              </PlayerRow>
             ))}
           </div>
         )}

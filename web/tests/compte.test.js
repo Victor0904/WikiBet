@@ -5,7 +5,8 @@ import { freshDb, login } from "./db.js";
 test("Connexion par pseudo : adresse interne seulement, pseudo exact d'abord, sans majuscules sinon", async () => {
   const db = await freshDb();
   const A = "00000000-0000-0000-0000-00000000000a", B = "00000000-0000-0000-0000-00000000000b", C = "00000000-0000-0000-0000-00000000000c";
-  await login(db, A, "Bob"); await login(db, B, "bob"); await login(db, C, "Anon");
+  await login(db, A, "Bob"); await login(db, C, "Anon");
+  await login(db, B); await db.query("insert into profiles (id, pseudo) values ($1, 'bob')", [B]); // doublon de casse d'avant H2
   for (const id of [A, B]) await db.query("update auth.users set email = $1 || '@joueurs.aurelys.invalid' where id = $1", [id]);
   const mail = async p => (await db.query("select login_email($1) e", [p])).rows[0].e;
   assert.equal(await mail("bob"), B + "@joueurs.aurelys.invalid");

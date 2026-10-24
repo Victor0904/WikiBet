@@ -39,7 +39,7 @@ test("écrans principaux : aucun débordement horizontal à 360, 375 et 414 px",
       await press("Guilde", ".dock"); await check("Guilde");
       await press("Fonder une guilde"); await check("Guilde · fonder");
       await press("Plus", ".dock"); await check("Profil");
-      for (const v of ["Classement", "Succès", "Mon compte", "Comment jouer", "Sources des données", "Confidentialité"]) {
+      for (const v of ["Ma page", "Modifier mon profil", "Classement", "Succès", "Mon compte", "Comment jouer", "Sources des données", "Confidentialité"]) {
         await press("Plus", ".dock"); await press(v); await check(v);
       }
     }

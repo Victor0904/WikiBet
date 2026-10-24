@@ -5,9 +5,9 @@ import { DIVISIONS, ELIGIBLE_TRADES } from "../supabase/functions/_shared/progre
 import { W, pct, cls } from "./format.js";
 import { LOCALE } from "./i18n.js";
 import { Loading } from "./nav.jsx";
+import { tierOf, PlayerAvatar } from "./avatars.jsx";
+import { PlayerRow } from "./social.jsx";
 
-// Famille de la division (cadre de couleur, aussi autour de l'avatar en H2).
-export const tierOf = d => ["bronze", "argent", "or", "platine", "diamant", "maitre"][Math.min(5, Math.floor(d / 3))];
 export const DivBadge = ({ d, size = 56 }) => (
   <span className={"div-badge tier-" + tierOf(d)} style={{ width: size, height: size }} aria-hidden="true">
     <svg viewBox="0 0 24 24" width={size * .55} height={size * .55} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
@@ -20,7 +20,7 @@ const ZONE = { 2: ["z-promo2", "Montée de 2 divisions"], 1: ["z-promo", "Monté
 const left = s => { s = Math.max(0, Math.floor(s)); const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
   return d ? `${d} j ${h} h` : `${h} h ${String(m).padStart(2, "0")} min` };
 
-export function League({ api, now, say }) {
+export function League({ api, now, say, onPlayer }) {
   const [l, setL] = useState(null);
   const load = useCallback(() => api.myLeague().then(setL).catch(e => say(e.message, "down")), [api, say]);
   useEffect(() => { load(); const id = setInterval(() => { if (!document.hidden) load() }, 60000); return () => clearInterval(id) }, [load]);
@@ -44,11 +44,12 @@ export function League({ api, now, say }) {
         <h3>{`Mon groupe, ${g.n} joueur${g.n > 1 ? "s" : ""}`}</h3>
         <div className="lg-legend">{[2, 1, 0, -1].map(z => <span key={z} className={"lg-z " + ZONE[z][0]}>{ZONE[z][1]}</span>)}</div>
         <div className="board">{g.members.map(m => (
-          <div key={m.id} className={"brow lg-row " + ZONE[m.move][0] + (m.me ? " me" : "")}>
+          <PlayerRow key={m.id} p={m} onPlayer={onPlayer} className={"brow lg-row " + ZONE[m.move][0] + (m.me ? " me" : "")}>
             <span className="rk mono">{m.rank}</span>
-            <span><b>{m.pseudo}</b><small>{`${m.trades} trade${m.trades > 1 ? "s" : ""} valide${m.trades > 1 ? "s" : ""}`}</small></span>
+            <span className="lg-who"><PlayerAvatar avatar={m.avatar} pseudo={m.pseudo} size={30} />
+              <span><b>{m.pseudo}</b><small>{m.title ? <span className="accent">{m.title}</span> : `${m.trades} trade${m.trades > 1 ? "s" : ""} valide${m.trades > 1 ? "s" : ""}`}</small></span></span>
             <span className={"r mono " + cls(m.ret)}>{pct(m.ret)}</span>
-          </div>))}</div>
+          </PlayerRow>))}</div>
         <p className="muted small">Classement au rendement de la semaine : gain de trading (positions clôturées, et ouvertes au cours du moment) divisé par ton patrimoine de lundi, au moins 10 000 W. Petit groupe (moins de 10) : personne ne descend, seul le premier monte s'il y a 3 joueurs ou plus.</p>
       </div> : <p className="lg-empty">Clôture un trade valide pour entrer dans la saison : tu rejoindras un groupe de joueurs de ta division.</p>}
 

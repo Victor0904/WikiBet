@@ -8,6 +8,12 @@ const srv = await demoServer(), b = await launch();
 const press = (text, scope = "main") => b.evaluate(`(() => { const x = [...document.querySelectorAll(${JSON.stringify(scope)} + " button")].find(x => x.textContent.trim().startsWith(${JSON.stringify(text)})); x?.click(); return !!x })()`);
 const sql = q => b.evaluate(`window.__wbDemo.query(${JSON.stringify(q)}).then(() => true)`);
 const home = async () => { await b.evaluate("location.reload(), true"); await sleep(1500); await b.waitFor("!!document.querySelector('.dock')", 60000); await sleep(1500) };
+const profil = async () => {
+  await sql("insert into aur_achievements (user_id, code) select p.id, a.code from profiles p, achievements a where not p.bot and a.code in ('FIRST_TRADE', 'SERIE_10', 'GAIN_10K', 'LECTEUR') on conflict do nothing");
+  await sql("update profiles set division = 6, avatar = 'eclair:3', title = 'imbattable', pins = array['SERIE_10', 'FIRST_TRADE', 'GAIN_10K'] where not bot");
+  await sql("insert into quest_chests (user_id, week) select id, current_date from profiles where not bot on conflict do nothing");
+  await home();
+};
 const SCREENS = {
   marche: async () => {},
   actions: () => press("Actions"),
@@ -42,6 +48,9 @@ const SCREENS = {
       select id, paris_date(paris_week(now()) - interval '7 days'), 1, 3, 240, 480, 512, 'reached', 70 from guilds where tag = 'TAU' on conflict do nothing`);
     await press("Guilde", ".dock"); await sleep(1500);
   },
+  // Profil (H2) : avatar, titre, 3 trophées épinglés, ligue Or 1, un coffre à ouvrir.
+  "ma-page": async () => { await profil(); await press("Plus", ".dock"); await sleep(500); await press("Ma page") },
+  "edit-profil": async () => { await profil(); await press("Plus", ".dock"); await sleep(500); await press("Modifier mon profil") },
   classement: async () => { await press("Plus", ".dock"); await sleep(500); await press("Classements") },
   succes: async () => { await press("Plus", ".dock"); await sleep(500); await press("Succès") },
   compte: async () => { await press("Plus", ".dock"); await sleep(500); await press("Mon compte") },

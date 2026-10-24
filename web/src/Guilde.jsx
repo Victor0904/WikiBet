@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { GUILD_MAX_RATIO } from "../supabase/functions/_shared/progression.js";
 import { W, sW, cls } from "./format.js";
 import { BotTag } from "./social.jsx";
+import { PlayerAvatar } from "./avatars.jsx";
 import { LOCALE } from "./i18n.js";
 import { Segmented, SubHeader, Loading } from "./nav.jsx";
 
@@ -56,8 +57,8 @@ const STATUS = { reached: "atteint", partial: "presque atteint", missed: "manqu�
 const RATIOS = [1, 1.5, 2, 3, GUILD_MAX_RATIO];
 const week = d => new Date(d + "T12:00:00").toLocaleDateString(LOCALE, { day: "numeric", month: "short" });
 
-export function Guilds({ api, me, say }) {
-  const [period, setPeriod] = useState("today"), [sel, setSel] = useState(null), [create, setCreate] = useState(false);
+export function Guilds({ api, me, say, open = null, onPlayer }) {
+  const [period, setPeriod] = useState("today"), [sel, setSel] = useState(open), [create, setCreate] = useState(false);
   const [q, setQ] = useState(""), [minLv, setMinLv] = useState(1), [size, setSize] = useState("all"), [openOnly, setOpenOnly] = useState(false);
   const [list, setList] = useState(null), [invites, setInvites] = useState([]);
   const reload = useCallback(() => {
@@ -72,7 +73,7 @@ export function Guilds({ api, me, say }) {
   return (
     <section className="guilds">
       <SubHeader title={sel && sel !== mine?.id ? "Guilde" : "Ma guilde"} onBack={sel ? () => setSel(null) : null} />
-      {shown ? <GuildPage key={shown} api={api} me={me} id={shown} hasGuild={!!mine} run={run} />
+      {shown ? <GuildPage key={shown} api={api} me={me} id={shown} hasGuild={!!mine} run={run} onPlayer={onPlayer} />
         : create ? <GuildForm onCreate={v => run(() => api.guildCreate(v), `Guilde ${v.name} fondée.`)} onCancel={() => setCreate(false)} />
         : <div className="guild-intro">
             <p className="muted">Une guilde se fixe chaque semaine un objectif commun : la somme des gains de trading de ses membres. Atteint, il fait monter la guilde de niveau et rapporte de l'XP à chacun.</p>
@@ -104,7 +105,7 @@ export function Guilds({ api, me, say }) {
   );
 }
 
-function GuildPage({ api, me, id, hasGuild, run }) {
+function GuildPage({ api, me, id, hasGuild, run, onPlayer }) {
   const [g, setG] = useState(undefined), [now, setNow] = useState(Date.now());
   const load = useCallback(() => api.guildPage({ id }).then(setG).catch(() => setG(null)), [api, id]);
   useEffect(() => { load(); const t = setInterval(() => { setNow(Date.now()); if (!document.hidden) load() }, 30000); return () => clearInterval(t) }, [load]);
@@ -138,9 +139,14 @@ function GuildPage({ api, me, id, hasGuild, run }) {
       <div className="board">
         {g.members.map(m => (
           <div key={m.id} className={"brow frow" + (m.id === me.id ? " me" : "")}>
-            <span className="fname">
-              <b>{m.pseudo}<BotTag id={m.id} />{m.owner && <small className="accent"> chef</small>}</b>
+            <span className="fname g-mem">
+              {!m.bot && <PlayerAvatar avatar={m.avatar} pseudo={m.pseudo} size={32} division={m.division} />}
+              <span>
+              {m.bot || !onPlayer ? <b>{m.pseudo}<BotTag id={m.id} />{m.owner && <small className="accent"> chef</small>}</b>
+                : <button type="button" className="g-name" onClick={() => onPlayer(m.pseudo)}><b>{m.pseudo}</b>{m.owner && <small className="accent"> chef</small>}</button>}
+              {m.title && <small className="accent">{m.title}</small>}
               <small>{m.counted ? `${m.level != null ? `niveau ${m.level}, ` : ""}${m.trades} trade${m.trades > 1 ? "s" : ""} valide${m.trades > 1 ? "s" : ""}` : m.bot ? "ne compte pas dans l'objectif" : "comptera à partir de lundi"}</small>
+              </span>
             </span>
             <span className="f-acts">
               {m.counted && <b className={"mono " + cls(m.contribution)}>{sW(m.contribution)}</b>}

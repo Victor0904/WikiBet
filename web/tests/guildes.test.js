@@ -105,7 +105,7 @@ test("guildes : 24 h entre deux guildes, guilde sur invitation, plafond selon le
   assert.equal((await one(db, "select count(*)::int n from guild_invites")).n, 0, "invitation consommée");
   // Plafond : 10 joueurs au niveau 1.
   await as(db, a); await db.query("select guild_set(p_open => true)");
-  for (let i = 0; i < 8; i++) { const u = id(60 + i); await login(db, u, "p" + i); await db.query("select guild_join($1)", [g]) }
+  for (let i = 0; i < 8; i++) { const u = id(60 + i); await login(db, u, "pl" + i); await db.query("select guild_join($1)", [g]) }
   const extra = id(70); await login(db, extra, "onzieme");
   await assert.rejects(db.query("select guild_join($1)", [g]), /complète \(10 membres au niveau 1\)/);
   await db.query("update guilds set xp = 1500 where id = $1", [g]); // niveau 3 : 15 membres

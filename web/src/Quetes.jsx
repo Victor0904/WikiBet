@@ -51,7 +51,7 @@ export function Quests({ api, now, say }) {
       <div className="ach-cat">
         <h3>Quêtes de la semaine <small className="muted">{`· nouvelles dans ${left(q.week_end - t)}`}</small></h3>
         <div className="q-list">{list("week").map(item)}</div>
-        {q.chest && <p className="small accent">Coffre de la semaine gagné : il s'ouvrira avec les profils, bientôt.</p>}
+        {q.chest && <p className="small accent">Coffre de la semaine gagné : ouvre-le dans Plus, Modifier mon profil.</p>}
       </div>
     </section>
   );

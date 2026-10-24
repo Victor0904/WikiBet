@@ -949,3 +949,36 @@ a.btn.primary { color: var(--accent-ink) }
 .lg-row.me { background: var(--panel2) }
 .lg-empty { padding: 14px 16px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted) }
 .league .plain { margin-bottom: 8px }
+
+/* ===== Profil (H2) ===== */
+.pav { display: inline-grid; place-items: center; flex: none; border-radius: 50%; background: var(--panel2); color: var(--ink); font: 700 1em var(--f-cond) }
+.pav.framed { box-shadow: 0 0 0 2.5px var(--tier), 0 0 0 5px color-mix(in srgb, var(--tier) 22%, transparent) }
+.pl-head { display: flex; align-items: center; gap: 16px; padding: 8px 4px 14px }
+.pl-head > div { display: flex; flex-direction: column; gap: 2px; min-width: 0 }
+.pl-head h1 { margin: 0; font: 700 26px/1.1 var(--f-cond); overflow-wrap: anywhere }
+.pl-head p { margin: 0 }
+.pl-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 }
+.pl-pins { display: grid; gap: 8px }
+.pl-pin { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel) }
+.pl-pin span { grid-row: span 2; color: var(--accent); font-size: 18px }
+.pl-guild { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; text-align: left; cursor: pointer }
+.player .g-xp, .player .plain { margin-bottom: 12px }
+.p-edit { display: flex; flex-direction: column; gap: 10px }
+.p-edit .sec { margin: 12px 0 0 }
+.av-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px }
+.av-grid button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: inherit }
+.av-grid button[aria-pressed=true] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent) }
+.av-grid button:disabled { opacity: .5 }
+.av-grid small { font-size: 10px; line-height: 1.1; color: var(--muted); text-align: center }
+.av-colors { display: flex; flex-wrap: wrap; gap: 8px }
+.av-colors button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; padding: 0 }
+.av-colors button[aria-pressed=true] { border-color: var(--ink) }
+.p-select { height: 44px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px }
+.p-edit form.row input { flex: 1; min-width: 0; height: 40px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px }
+.pin-chips { flex-wrap: wrap }
+.pl-check { align-items: center } .pl-check input { width: 22px; height: 22px; flex: none }
+.g-mem { display: flex; align-items: center; gap: 10px; min-width: 0 } .g-mem > span:last-child { display: flex; flex-direction: column; min-width: 0 }
+.g-name { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer }
+.g-name b { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px }
+.lg-who { display: flex !important; flex-direction: row !important; align-items: center; gap: 8px }
+.lg-who > span:last-child { display: flex; flex-direction: column; min-width: 0 }
