@@ -99,11 +99,14 @@ export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscri
   useEffect(() => { if (view === "rumors" && top > seen) { setSeen(top); try { localStorage.setItem("wb-rumeurs", String(top)) } catch { } } }, [view, top, seen]);
   return (
     <section className="aur-market">
-      {view === "board" ? <AurHero aur={aur} now={now} /> : <AurLine aur={aur} now={now} />}
-      <Flash aur={aur} now={now} onDetail={onDetail} />
+      {/* Barre d'onglets fixe (demande de Victor) : rien au-dessus ne change de hauteur d'un onglet à l'autre ; le grand
+          bandeau de l'indice (Aperçu) et le flash d'actualité passent dessous. */}
+      <AurLine aur={aur} now={now} />
       <div className="tabs" role="group" aria-label="Vue du marché">
         {VIEWS.filter(([k]) => k !== "analysts" || api?.analystList).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}{k === "rumors" && top > seen && <i className="chip-dot" role="img" aria-label="nouvelle rumeur" />}{k === "analysts" && anaTop > anaSeen && <i className="chip-dot" role="img" aria-label="tuyau jugé" />}</button>)}
       </div>
+      {view === "board" && <AurHero aur={aur} now={now} />}
+      <Flash aur={aur} now={now} onDetail={onDetail} />
       {view === "board" ? <Board aur={aur} now={now} onDetail={onDetail} onNews={() => setView("news")} onRead={setRead} onList={onList} />
         : view === "list" ? <List aur={aur} now={now} bets={bets} onPick={onPick} onDetail={onDetail} onSubscribe={onSubscribe} onRead={setRead} />
         : view === "news" ? <News aur={aur} now={now} onDetail={onDetail} onRead={setRead} />
