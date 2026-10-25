@@ -20,7 +20,7 @@ test("succès en XP : barème partagé, une seule fois, total des trophées born
   // Remplace « 21 points au plus » : tous les trophées réunis valent moins de 4 000 XP (niveau 15 environ), pour que la
   // courbe d'XP reste calée sur les quêtes (scripts/sim-xp.mjs compte ~300 XP de succès la 1re semaine, puis ~60).
   const tot = (await one(db, "select sum(ach_xp(points))::int t, count(*)::int n from achievements"));
-  assert.ok(tot.t <= 4000, `total ${tot.t} XP`); assert.equal(tot.n, 64);
+  assert.ok(tot.t <= 4000, `total ${tot.t} XP`); assert.equal(tot.n, 68); // + 4 succès des analystes
   const easy = (await one(db, `select sum(ach_xp(points))::int t from achievements
     where code in ('FIRST_TRADE', 'FIRST_GREEN', 'GUILDE', 'SALAIRE', 'DIVERSIFIE', 'LECTEUR', 'SCALPEUR', 'TOP_100')`)).t;
   assert.ok(easy >= 200 && easy <= 400, `succès d'une 1re semaine : ${easy} XP`);
