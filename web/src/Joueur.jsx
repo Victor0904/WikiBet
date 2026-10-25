@@ -12,8 +12,8 @@ const Bar = ({ cur, goal, label }) => (
 );
 
 export function PlayerPage({ api, name, onBack, onEdit, onGuild }) {
-  const [p, setP] = useState(undefined);
-  useEffect(() => { setP(undefined); api.playerPage(name).then(setP).catch(() => setP(null)) }, [api, name]);
+  const [p, setP] = useState(undefined), [tu, setTu] = useState(null);
+  useEffect(() => { setP(undefined); api.playerPage(name).then(setP).catch(() => setP(null)); api.playerTuyaux?.(name).then(setTu).catch(() => {}) }, [api, name]);
   return (
     <section className="player">
       <SubHeader title={p?.me ? "Ma page" : "Joueur"} onBack={onBack} />
@@ -38,6 +38,7 @@ export function PlayerPage({ api, name, onBack, onEdit, onGuild }) {
         <div className="plain">
           <div className="plain-row"><span>Trades valides</span><span className="mono">{p.trades}</span></div>
           <div className="plain-row"><span>Meilleur trade</span><span className={"mono " + cls(p.best ?? 0)}>{p.best != null ? sW(p.best) : "—"}</span></div>
+          {tu?.n > 0 && <div className="plain-row"><span>Tuyaux suivis</span><span className="mono">{tu.ok == null ? tu.n : t("{n} · {x} % de justes", { n: tu.n, x: Math.round(100 * tu.ok) })}</span></div>}
           <div className="plain-row"><span>Série de quêtes</span><span className="mono">{`${p.streak} jour${p.streak > 1 ? "s" : ""}`}</span></div>
           {p.guild && <button type="button" className="plain-row pl-guild" onClick={() => onGuild(p.guild.id)}><span>Guilde</span><span>{p.guild.name} <i className="gtag">{p.guild.tag}</i></span></button>}
           <div className="plain-row"><span>Joue depuis le</span><span>{new Date(p.since).toLocaleDateString(LOCALE, { day: "numeric", month: "long", year: "numeric" })}</span></div>

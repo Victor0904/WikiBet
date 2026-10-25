@@ -30,7 +30,7 @@ test("anglais : les écrans principaux n'affichent plus de français", { skip: !
     await b.goto(srv.url + "jouer"); await b.waitFor("!!document.querySelector('#pseudo')"); await check("Inscription");
     await b.evaluate(`(() => { const i = document.querySelector("#pseudo"), set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; set.call(i, "Testeur"); i.dispatchEvent(new Event("input", { bubbles: true })); return true })()`);
     await press("Enter", "form"); await b.waitFor("!!document.querySelector('.dock')", 120000); await sleep(4000);
-    for (const v of ["Overview", "Stocks", "News", "Map", "Rumours"]) { await press(v); await check(`Market · ${v}`) }
+    for (const v of ["Overview", "Stocks", "News", "Map", "Rumours", "Analysts"]) { await press(v); await check(`Market · ${v}`) }
     await press("Overview"); await sleep(600);
     await b.evaluate(`document.querySelector("main .p-row")?.click(), true`); await sleep(1500); await check("Fiche");
     await press("Invest", ".sheet.detail"); await sleep(800); await check("Achat d'actions");

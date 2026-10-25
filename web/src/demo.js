@@ -86,6 +86,12 @@ export async function demoApi() {
     myUnlocks: async since => (await all("select my_unlocks($1) as r", [since]))[0].r,
     articleRead: id => all("select article_read($1)", [id]),
     aurRumors: async () => (await all("select aur_rumor_list() as r"))[0].r,
+    analystList: async () => (await all("select analyst_list() as r"))[0].r,
+    analystQuote: async (analyst, tk, level) => (await all("select analyst_quote($1, $2, $3) as r", [analyst, tk, level]))[0].r,
+    rumorBuy: async (analyst, tk, level) => (await act("select rumor_buy($1, $2, $3) as r", [analyst, tk, level])).r,
+    // Pas de pg_cron en démo : les tuyaux échus sont jugés à la lecture.
+    myTuyaux: async status => { await all("select analyst_resolve()"); return (await all("select my_tuyaux($1) as r", [status ?? null]))[0].r },
+    playerTuyaux: async pseudo => (await all("select player_tuyaux($1) as r", [pseudo]))[0].r,
     aurStocks: () => all("select * from aur_stocks order by status, tk"),
     aurSubscribe: (tk, amount) => act("select * from aur_subscribe($1, $2)", [tk, amount]),
     myHoldings: () => all("select * from my_holdings()"),

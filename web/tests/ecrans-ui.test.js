@@ -29,7 +29,7 @@ test("écrans principaux : aucun débordement horizontal à 360, 375 et 414 px",
       await b.size(w);
       await b.evaluate("location.reload(), true"); await sleep(1500); await b.waitFor("!!document.querySelector('.dock')", 60000);
       if (w === 360) { await b.waitFor("!!document.querySelector('.sheet')", 20000); await check("Message de la refonte"); await press("Compris", ".sheet") }
-      for (const v of ["Aperçu", "Actions", "Journal", "Carte", "Rumeurs"]) { await press(v); await check(`Marché · ${v}`) }
+      for (const v of ["Aperçu", "Actions", "Journal", "Carte", "Rumeurs", "Analystes"]) { await press(v); await check(`Marché · ${v}`) }
       await press("Quêtes", ".dock"); await b.waitFor("!!document.querySelector('.quest-head')", 20000); await check("Quêtes");
       await press("Ligue"); await b.waitFor("!!document.querySelector('.lg-head')", 20000); await check("Ligue"); await press("Quêtes");
       await press("Positions", ".dock"); await check("Positions · en cours");

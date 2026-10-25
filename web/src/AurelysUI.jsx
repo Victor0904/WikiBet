@@ -10,6 +10,7 @@ import { W, sW, nf0, nf2, pct, cls, clock } from "./format.js";
 import { liqPrice } from "./engine.js";
 import { Spark, PositionChart } from "./charts.jsx";
 import { TkIcon } from "./logos.jsx";
+import { Analysts, lastResolved } from "./Analystes.jsx";
 export { TkIcon };
 
 export const px = v => v == null || isNaN(v) ? "—" : nf2.format(v);
@@ -76,9 +77,17 @@ const isMajor = n => MAJOR.has(n.cat) || Math.abs(n.sent) >= .7;
 
 // Le Marché : tableau de bord, liste des actions, journal, carte et rumeurs.
 // Actions d'abord (demande de Victor, octobre 2026) : toutes les sociétés dès l'arrivée, l'Aperçu (indice, macro) ensuite.
-const VIEWS = [["list", "Actions"], ["board", "Aperçu"], ["news", "Journal"], ["heat", "Carte"], ["rumors", "Rumeurs"]];
-export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscribe }) {
+const VIEWS = [["list", "Actions"], ["board", "Aperçu"], ["news", "Journal"], ["heat", "Carte"], ["rumors", "Rumeurs"], ["analysts", "Analystes"]];
+export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscribe, focus, onFocus }) {
   const [view, setView] = useState("list"), [read, setRead] = useState(null), onList = () => setView("list");
+  // Analystes : liste et tuyaux du joueur relus toutes les 30 s (pastille quand un tuyau vient d'être jugé). `focus` : société
+  // choisie depuis sa fiche (« Demander à un analyste »).
+  const [ana, setAna] = useState(null), [mine, setMine] = useState(null), [anaSeen, setAnaSeen] = useState(() => { try { return +localStorage.getItem("wb-tuyaux") || 0 } catch { return 0 } });
+  const loadAna = () => api?.analystList && Promise.all([api.analystList(), api.myTuyaux()]).then(([a, m]) => { setAna(a); setMine(m) }).catch(() => {});
+  useEffect(() => { if (!api?.analystList) return; loadAna(); const id = setInterval(() => { if (!document.hidden) loadAna() }, 30000); return () => clearInterval(id) }, [api]); // eslint-disable-line
+  useEffect(() => { if (focus) setView("analysts") }, [focus]);
+  const anaTop = lastResolved(mine);
+  useEffect(() => { if (view === "analysts" && anaTop > anaSeen) { setAnaSeen(anaTop); try { localStorage.setItem("wb-tuyaux", String(anaTop)) } catch { } } }, [view, anaTop, anaSeen]);
   // Rumeurs : relues toutes les 10 s (pastille sur l'onglet quand une nouvelle arrive, dernière vue gardée dans le navigateur).
   const [rum, setRum] = useState(null), [seen, setSeen] = useState(() => { try { return +localStorage.getItem("wb-rumeurs") || 0 } catch { return 0 } });
   useEffect(() => {
@@ -93,12 +102,14 @@ export function AurelysMarket({ api, aur, now, bets, onPick, onDetail, onSubscri
       {view === "board" ? <AurHero aur={aur} now={now} /> : <AurLine aur={aur} now={now} />}
       <Flash aur={aur} now={now} onDetail={onDetail} />
       <div className="tabs" role="group" aria-label="Vue du marché">
-        {VIEWS.map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}{k === "rumors" && top > seen && <i className="chip-dot" role="img" aria-label="nouvelle rumeur" />}</button>)}
+        {VIEWS.filter(([k]) => k !== "analysts" || api?.analystList).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}{k === "rumors" && top > seen && <i className="chip-dot" role="img" aria-label="nouvelle rumeur" />}{k === "analysts" && anaTop > anaSeen && <i className="chip-dot" role="img" aria-label="tuyau jugé" />}</button>)}
       </div>
       {view === "board" ? <Board aur={aur} now={now} onDetail={onDetail} onNews={() => setView("news")} onRead={setRead} onList={onList} />
         : view === "list" ? <List aur={aur} now={now} bets={bets} onPick={onPick} onDetail={onDetail} onSubscribe={onSubscribe} onRead={setRead} />
         : view === "news" ? <News aur={aur} now={now} onDetail={onDetail} onRead={setRead} />
         : view === "rumors" ? <Rumors data={rum} now={now} onDetail={onDetail} />
+        : view === "analysts" ? <Analysts api={api} data={ana} mine={mine} focus={focus} onFocus={onFocus} now={now} reload={loadAna}
+            onDetail={onDetail} onPick={(tk, dir) => dir ? onPick(tk, dir) : onDetail(tk)} />
         : <Heat aur={aur} now={now} onDetail={onDetail} />}
       {read && <Article api={api} n={read} now={now} onClose={() => setRead(null)} onDetail={tk => { setRead(null); onDetail(tk) }} />}
       <p className="fine">Un jour d'Aurelys dure 1 h réelle.</p>
@@ -478,7 +489,7 @@ function Alerts({ tk, last, alerts, setAlerts, max }) {
   );
 }
 
-export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onClose, alerts = [], setAlerts, alertsMax = 1 }) {
+export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onClose, onAnalyst, alerts = [], setAlerts, alertsMax = 1 }) {
   const s = BY[tk], q = aur.quotes[tk], c = chgOf(aur, tk, now);
   const [g, setG] = useState(hl ? 60 : 15), [ind, setInd] = useState({ mm20: true, mm50: false, boll: false, rsi: false }), [long, setLong] = useState([]), [mins, setMins] = useState([]), [mark, setMark] = useState(null);
   // Assez d'historique pour 80 bougies et une MM 50 : bougies d'une heure d'Aurelys, ou cours des 2 dernières heures réelles.
@@ -520,6 +531,7 @@ export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onClose
         {nextRes && <section className="d-sec">
           <h2>Prochains résultats <span className="muted">{gwhen(nextRes.at, now)}</span></h2>
           <p>{cons != null ? <>Les analystes attendent un chiffre d'affaires en hausse de <b className="mono">{signed(cons)}</b> sur un an. Le cours réagira à l'écart avec ce chiffre.</> : "Le consensus des analystes arrive."}</p>
+          {onAnalyst && STORIES[tk] && <button type="button" className="btn" onClick={() => onAnalyst(tk)}>Demander à un analyste</button>}
         </section>}
         {LINKS[tk] && <section className="d-sec d-real">
           <h2>Branchée sur du réel</h2>

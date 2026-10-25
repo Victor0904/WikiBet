@@ -1,4 +1,4 @@
-import { LOCALE, t } from "./i18n.js";
+import { LANG, LOCALE, t } from "./i18n.js";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { liqPrice, BK_LIMIT, CAP0, EPOCH, CYCLE_MS } from "./engine.js";
 import { nf0, nf2, W, sW, clock, cls, HIST_DAYS, ALERTS_MAX, MAX_POS } from "./format.js";
@@ -45,7 +45,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
 
   const [me, setMe] = useState(undefined), [bets, setBets] = useState([]), [board, setBoard] = useState([]);
   const [toast, setToast] = useState(null), [tab, setTab] = useState("market"), [ticket, setTicket] = useState(null);
-  const [aurDetail, setAurDetail] = useState(null), [aurHl, setAurHl] = useState(null), [posView, setPosView] = useState("open"), [more, setMore] = useState(null), [qtab, setQtab] = useState("quests");
+  const [anaTk, setAnaTk] = useState(null), [aurDetail, setAurDetail] = useState(null), [aurHl, setAurHl] = useState(null), [posView, setPosView] = useState("open"), [more, setMore] = useState(null), [qtab, setQtab] = useState("quests");
   // Page d'un joueur ouverte (pseudo) et guilde à ouvrir dans l'onglet Guilde ; liens /joueur/<pseudo> et /guilde/<nom>.
   const [player, setPlayer] = useState(null), [guildOpen, setGuildOpen] = useState(null);
   useEffect(() => {
@@ -165,6 +165,12 @@ export default function Game({ api, trial = false, onNoProfile }) {
           setToast({ text: msg.join("\n"), tone: b.status === "missed" ? "down" : "up", long: true, at: Date.now(),
             action: { label: "Voir ma guilde", go: () => setTab("guild") } });
         }
+        // Tuyau d'un analyste jugé à la publication des résultats.
+        if (n.kind === "tuyau") {
+          const b = n.body, a = b[`analyst_${LANG}`] ?? b.analyst_fr, f = `${b.pub >= 0 ? "+" : "−"}${Math.abs(b.pub).toFixed(1).replace(".", LANG === "en" ? "." : ",")} %`;
+          setToast({ text: b.ok ? t("{a} avait un bon tuyau : {s} a publié {f}.", { a, s: b.name, f }) : t("Mauvais tuyau de {a} sur {s} : publié {f}.", { a, s: b.name, f }),
+            tone: b.ok ? "up" : "down", long: true, at: Date.now(), action: { label: "Voir mes tuyaux", go: () => { setTab("market"); setAnaTk(b.tk) } } });
+        }
         api.noticeRead(n.id).catch(() => {});
       }
       if (lines.length) setToast({ text: lines.join("\n"), tone: "up", long: true, at: Date.now(), action: { label: "Voir mes quêtes", go: () => setTab("quests") } });
@@ -225,7 +231,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
           {showHowto ? <HowTo first={firstVisit} onBack={firstVisit ? howtoDone : () => { api.tutoDone?.("howto").catch(() => {}); setMore(null) }} /> : <>
           {tab === "market" && <MiniTicker aur={aur} bets={open} onOpen={() => { setPosView("open"); go("positions") }} />}
 
-          {tab === "market" && <AurelysMarket api={api} aur={aur} now={now} bets={open} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onSubscribe={tk => setInvest({ tk, mode: "round" })} onDetail={(tk, hl) => { setAurDetail(tk); setAurHl(hl ?? null) }} />}
+          {tab === "market" && <AurelysMarket api={api} aur={aur} now={now} bets={open} focus={anaTk} onFocus={setAnaTk} onPick={(tk, dir) => setTicket({ kind: "aurelys", tk, dir })} onSubscribe={tk => setInvest({ tk, mode: "round" })} onDetail={(tk, hl) => { setAurDetail(tk); setAurHl(hl ?? null) }} />}
 
           {tab === "positions" && <>
             <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` (${open.length})` : ""}`], ["folio", "Portefeuille"], ["history", "Historique"]]} />
@@ -268,6 +274,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
       <Dock tab={showHowto && firstVisit ? null : tab} setTab={t => { if (firstVisit) howtoDone(); go(t) }} badge={open.length} />
 
       {aurDetail && <AurelysDetail tk={aurDetail} hl={aurHl} aur={aur} api={api} now={now} alerts={alerts} setAlerts={setAlerts} alertsMax={ALERTS_MAX} onClose={() => { setAurDetail(null); setAurHl(null) }} onPick={(tk, dir) => { setAurDetail(null); setTicket({ kind: "aurelys", tk, dir }) }}
+        onAnalyst={tk => { setAurDetail(null); setAnaTk(tk); setTab("market") }}
         onInvest={tk => { setAurDetail(null); setInvest({ tk, mode: "buy" }) }} />}
       {invest && <InvestSheet {...invest} api={api} aur={aur} me={me} hold={holds.find(h => h.tk === invest.tk)} onClose={() => setInvest(null)}
         onDone={async (args, ok) => { const r = await run(() => args.mode === "round" ? api.aurSubscribe(args.tk, args.amount) : api.aurOrder(args.mode === "buy" ? { action: "buy", tk: args.tk, amount: args.amount } : { action: "sell", tk: args.tk, qty: args.qty }), () => ok); if (r) setInvest(null) }} />}
