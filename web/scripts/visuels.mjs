@@ -1,6 +1,7 @@
 // Visuels de la page d'accueil, regénérés par `npm run visuels` (Chrome sans fenêtre, comme les tests d'écran) :
 //   public/og.png (1200 × 630, aperçu de partage), icônes PNG, captures WebP du jeu en démo (public/captures).
-import { mkdirSync, statSync } from "node:fs";
+//   `npm run visuels -- icones` : les icônes seulement.
+import { mkdirSync, statSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -22,6 +23,20 @@ const page = async (w, h, html) => {
   await b.size(w, h); await b.goto(url + "robots.txt"); await sleep(400);
   await b.evaluate(`document.open(); document.write(${JSON.stringify(html)}); document.close(); document.fonts.ready.then(() => true)`); await sleep(300);
 };
+// Icônes dessinées sur un canvas (une capture d'écran dépendait de la fenêtre : en émulation mobile, le logo tombait dans
+// un coin). « any » : le favicon, coins arrondis. Fond plein pour iOS (il arrondit lui-même) et pour Android « maskable »
+// (découpé en rond ou en goutte) : le logo réduit à 80 % tient dans la zone sûre.
+const LOGO = readFileSync(pub + "favicon.svg", "utf8"), FULL = LOGO.replace(/<rect[^>]*\/>/, '<rect width="64" height="64" fill="#0F1117"/><g transform="translate(32 32) scale(.8) translate(-32 -31.5)">').replace("</svg>", "</g></svg>");
+const ICONS = [["icon-192.png", 192, LOGO], ["icon-512.png", 512, LOGO], ["apple-touch-icon.png", 180, FULL], ["icon-maskable-512.png", 512, FULL]];
+async function icons() {
+  await b.goto(url + "robots.txt");
+  for (const [f, n, svg] of ICONS) {
+    const data = await b.evaluate(`(async () => { const i = new Image(); i.src = "data:image/svg+xml," + encodeURIComponent(${JSON.stringify(svg)}); await i.decode();
+      const c = document.createElement("canvas"); c.width = c.height = ${n}; c.getContext("2d").drawImage(i, 0, 0, ${n}, ${n}); return c.toDataURL("image/png") })()`);
+    writeFileSync(pub + f, Buffer.from(data.split(",")[1], "base64"));
+    console.log(f, Math.round(statSync(pub + f).size / 1024), "Ko");
+  }
+}
 const FONTS = `<style>
 @font-face { font-family: Plex; font-weight: 400; src: url(/fonts/ibm-plex-sans-latin-400-normal.woff2) }
 @font-face { font-family: Cond; font-weight: 700; src: url(/fonts/ibm-plex-sans-condensed-latin-700-normal.woff2) }
@@ -31,6 +46,8 @@ html, body { margin: 0; background: #08090D; color: #E6E8EE }
 </style>`;
 
 try {
+  await icons();
+  if (process.argv.includes("icones")) { await b.close(); await server.close(); process.exit(0) }
   // Bougies de Pixelfold, tirées par le moteur (graine fixe, choisie pour un cours qui monte : même image à chaque génération).
   const t0 = 1800000000, S = initState(t0, 185), cs = [];
   for (let v = t0, i = 0; i < 4; i++) { v += 120 * SPM; for (const k of advance(S, v).ticks) if (k.tk === "PXF") {
@@ -54,11 +71,6 @@ try {
     </div>
   </div>`);
   await b.shot(pub + "og.png", false);
-  // Icônes : fond plein (iOS arrondit lui-même les coins).
-  for (const [f, n] of [["apple-touch-icon.png", 180], ["icon-192.png", 192], ["icon-512.png", 512]]) {
-    await page(n, n, `${FONTS}<body style="background:#0F1117"><img src="/favicon.svg" width="${n}" height="${n}" style="display:block"></body>`);
-    await b.shot(pub + f, false);
-  }
   // Captures du jeu en démo, sur téléphone.
   mkdirSync(pub + "captures", { recursive: true });
   await b.size(375, 760); await b.goto(url + "jouer");
@@ -75,6 +87,6 @@ try {
   await b.evaluate(`document.querySelector(".sheet.detail .x").click(), true`);
   await b.click("Guilde", ".dock"); await sleep(1500);
   await b.shot(pub + "captures/guilde.webp", false, "webp");
-  for (const f of ["og.png", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "captures/marche.webp", "captures/fiche.webp", "captures/guilde.webp"])
+  for (const f of ["og.png", "captures/marche.webp", "captures/fiche.webp", "captures/guilde.webp"])
     console.log(f, Math.round(statSync(pub + f).size / 1024), "Ko");
 } finally { await b.close(); await server.close() }

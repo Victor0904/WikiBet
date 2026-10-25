@@ -15,7 +15,7 @@ self.addEventListener("push", e => e.waitUntil((async () => {
   } catch { }
   await self.registration.showNotification(title ?? "Aurelys", {
     body: lines.length ? lines.join("\n") : "Une de tes positions Aurelys approche de la liquidation, ou a été liquidée.",
-    icon: "/favicon.svg", badge: "/favicon.svg", tag: "liquidation", renotify: true,
+    icon: "/icon-192.png?v=2", badge: "/icon-192.png?v=2", tag: "liquidation", renotify: true,
   });
 })()));
 
