@@ -357,8 +357,6 @@ button:active:not(:disabled) { transform: scale(.96) }
 .tick b { font-weight: 600; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 
 /* Paris en cours en liste, état vide */
-.pos-list.vertical { flex-direction: column; overflow: visible; margin: 0; padding: 0 }
-.pos-list.vertical .pos { flex-basis: auto }
 .empty-state { text-align: center; padding: 36px 16px; display: flex; flex-direction: column; gap: 8px; align-items: center }
 .empty-state b { font: 700 20px var(--f-cond) }
 .empty-state p { margin: 0; max-width: 34ch }
@@ -576,7 +574,9 @@ button:active:not(:disabled) { transform: scale(.96) }
 .h-row:first-child { border-top: 0 }
 .h-row { display: grid; grid-template-columns: auto minmax(0, 1fr) 56px auto; gap: 10px; align-items: center; width: 100%; min-height: 58px; padding: 8px 16px; background: none; border: 0; border-top: 1px solid var(--line); color: inherit; font: inherit; text-align: left }
 button.h-row { cursor: pointer } button.h-row:active { background: var(--panel2) }
-.h-spark .spark { width: 56px; height: 28px; display: block }
+.h-spark .spark, .h-spark .tchart { width: 56px; height: 28px; display: block } .h-spark .dot { display: none }
+.h-row.danger { box-shadow: inset 3px 0 var(--down) } /* proche de la liquidation */
+.my-bet { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); margin-bottom: 12px } .my-bet .link { align-self: flex-start }
 .h-n { display: flex; flex-direction: column; gap: 2px; min-width: 0 }
 .h-n b { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 .h-n small { color: var(--muted); font-size: 12.5px } .h-row .r small { font-size: 12.5px }

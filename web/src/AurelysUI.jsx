@@ -547,7 +547,7 @@ const frameFor = (opens, now) => {
   return (FRAMES.find(([v]) => age / v < 70) ?? FRAMES.at(-1))[0];
 };
 
-export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onSell, onClose, onAnalyst, bets = [], hold, alerts = [], setAlerts, alertsMax = 1 }) {
+export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onSell, onClose, onAnalyst, onTrade, onAuto, canStop, bets = [], hold, alerts = [], setAlerts, alertsMax = 1 }) {
   const s = BY[tk], q = aur.quotes[tk], c = chgOf(aur, tk, now), my = mineOf(tk, bets, hold);
   const [g, setG] = useState(() => hl ? 60 : frameFor(my.opens, now) ?? (hold ? 60 : 15)), [ind, setInd] = useState({ mm20: true, mm50: false, boll: false, rsi: false }), [long, setLong] = useState([]), [mins, setMins] = useState([]), [mark, setMark] = useState(null);
   // Assez d'historique pour remonter de 400 bougies (plus 50 pour la MM 50) : bougies d'une heure d'Aurelys (10 jours réels
@@ -580,7 +580,7 @@ export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onSell,
         <AurChart key={g} rows={cs} g={g} last={q?.p} ind={ind} marks={aur.news.filter(n => n.tk === tk)} onMark={setMark} hl={hl} lines={my.lines} opens={my.opens} />
         {hl && <p className="muted small">Trait ambre : la rumeur, {gwhen(hl * 1000, now)}.</p>}
         {mark && <Article api={api} n={mark} now={now} onClose={() => setMark(null)} onDetail={() => setMark(null)} />}
-        {(my.mine.length > 0 || hold) && <MyStake tk={tk} mine={my.mine} hold={hold} aur={aur} now={now} onSell={onSell} />}
+        {(my.mine.length > 0 || hold) && <MyStake tk={tk} mine={my.mine} hold={hold} aur={aur} now={now} onSell={onSell} onTrade={onTrade} onAuto={onAuto} canStop={canStop} />}
         <div className="qbtns">
           <button type="button" className="buy" disabled={!q || q.halt} onClick={() => onPick(tk, "up")}><span>▲ Hausse</span></button>
           <button type="button" className="sell" disabled={!q || q.halt} onClick={() => onPick(tk, "down")}><span>▼ Baisse</span></button>
@@ -627,29 +627,75 @@ export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onSell,
 }
 
 // Fiche : ce que j'ai sur cette société (positions à levier en cours, actions détenues), gain ou perte en direct.
-function MyStake({ tk, mine, hold, aur, now, onSell }) {
+function MyStake({ tk, mine, hold, aur, now, onSell, onTrade, onAuto, canStop }) {
   const q = aur.quotes[tk], p = q?.p ?? hold?.price, val = hold ? hold.qty * p : 0, g = hold ? val - hold.cost : 0;
   return (
     <section className="d-sec">
       <h2>Ma position</h2>
-      <div className="plain">
-        {mine.map(b => {
-          const x = aurLive(b, q, aur.ticks[tk], aur.feeRate, aur.cut);
-          return <div key={b.id} className="plain-row"><span>{`${b.dir === "up" ? "▲" : "▼"} ×${b.lev}, ${W(b.stake)} depuis ${gdur(now - Date.parse(b.created_at))}`}</span>
-            <b className={"mono " + cls(x.net)}>{`${sW(x.net)}, ${pct(x.net / b.stake)}`}</b></div>;
-        })}
-        {hold && <>
-          <div className="plain-row"><span>{`${nf2.format(hold.qty).replace(/,00$/, "")} actions`}</span><b className="mono">{W(val)}</b></div>
-          <div className="plain-row"><span>Plus-value</span><b className={"mono " + cls(g)}>{`${sW(g)}, ${pct(g / hold.cost)}`}</b></div>
-          <div className="plain-row"><span>Achat moyen, cours</span><b className="mono">{`${px(hold.cost / hold.qty)}, ${px(p)}`}</b></div>
-          {BY[tk]?.div > 0 && <div className="plain-row"><span>Dividende</span><b className="mono">{nf2.format(BY[tk].div)} % par an</b></div>}
-        </>}
-      </div>
-      <p className="muted small">Pointillés sur le graphique : entrée, liquidation, stop, objectif et achat moyen ; trait vertical : ouverture.</p>
+      {mine.map(b => <MyBet key={b.id} b={b} aur={aur} now={now} onTrade={onTrade} onAuto={onAuto} canStop={canStop} />)}
+      {hold && <div className="plain">
+        <div className="plain-row"><span>{`${nf2.format(hold.qty).replace(/,00$/, "")} actions`}</span><b className="mono">{W(val)}</b></div>
+        <div className="plain-row"><span>Plus-value</span><b className={"mono " + cls(g)}>{`${sW(g)}, ${pct(g / hold.cost)}`}</b></div>
+        <div className="plain-row"><span>Achat moyen, cours</span><b className="mono">{`${px(hold.cost / hold.qty)}, ${px(p)}`}</b></div>
+        {BY[tk]?.div > 0 && <div className="plain-row"><span>Dividende</span><b className="mono">{nf2.format(BY[tk].div)} % par an</b></div>}
+      </div>}
       {hold && onSell && <button type="button" className="btn" disabled={!q || q.halt} onClick={() => onSell(hold)}>Vendre mes actions</button>}
+      <p className="muted small">Pointillés sur le graphique : entrée, liquidation, stop, objectif et achat moyen ; trait vertical : ouverture.</p>
     </section>
   );
 }
+// Une position à levier dans la fiche : gain en direct, seuils, clôture, stop et objectif (comme la carte de position).
+function MyBet({ b, aur, now, onTrade, onAuto, canStop }) {
+  const x = aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur], aur.feeRate, aur.cut), [ask, setAsk] = useState(false), [auto, setAuto] = useState(false), [busy, setBusy] = useState(false);
+  return (
+    <div className="my-bet">
+      <div className="plain">
+        <div className="plain-row"><span>{`${b.dir === "up" ? "▲" : "▼"} ×${b.lev}, ${W(b.stake)} depuis ${gdur(now - Date.parse(b.created_at))}`}</span>
+          <b className={"mono " + cls(x.net)}>{`${sW(x.net)}, ${pct(x.net / b.stake)}`}</b></div>
+        <div className="plain-row"><span>Entrée, liquidation</span><b className="mono">{`${px(b.entry)}, ${px(x.lq)}`}</b></div>
+        {(b.sl != null || b.tp != null) && <div className="plain-row"><span>Stop, objectif</span><b className="mono">{`${px(b.sl)}, ${px(b.tp)}`}</b></div>}
+      </div>
+      {onAuto && (auto ? <AutoForm b={b} onAuto={onAuto} canStop={canStop} onDone={() => setAuto(false)} />
+        : <button type="button" className="link" onClick={() => setAuto(true)}>{b.sl != null || b.tp != null ? "Modifier le stop et l'objectif" : "Ajouter un stop ou un objectif"}</button>)}
+      {onTrade && (x.hit ? <p className="muted small">Seuil de liquidation touché, règlement en cours…</p>
+        : <button type="button" className="btn primary" disabled={busy || x.halt} onClick={() => setAsk(true)}>{`Clôturer pour ${W(x.value)}`}</button>)}
+      {ask && !x.hit && <CloseSheet b={b} x={x} busy={busy} onCancel={() => setAsk(false)} onConfirm={async () => { setBusy(true); await onTrade(b); setBusy(false); setAsk(false) }} />}
+    </div>
+  );
+}
+
+// Positions en cours, toutes visibles d'un coup : une ligne par position (courbe depuis l'ouverture, gain si je clôture
+// maintenant). Un appui ouvre la fiche : graphique navigable, clôture, stop et objectif.
+export function OpenList({ bets, aur, now, onOpen }) {
+  const rows = bets.filter(b => b.kind === "aurelys").sort((a, b) => b.id - a.id).map(b => ({ b, x: aurLive(b, aur.quotes[b.aur], aur.ticks[b.aur], aur.feeRate, aur.cut) }));
+  const net = rows.reduce((a, r) => a + r.x.net, 0), stake = rows.reduce((a, r) => a + r.b.stake, 0);
+  return (
+    <section className="folio">
+      <div className="folio-total"><small>Si tu clôtures tout maintenant</small><b className={"mono " + cls(net)}>{sW(net)}</b>
+        <span className="mono muted">{`${rows.length} en cours, ${W(stake)} misés`}</span></div>
+      <div className="p-list">
+        {rows.map(({ b, x }) => {
+          const t0 = Date.parse(b.created_at), danger = !x.hit && x.value <= .25 * b.stake, name = BY[b.aur]?.name ?? b.aur;
+          return (
+            <button key={b.id} type="button" className={"h-row" + (danger ? " danger" : "")} onClick={() => onOpen(b.aur)} aria-label={`Graphique de ma position ${name}`}>
+              <TkIcon tk={b.aur} size={30} />
+              <span className="h-n"><b>{name}</b><small>{`${b.dir === "up" ? "▲ Hausse" : "▼ Baisse"} ×${b.lev}, ${W(b.stake)}${x.hit ? ", liquidée" : ""}`}</small></span>
+              <span className="h-spark"><PositionChart id={"r" + b.id} entry={b.entry} dir={b.dir} pts={posPts(b, aur, now, x.px)} x0={t0} x1={Math.max(now, t0 + 60 * SPM * 1000)} h={28} /></span>
+              <span className="r mono"><b className={cls(x.net)}>{sW(x.net)}</b><small className={cls(x.net)}>{pct(x.net / b.stake)}</small></span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="muted small">Touche une position pour son graphique, la clôturer ou poser un stop.</p>
+    </section>
+  );
+}
+// Courbe d'une position : cours minute par minute tant qu'on les a (dernière heure réelle), sinon bougies d'une heure d'Aurelys.
+const posPts = (b, aur, now, last) => {
+  const t0 = Date.parse(b.created_at), ticks = aur.ticks[b.aur];
+  const cs = (aur.candles[b.aur] ?? []).filter(k => k[0] * 1000 > t0 - 300000), recent = (ticks ?? []).filter(k => k[0] * 1000 > t0);
+  return [[t0, b.entry], ...((ticks?.[0]?.[0] ?? Infinity) * 1000 <= t0 ? recent.map(k => [k[0] * 1000, k[1]]) : cs.map(k => [Math.min(now, (k[0] + 60 * SPM) * 1000), k[4]])), [now, last]];
+};
 
 // Volatilité réalisée sur les 24 dernières bougies d'une heure, ramenée à un jour d'Aurelys.
 function realizedVol(cs) {
@@ -705,9 +751,7 @@ function AutoForm({ b, onAuto, canStop, onDone }) {
 
 export function AurelysCard({ b, aur, now, onClose, onAuto, canStop, onDetail, Facts }) {
   const q = aur.quotes[b.aur], ticks = aur.ticks[b.aur], x = aurLive(b, q, ticks, aur.feeRate, aur.cut), t0 = Date.parse(b.created_at), [busy, setBusy] = useState(false), [auto, setAuto] = useState(false), [ask, setAsk] = useState(false);
-  // Cours minute par minute tant qu'on les a (dernière heure réelle), sinon bougies d'une heure d'Aurelys.
-  const cs = (aur.candles[b.aur] ?? []).filter(k => k[0] * 1000 > t0 - 300000), recent = (ticks ?? []).filter(k => k[0] * 1000 > t0);
-  const pts = [[t0, b.entry], ...((ticks?.[0]?.[0] ?? Infinity) * 1000 <= t0 ? recent.map(k => [k[0] * 1000, k[1]]) : cs.map(k => [Math.min(now, (k[0] + 60 * SPM) * 1000), k[4]])), [now, x.px]];
+  const pts = posPts(b, aur, now, x.px);
   const d = x.lq / x.px - 1, danger = !x.hit && x.value <= .25 * b.stake; // proche de la liquidation : la carte clignote
   return (
     <article className={"pos " + (x.net >= 0 ? "gain" : "loss") + (danger ? " danger" : "")}>

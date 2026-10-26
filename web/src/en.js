@@ -2127,4 +2127,10 @@ export default {
   "Graphique de ma position {0}": "Chart of my {0} position",
   "{0} actions{1}": "{0} shares{1}",
   ", jeune pousse": ", start-up",
+  "Entrée, liquidation": "Entry, liquidation",
+  "Stop, objectif": "Stop, target",
+  "Si tu clôtures tout maintenant": "If you close everything now",
+  ", liquidée": ", liquidated",
+  "Touche une position pour son graphique, la clôturer ou poser un stop.": "Tap a position to see its chart, close it or set a stop.",
+  "{0} en cours, {1} misés": "{0} open, {1} staked",
 };

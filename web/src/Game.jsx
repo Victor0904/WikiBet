@@ -4,7 +4,7 @@ import { liqPrice, BK_LIMIT, CAP0, EPOCH, CYCLE_MS } from "./engine.js";
 import { nf0, nf2, W, sW, clock, cls, HIST_DAYS, ALERTS_MAX, MAX_POS } from "./format.js";
 import { LEVS, LEV_LEVEL, LEV_DIVISION, DIVISIONS, QUEST_BY, TRIGGER_LEVEL, unlocksAt } from "../supabase/functions/_shared/progression.js";
 import { useAurelys } from "./aurelys.js";
-import { AurelysMarket, AurelysDetail, AurelysCard, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
+import { AurelysMarket, AurelysDetail, AurelysCard, OpenList, aurLive, aurCap, px as aurPx } from "./AurelysUI.jsx";
 import { Achievements } from "./Succes.jsx";
 import { Quests } from "./Quetes.jsx";
 import { League } from "./Ligue.jsx";
@@ -239,7 +239,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
             : posView === "open" ? <>
               {api.push && positions.length > 0 && <PushPanel push={api.push} compact />}
               <Triggers list={triggers} onCancel={cancelTrigger} />
-              {open.length ? <Positions vertical now={now} aur={aur} bets={open} onClose={closeTrade} onAuto={onAuto} canStop={canStop} onDetail={setAurDetail} />
+              {open.length ? <OpenList now={now} aur={aur} bets={open} onOpen={setAurDetail} />
                 : <div className="empty-state"><b>Aucun pari en cours</b><p className="muted">Prends position sur une action d'Aurelys.</p>
                     <div className="empty-acts"><button type="button" className="btn primary" onClick={() => go("market")}>Marché</button></div></div>}
             </> : <History bets={withExtras(bets.filter(b => b.status !== "open"), refs, refunds)} />}
@@ -275,7 +275,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
 
       {aurDetail && <AurelysDetail tk={aurDetail} hl={aurHl} aur={aur} api={api} now={now} alerts={alerts} setAlerts={setAlerts} alertsMax={ALERTS_MAX} onClose={() => { setAurDetail(null); setAurHl(null) }} onPick={(tk, dir) => { setAurDetail(null); setTicket({ kind: "aurelys", tk, dir }) }}
         onAnalyst={tk => { setAurDetail(null); setAnaTk(tk); setTab("market") }}
-        onInvest={tk => { setAurDetail(null); setInvest({ tk, mode: "buy" }) }} bets={open} hold={holds.find(h => h.tk === aurDetail && h.status !== "round")}
+        onInvest={tk => { setAurDetail(null); setInvest({ tk, mode: "buy" }) }} bets={open} onTrade={closeTrade} onAuto={onAuto} canStop={canStop} hold={holds.find(h => h.tk === aurDetail && h.status !== "round")}
         onSell={h => { setAurDetail(null); setInvest({ tk: h.tk, mode: "sell", qty: h.qty }) }} />}
       {invest && <InvestSheet {...invest} api={api} aur={aur} me={me} hold={holds.find(h => h.tk === invest.tk)} onClose={() => setInvest(null)}
         onDone={async (args, ok) => { const r = await run(() => args.mode === "round" ? api.aurSubscribe(args.tk, args.amount) : api.aurOrder(args.mode === "buy" ? { action: "buy", tk: args.tk, amount: args.amount } : { action: "sell", tk: args.tk, qty: args.qty }), () => ok); if (r) setInvest(null) }} />}
@@ -390,11 +390,10 @@ function Triggers({ list, onCancel }) {
   );
 }
 
-function Positions({ now, aur, bets, onClose, onAuto, canStop, onDetail, vertical }) {
-  if (!bets.length && !vertical) return <div className="panel empty-pos"><h2>Mes positions</h2><p className="muted">Aucune position ouverte. Choisis une action d'Aurelys et prends position à la hausse ou à la baisse.</p></div>;
+function Positions({ now, aur, bets, onClose, onAuto, canStop, onDetail }) {
+  if (!bets.length) return <div className="panel empty-pos"><h2>Mes positions</h2><p className="muted">Aucune position ouverte. Choisis une action d'Aurelys et prends position à la hausse ou à la baisse.</p></div>;
   const list = [...bets].filter(b => b.kind === "aurelys").sort((a, b) => b.id - a.id);
   const cards = list.map(b => <AurelysCard key={b.id} b={b} aur={aur} now={now} onClose={onClose} onAuto={onAuto} canStop={canStop} onDetail={onDetail} Facts={Facts} />);
-  if (vertical) return <div className="pos-list vertical">{cards}</div>;
   return (
     <section className="panel">
       <h2>Mes positions <span className="muted">{bets.length} en cours</span></h2>

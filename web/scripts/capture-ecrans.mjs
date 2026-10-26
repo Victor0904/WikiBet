@@ -26,7 +26,7 @@ const SCREENS = {
   portefeuille: async () => { await press("Positions", ".dock"); await sleep(500); await press("Portefeuille") },
   // Fiche ouverte depuis le portefeuille (achat moyen) et depuis une position à levier (entrée, liquidation, ouverture).
   "fiche-action": async () => { await press("Positions", ".dock"); await sleep(500); await press("Portefeuille"); await sleep(800); await b.evaluate(`document.querySelector("main button.h-row")?.click(), true`); await sleep(2500) },
-  "fiche-position": async () => { await press("Positions", ".dock"); await sleep(800); await b.evaluate(`document.querySelector("main .pos-chart")?.click(), true`); await sleep(2500) },
+  "fiche-position": async () => { await press("Positions", ".dock"); await sleep(800); await b.evaluate(`document.querySelector("main button.h-row")?.click(), true`); await sleep(2500) },
   historique: async () => { await press("Positions", ".dock"); await sleep(500); await press("Historique") },
   quetes: () => press("Quêtes", ".dock"),
   // Groupe de ligue de 12 joueurs (Or 2), dont le joueur, et une saison passée.
@@ -59,21 +59,22 @@ const SCREENS = {
   compte: async () => { await press("Plus", ".dock"); await sleep(500); await press("Mon compte") },
   howto: async () => { await press("Plus", ".dock"); await sleep(500); await press("Comment jouer") },
   investir: async () => { await press("Actions"); await sleep(600); await b.evaluate(`document.querySelector("main .srow-open")?.click(), true`); await sleep(1200); await press("Investir", ".sheet"); await sleep(1200) },
-  cloture: async () => { await press("Positions", ".dock"); await sleep(800); await press("Clôturer pour"); await sleep(1200) },
+  cloture: async () => { await press("Positions", ".dock"); await sleep(800); await b.evaluate(`document.querySelector("main button.h-row")?.click(), true`); await sleep(2000); await press("Clôturer pour", ".sheet"); await sleep(1200) },
   amis: async () => { await press("Plus", ".dock"); await sleep(500); await press("Amis") },
   sources: async () => { await press("Plus", ".dock"); await sleep(500); await press("Sources des données") },
   confidentialite: async () => { await press("Plus", ".dock"); await sleep(500); await press("Confidentialité") },
 };
 try {
   await openApp(b, srv.url);
-  // Un joueur qui a un peu joué : niveau, une position ouverte, un trade réglé, un pari du jour.
+  // Un joueur qui a un peu joué : niveau, cinq positions ouvertes, un trade réglé, un pari du jour.
   await sql("update profiles set xp = 900 where not bot");
   await sql("insert into aur_pari (day, kind, tks, open_until, resolve_at) values (paris_date(now()), 'B', array['NXR', 'OMB', 'VLS'], now() + interval '2 hours', now() + interval '5 hours') on conflict do nothing");
   await sql(`insert into bets (user_id, session, day, kind, stake, aur, dir, lev, entry, exit, status, payout, fees, fee_open, created_at, closed_at, exit_at)
     select id, (select k from game_now()), 0, 'aurelys', 500, 'NXR', 'down', 5, 100, 99, 'won', 524, 2, 1, now() - interval '9 minutes', now(), now() from profiles where not bot`);
   await sleep(4000); // premiers cours de la démo
   await sql(`insert into bets (user_id, session, day, kind, stake, aur, dir, lev, entry, fees, fee_open, created_at)
-    select id, (select k from game_now()), 0, 'aurelys', 800, 'OMB', 'up', 5, (select p * .998 from aur_ticks where tk = 'OMB' and t <= now() order by t desc limit 1), 4, 4, now() - interval '4 minutes' from profiles where not bot`);
+    select id, (select k from game_now()), 0, 'aurelys', st, tk, d, l, (select p * m from aur_ticks where aur_ticks.tk = v.tk and t <= now() order by t desc limit 1), 4, 4, now() - interval '4 minutes'
+    from profiles, (values ('OMB', 'up', 5, 800, .998), ('GTR', 'down', 2, 500, .996), ('NXR', 'up', 1, 1200, 1.004), ('LMR', 'up', 5, 300, 1.01), ('HLV', 'down', 2, 650, 1.001)) v(tk, d, l, st, m) where not bot`);
   await sql("insert into aur_holdings (user_id, tk, qty, cost) select id, tk, q, q * c from profiles, (values ('NXR', 12, 130), ('GTR', 80, 23), ('LMR', 50, 17.5)) v(tk, q, c) where not bot");
   await sql("insert into h1_refunds (user_id, kind, item, amount) select id, 'logement', 'studio', 7200 from profiles where not bot");
   await b.size(+width, +width < 600 ? 812 : 900);
