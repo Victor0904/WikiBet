@@ -1,8 +1,8 @@
 // Portefeuille d'actions (sans levier) : valeur dans le temps (seule chose marquante), chiffres, répartition, une ligne
-// par société qui se déplie (détail, Renforcer, Vendre).
+// par société : un appui ouvre la fiche avec le graphique de ma position (Renforcer, Vendre).
 import { useMemo, useRef, useState } from "react";
 import { BY, SPM } from "../supabase/functions/_shared/aurelys.js";
-import { TkIcon, px as aurPx } from "./AurelysUI.jsx";
+import { TkIcon } from "./AurelysUI.jsx";
 import { Spark } from "./charts.jsx";
 import { W, sW, nf0, nf2, pct, cls, clock } from "./format.js";
 
@@ -45,7 +45,7 @@ function ValueChart({ pts, cost }) {
   );
 }
 
-export default function Portfolio({ holds, aur, px, onSell, onBuy, onMarket }) {
+export default function Portfolio({ holds, aur, px, onDetail, onMarket }) {
   const pts = useMemo(() => history(holds, aur, px), [holds, aur, aur.candles, px]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!holds.length) return (
     <div className="empty-state"><b>Portefeuille vide</b>
@@ -78,29 +78,15 @@ export default function Portfolio({ holds, aur, px, onSell, onBuy, onMarket }) {
       <section className="b-sec">
         <h2>Mes actions</h2>
         <div className="p-list">
-          {rows.map(({ h, d, p, val, gain: g }) => {
-            const v = series(aur, h.tk).map(k => k[1]);
+          {rows.map(({ h, d, val, gain: g }) => {
+            const v = series(aur, h.tk).map(k => k[1]), round = h.status === "round", Row = round ? "div" : "button";
             return (
-              <details key={h.tk} className="h-row">
-                <summary>
-                  <TkIcon tk={h.tk} size={30} />
-                  <span className="h-n"><b>{d.name ?? h.tk}</b><small>{h.status === "round" ? "levée en cours, cotation à venir" : `${nf2.format(h.qty).replace(/,00$/, "")} actions${h.status === "listed" ? ", jeune pousse" : ""}`}</small></span>
-                  <span className="r mono"><b>{W(val)}</b><small className={cls(g)}>{pct(g / h.cost)}</small></span>
-                </summary>
-                <div className="h-more">
-                  {v.length > 1 && <Spark path={v} t={v.length - 1} h={34} />}
-                  <div className="plain">
-                    <div className="plain-row"><span>Plus-value</span><b className={"mono " + cls(g)}>{sW(g)}</b></div>
-                    <div className="plain-row"><span>Achat moyen, cours</span><b className="mono">{`${aurPx(h.cost / h.qty)}, ${aurPx(p)}`}</b></div>
-                    <div className="plain-row"><span>Poids</span><b className="mono">{nf0.format(val / tot * 100)} %</b></div>
-                    {d.div > 0 && <div className="plain-row"><span>Dividende</span><b className="mono">{nf2.format(d.div)} % par an</b></div>}
-                  </div>
-                  {h.status !== "round" && <div className="empty-acts">
-                    <button type="button" className="btn" onClick={() => onBuy(h.tk)}>Renforcer</button>
-                    <button type="button" className="btn" onClick={() => onSell(h)}>Vendre</button>
-                  </div>}
-                </div>
-              </details>
+              <Row key={h.tk} className="h-row" {...(!round && { type: "button", onClick: () => onDetail(h.tk), "aria-label": `Graphique de ma position ${d.name ?? h.tk}` })}>
+                <TkIcon tk={h.tk} size={30} />
+                <span className="h-n"><b>{d.name ?? h.tk}</b><small>{round ? "levée en cours, cotation à venir" : `${nf2.format(h.qty).replace(/,00$/, "")} actions${h.status === "listed" ? ", jeune pousse" : ""}`}</small></span>
+                <span className="h-spark">{v.length > 1 && <Spark path={v} t={v.length - 1} h={28} />}</span>
+                <span className="r mono"><b>{W(val)}</b><small className={cls(g)}>{`${g >= 0 ? "▲" : "▼"} ${pct(g / h.cost)}`}</small></span>
+              </Row>
             );
           })}
         </div>

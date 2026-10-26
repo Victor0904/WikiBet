@@ -235,7 +235,7 @@ export default function Game({ api, trial = false, onNoProfile }) {
 
           {tab === "positions" && <>
             <Segmented label="Mes paris" value={posView} onChange={setPosView} options={[["open", `En cours${open.length ? ` (${open.length})` : ""}`], ["folio", "Portefeuille"], ["history", "Historique"]]} />
-            {posView === "folio" ? <Portfolio holds={holds} aur={aur} px={holdPx} onSell={h => setInvest({ tk: h.tk, mode: "sell", qty: h.qty })} onBuy={tk => setInvest({ tk, mode: "buy" })} onMarket={() => go("market")} />
+            {posView === "folio" ? <Portfolio holds={holds} aur={aur} px={holdPx} onDetail={setAurDetail} onMarket={() => go("market")} />
             : posView === "open" ? <>
               {api.push && positions.length > 0 && <PushPanel push={api.push} compact />}
               <Triggers list={triggers} onCancel={cancelTrigger} />
@@ -275,7 +275,8 @@ export default function Game({ api, trial = false, onNoProfile }) {
 
       {aurDetail && <AurelysDetail tk={aurDetail} hl={aurHl} aur={aur} api={api} now={now} alerts={alerts} setAlerts={setAlerts} alertsMax={ALERTS_MAX} onClose={() => { setAurDetail(null); setAurHl(null) }} onPick={(tk, dir) => { setAurDetail(null); setTicket({ kind: "aurelys", tk, dir }) }}
         onAnalyst={tk => { setAurDetail(null); setAnaTk(tk); setTab("market") }}
-        onInvest={tk => { setAurDetail(null); setInvest({ tk, mode: "buy" }) }} />}
+        onInvest={tk => { setAurDetail(null); setInvest({ tk, mode: "buy" }) }} bets={open} hold={holds.find(h => h.tk === aurDetail && h.status !== "round")}
+        onSell={h => { setAurDetail(null); setInvest({ tk: h.tk, mode: "sell", qty: h.qty }) }} />}
       {invest && <InvestSheet {...invest} api={api} aur={aur} me={me} hold={holds.find(h => h.tk === invest.tk)} onClose={() => setInvest(null)}
         onDone={async (args, ok) => { const r = await run(() => args.mode === "round" ? api.aurSubscribe(args.tk, args.amount) : api.aurOrder(args.mode === "buy" ? { action: "buy", tk: args.tk, amount: args.amount } : { action: "sell", tk: args.tk, qty: args.qty }), () => ok); if (r) setInvest(null) }} />}
       {ticket && <Ticket aur={aur} me={me} ticket={ticket} openCount={positions.length + triggers.filter(g => g.status === "wait").length} pref={pref} setPref={setPref} onClose={() => setTicket(null)}

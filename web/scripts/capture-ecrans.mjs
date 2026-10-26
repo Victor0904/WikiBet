@@ -24,6 +24,9 @@ const SCREENS = {
   ticket: async () => { await press("Actions"); await sleep(600); await b.evaluate(`document.querySelector("main .srow-open")?.click(), true`); await sleep(1200); await press("▲", ".sheet"); await sleep(1200) },
   positions: () => press("Positions", ".dock"),
   portefeuille: async () => { await press("Positions", ".dock"); await sleep(500); await press("Portefeuille") },
+  // Fiche ouverte depuis le portefeuille (achat moyen) et depuis une position à levier (entrée, liquidation, ouverture).
+  "fiche-action": async () => { await press("Positions", ".dock"); await sleep(500); await press("Portefeuille"); await sleep(800); await b.evaluate(`document.querySelector("main button.h-row")?.click(), true`); await sleep(2500) },
+  "fiche-position": async () => { await press("Positions", ".dock"); await sleep(800); await b.evaluate(`document.querySelector("main .pos-chart")?.click(), true`); await sleep(2500) },
   historique: async () => { await press("Positions", ".dock"); await sleep(500); await press("Historique") },
   quetes: () => press("Quêtes", ".dock"),
   // Groupe de ligue de 12 joueurs (Or 2), dont le joueur, et une saison passée.

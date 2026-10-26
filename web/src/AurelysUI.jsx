@@ -410,26 +410,51 @@ function group(rows, g, isTick) {
     const [t, o, h, l, c, v] = isTick ? [r[0], r[1], r[1], r[1], r[1], r[2]] : r, m = t - (t - EPOCH_S) % span, k = out[out.length - 1];
     if (k && k.t === m) { k.h = Math.max(k.h, h); k.l = Math.min(k.l, l); k.c = c; k.v += v } else out.push({ t: m, o, h, l, c, v });
   }
-  return out.slice(-80);
+  return out;
 }
 
 const gLabel = (t, g) => { const c = gameClock(t); return g >= 60 ? `j${c.day} ${c.hm}` : c.hm };
-function AurChart({ cs, g, last, ind, marks, onMark, hl }) {
-  const [hover, setHover] = useState(null), box = useRef(null);
-  if (!cs.length) return <div className="candles empty"><Loading size={48} label="Chargement du graphique…" /></div>;
-  const closes = cs.map(k => k.c), m20 = sma(closes, 20), m50 = sma(closes, 50), bb = bollinger(closes, 20);
-  const band = bb.map((b, i) => b && [i, b[0], b[1]]).filter(Boolean);
-  const lo0 = Math.min(...cs.map(k => k.l), ...(ind.boll ? bb.filter(Boolean).map(b => b[0]) : [])), hi0 = Math.max(...cs.map(k => k.h), ...(ind.boll ? bb.filter(Boolean).map(b => b[1]) : []));
+// Fenêtre affichée : n bougies, finissant `off` bougies avant la dernière. Glisser pour remonter le temps, molette ou − / + pour zoomer.
+const fitView = ({ n, off }, len) => { n = Math.max(Math.min(20, len), Math.min(n, len, 400)); return { n, off: Math.max(0, Math.min(off, len - n)) } };
+// lines : cours de référence ({ v, label, c, fit } : entrée, liquidation, stop, objectif, achat moyen ; fit = toujours dans l'échelle).
+// opens : ouvertures de mes positions ({ t, label }, t en secondes réelles).
+function AurChart({ rows, g, last, ind, marks, onMark, hl, lines = [], opens = [] }) {
+  const [hover, setHover] = useState(null), [view, setView] = useState({ n: 80, off: 0 }), box = useRef(null), drag = useRef(null), len = useRef(0);
+  len.current = rows.length;
+  const zoom = f => setView(v => fitView({ n: Math.round(v.n * f), off: v.off }, len.current));
+  useEffect(() => {
+    const el = box.current; if (!el) return;
+    const w = e => { e.preventDefault(); zoom(e.deltaY > 0 ? 1.15 : 1 / 1.15) };
+    el.addEventListener("wheel", w, { passive: false }); return () => el.removeEventListener("wheel", w);
+  }, [rows.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!rows.length) return <div className="candles empty"><Loading size={48} label="Chargement du graphique…" /></div>;
+  // Indicateurs sur tout l'historique chargé (une MM 50 juste dès la première bougie affichée), puis découpés.
+  const all = rows.map(k => k.c), { n, off } = fitView(view, rows.length), end = rows.length - off, start = end - n;
+  const cut = a => a.slice(start, end), cs = cut(rows), closes = cut(all), m20 = cut(sma(all, 20)), m50 = cut(sma(all, 50)), bb = cut(bollinger(all, 20));
+  const band = bb.map((b, i) => b && [i, b[0], b[1]]).filter(Boolean), fit = lines.filter(l => l.fit).map(l => l.v);
+  const lo0 = Math.min(...cs.map(k => k.l), ...fit, ...(ind.boll ? bb.filter(Boolean).map(b => b[0]) : [])), hi0 = Math.max(...cs.map(k => k.h), ...fit, ...(ind.boll ? bb.filter(Boolean).map(b => b[1]) : []));
   const lo = Math.min(lo0, last ?? Infinity), hi = Math.max(hi0, last ?? -Infinity), r = (hi - lo) || hi * .001;
   const H = 100, PH = 78, Y = v => 4 + (1 - (v - lo) / r) * (PH - 8), w = 100 / cs.length, X = i => i * w + w / 2;
   const vmax = Math.max(...cs.map(k => k.v), 1), VY = v => H - v / vmax * (H - PH - 4);
   const line = a => a.map((v, i) => v == null ? null : `${X(i).toFixed(2)},${Y(v).toFixed(2)}`).filter(Boolean).map((p, i) => (i ? "L" : "M") + p).join("");
-  const t0 = cs[0].t, t1 = cs[cs.length - 1].t + g * SPM;
-  const at = e => { const b = box.current.getBoundingClientRect(), i = Math.floor((e.clientX - b.left - 10) / (b.width - 80) * cs.length); setHover(Math.max(0, Math.min(cs.length - 1, i))) };
+  const t0 = cs[0].t, t1 = cs[cs.length - 1].t + g * SPM, XT = t => (t - t0) / (t1 - t0);
+  const at = e => { const b = box.current.getBoundingClientRect(); setHover(Math.max(0, Math.min(cs.length - 1, Math.floor((e.clientX - b.left - 10) / (b.width - 80) * cs.length)))) };
+  const down = e => { drag.current = { x: e.clientX, off, moved: false }; at(e) };
+  const move = e => {
+    const d = drag.current;
+    if (d && e.buttons) {
+      const dx = e.clientX - d.x;
+      if (!d.moved && Math.abs(dx) > 6) { d.moved = true; e.currentTarget.setPointerCapture?.(e.pointerId) }
+      if (d.moved) { setHover(null); setView(v => fitView({ n: v.n, off: d.off + Math.round(dx / (box.current.offsetWidth - 80) * n) }, len.current)); return }
+    }
+    at(e);
+  };
+  const shown = lines.filter(l => l.v >= lo && l.v <= hi), here = opens.filter(o => o.t >= t0 && o.t < t1);
+  const lineCol = c => c === "up" ? "var(--up)" : c === "down" ? "var(--down)" : "var(--ink)";
   const hk = hover != null ? cs[hover] : null;
   return (
     <>
-      <div className="candles aur-chart" ref={box} onPointerMove={at} onPointerDown={at} onPointerLeave={() => setHover(null)}>
+      <div className="candles aur-chart" ref={box} onPointerDown={down} onPointerMove={move} onPointerUp={() => { drag.current = null }} onPointerLeave={() => { drag.current = null; setHover(null) }}>
         <svg viewBox={`0 0 100 ${H}`} preserveAspectRatio="none" aria-label="Graphique en bougies avec volumes">
           {ind.boll && band.length > 1 && <path d={"M" + [...band.map(([i, , u]) => [X(i), Y(u)]), ...band.map(([i, l]) => [X(i), Y(l)]).reverse()].map(p => p.map(n => n.toFixed(2)).join(",")).join("L") + "Z"} fill="rgba(144, 151, 168, .14)" stroke="none" />}
           {cs.map((k, i) => {
@@ -442,19 +467,29 @@ function AurChart({ cs, g, last, ind, marks, onMark, hl }) {
           })}
           {ind.mm20 && <path d={line(m20)} fill="none" stroke="#c98500" strokeWidth="2" vectorEffect="non-scaling-stroke" />}
           {ind.mm50 && <path d={line(m50)} fill="none" stroke="#3987e5" strokeWidth="2" vectorEffect="non-scaling-stroke" />}
+          {shown.map((l, i) => <line key={i} x1="0" x2="100" y1={Y(l.v)} y2={Y(l.v)} stroke={lineCol(l.c)} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />)}
+          {here.map((o, i) => <line key={i} x1={XT(o.t) * 100} x2={XT(o.t) * 100} y1="0" y2={PH} stroke="var(--ink)" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />)}
           {last != null && <line x1="0" x2="100" y1={Y(last)} y2={Y(last)} stroke="var(--accent)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
           {hk && <line x1={X(hover)} x2={X(hover)} y1="0" y2={H} stroke="var(--faint)" vectorEffect="non-scaling-stroke" />}
-          {hl >= t0 && hl < t1 && <line x1={(hl - t0) / (t1 - t0) * 100} x2={(hl - t0) / (t1 - t0) * 100} y1="0" y2={H} stroke="var(--accent)" strokeWidth="2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />}
+          {hl >= t0 && hl < t1 && <line x1={XT(hl) * 100} x2={XT(hl) * 100} y1="0" y2={H} stroke="var(--accent)" strokeWidth="2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />}
         </svg>
         {marks.filter(n => sec(n.at) >= t0 && sec(n.at) < t1).map(n => (
-          <button key={n.id} type="button" className={"nmark " + (n.sent > .15 ? "up" : n.sent < -.15 ? "down" : "flat")} style={{ left: `calc(10px + (100% - 80px) * ${(sec(n.at) - t0) / (t1 - t0)})` }} onClick={() => onMark(n)} aria-label={`Actualité : ${n.title}`} />
+          <button key={n.id} type="button" className={"nmark " + (n.sent > .15 ? "up" : n.sent < -.15 ? "down" : "flat")} style={{ left: `calc(10px + (100% - 80px) * ${XT(sec(n.at))})` }} onClick={() => onMark(n)} aria-label={`Actualité : ${n.title}`} />
         ))}
+        {shown.map((l, i) => <span key={i} className={"ax-ref mono " + (l.c || "")} style={{ top: `calc(10px + (100% - 32px) * ${Y(l.v) / 100})` }}>{`${l.label} ${px(l.v)}`}</span>)}
+        {here.map((o, i) => <span key={i} className="ax-open mono" style={{ left: `calc(10px + (100% - 80px) * ${XT(o.t)})` }}>{o.label}</span>)}
         <span className="ax ax-hi mono">{px(hi)}</span>
         <span className="ax ax-lo mono">{px(lo)}</span>
         {last != null && <span className="ax last mono" style={{ top: `calc(10px + (100% - 32px) * ${Y(last) / 100})` }}>{px(last)}</span>}
         <span className="ax t0 mono">{gLabel(t0, g)}</span>
         <span className="ax t1 mono">{gLabel(cs[cs.length - 1].t, g)}</span>
         {hk && <span className="tip mono">{gLabel(hk.t, g)} · O {px(hk.o)} H {px(hk.h)} B {px(hk.l)} C {px(hk.c)} · vol. {nf0.format(hk.v)}</span>}
+      </div>
+      <div className="chart-nav">
+        <button type="button" className="btn ghost" onClick={() => zoom(1.5)} disabled={n >= Math.min(rows.length, 400)} aria-label="Dézoomer">−</button>
+        <button type="button" className="btn ghost" onClick={() => zoom(1 / 1.5)} disabled={n <= 20} aria-label="Zoomer">+</button>
+        {off > 0 ? <button type="button" className="btn ghost" onClick={() => setView(v => ({ ...v, off: 0 }))}>Revenir à maintenant</button>
+          : <small className="muted">Glisse le graphique pour remonter le temps.</small>}
       </div>
       {ind.rsi && <RsiPanel v={rsi(closes)} />}
     </>
@@ -492,13 +527,34 @@ function Alerts({ tk, last, alerts, setAlerts, max }) {
   );
 }
 
-export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onClose, onAnalyst, alerts = [], setAlerts, alertsMax = 1 }) {
-  const s = BY[tk], q = aur.quotes[tk], c = chgOf(aur, tk, now);
-  const [g, setG] = useState(hl ? 60 : 15), [ind, setInd] = useState({ mm20: true, mm50: false, boll: false, rsi: false }), [long, setLong] = useState([]), [mins, setMins] = useState([]), [mark, setMark] = useState(null);
-  // Assez d'historique pour 80 bougies et une MM 50 : bougies d'une heure d'Aurelys, ou cours des 2 dernières heures réelles.
+// Mes positions sur une société, pour la fiche : cours de référence et heures d'ouverture sur le graphique.
+const mineOf = (tk, bets, hold) => {
+  const mine = bets.filter(b => b.kind === "aurelys" && b.aur === tk), lines = [], opens = [];
+  for (const b of mine) {
+    const a = b.dir === "up" ? "▲" : "▼";
+    lines.push({ v: b.entry, label: `Entrée ${a}×${b.lev}`, fit: true }, { v: liqPrice(b), label: "Liquidation", c: "down" });
+    if (b.sl != null) lines.push({ v: b.sl, label: "Stop", c: "down" });
+    if (b.tp != null) lines.push({ v: b.tp, label: "Objectif", c: "up" });
+    opens.push({ t: Date.parse(b.created_at) / 1000, label: `${a}×${b.lev}` });
+  }
+  if (hold?.qty > 0) lines.push({ v: hold.cost / hold.qty, label: "Achat moyen", fit: true });
+  return { mine, lines, opens };
+};
+// Unité de temps qui montre l'ouverture de ma plus vieille position (70 bougies au plus), sinon 15 min.
+const frameFor = (opens, now) => {
+  if (!opens.length) return null;
+  const age = (now / 1000 - Math.min(...opens.map(o => o.t))) / SPM;
+  return (FRAMES.find(([v]) => age / v < 70) ?? FRAMES.at(-1))[0];
+};
+
+export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onSell, onClose, onAnalyst, bets = [], hold, alerts = [], setAlerts, alertsMax = 1 }) {
+  const s = BY[tk], q = aur.quotes[tk], c = chgOf(aur, tk, now), my = mineOf(tk, bets, hold);
+  const [g, setG] = useState(() => hl ? 60 : frameFor(my.opens, now) ?? (hold ? 60 : 15)), [ind, setInd] = useState({ mm20: true, mm50: false, boll: false, rsi: false }), [long, setLong] = useState([]), [mins, setMins] = useState([]), [mark, setMark] = useState(null);
+  // Assez d'historique pour remonter de 400 bougies (plus 50 pour la MM 50) : bougies d'une heure d'Aurelys (10 jours réels
+  // au plus côté serveur), ou cours des 2 dernières heures réelles.
   useEffect(() => {
     let on = true;
-    const need = Math.ceil(Math.max(24, 130 * g / 60) * 60 * SPM / 60); // minutes réelles
+    const need = Math.min(14400, Math.ceil(450 * g * SPM / 60)); // minutes réelles
     const load = () => Promise.all([api.aurHistory(tk, need), g < 60 ? api.aurTicks(tk, 120) : null])
       .then(([h, k]) => { if (!on) return; setLong((h[tk] ?? []).map(r => r.map(Number))); if (k) setMins(k.map(r => [Number(r[0]), Number(r[1]), Number(r[2])])) }).catch(() => {});
     load(); const id = setInterval(load, 60000); return () => { on = false; clearInterval(id) };
@@ -521,14 +577,15 @@ export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onClose
         <div className="chips legend" role="group" aria-label="Indicateurs">
           {MM.map(([k, l, col]) => <button key={k} type="button" aria-pressed={ind[k]} onClick={() => setInd(x => ({ ...x, [k]: !x[k] }))}><i style={{ background: col }} aria-hidden="true" />{l}</button>)}
         </div>
-        <AurChart cs={cs} g={g} last={q?.p} ind={ind} marks={aur.news.filter(n => n.tk === tk)} onMark={setMark} hl={hl} />
+        <AurChart key={g} rows={cs} g={g} last={q?.p} ind={ind} marks={aur.news.filter(n => n.tk === tk)} onMark={setMark} hl={hl} lines={my.lines} opens={my.opens} />
         {hl && <p className="muted small">Trait ambre : la rumeur, {gwhen(hl * 1000, now)}.</p>}
         {mark && <Article api={api} n={mark} now={now} onClose={() => setMark(null)} onDetail={() => setMark(null)} />}
+        {(my.mine.length > 0 || hold) && <MyStake tk={tk} mine={my.mine} hold={hold} aur={aur} now={now} onSell={onSell} />}
         <div className="qbtns">
           <button type="button" className="buy" disabled={!q || q.halt} onClick={() => onPick(tk, "up")}><span>▲ Hausse</span></button>
           <button type="button" className="sell" disabled={!q || q.halt} onClick={() => onPick(tk, "down")}><span>▼ Baisse</span></button>
         </div>
-        <button type="button" className="btn invest-btn" disabled={!q || q.halt} onClick={() => onInvest(tk)}>Investir sans levier</button>
+        <button type="button" className="btn invest-btn" disabled={!q || q.halt} onClick={() => onInvest(tk)}>{hold ? "Renforcer sans levier" : "Investir sans levier"}</button>
         <p className="muted small d-hint">Hausse et Baisse : une position à levier, à clôturer quand tu veux. Investir : de vraies actions, sans liquidation, à garder.</p>
         {setAlerts && <Alerts tk={tk} last={q?.p} alerts={alerts} setAlerts={setAlerts} max={alertsMax} />}
         {nextRes && <section className="d-sec">
@@ -566,6 +623,31 @@ export function AurelysDetail({ tk, hl, aur, api, now, onPick, onInvest, onClose
         {!news.length && <p className="muted small">Rien de neuf pour l'instant.</p>}
       </div>
     </div>
+  );
+}
+
+// Fiche : ce que j'ai sur cette société (positions à levier en cours, actions détenues), gain ou perte en direct.
+function MyStake({ tk, mine, hold, aur, now, onSell }) {
+  const q = aur.quotes[tk], p = q?.p ?? hold?.price, val = hold ? hold.qty * p : 0, g = hold ? val - hold.cost : 0;
+  return (
+    <section className="d-sec">
+      <h2>Ma position</h2>
+      <div className="plain">
+        {mine.map(b => {
+          const x = aurLive(b, q, aur.ticks[tk], aur.feeRate, aur.cut);
+          return <div key={b.id} className="plain-row"><span>{`${b.dir === "up" ? "▲" : "▼"} ×${b.lev}, ${W(b.stake)} depuis ${gdur(now - Date.parse(b.created_at))}`}</span>
+            <b className={"mono " + cls(x.net)}>{`${sW(x.net)}, ${pct(x.net / b.stake)}`}</b></div>;
+        })}
+        {hold && <>
+          <div className="plain-row"><span>{`${nf2.format(hold.qty).replace(/,00$/, "")} actions`}</span><b className="mono">{W(val)}</b></div>
+          <div className="plain-row"><span>Plus-value</span><b className={"mono " + cls(g)}>{`${sW(g)}, ${pct(g / hold.cost)}`}</b></div>
+          <div className="plain-row"><span>Achat moyen, cours</span><b className="mono">{`${px(hold.cost / hold.qty)}, ${px(p)}`}</b></div>
+          {BY[tk]?.div > 0 && <div className="plain-row"><span>Dividende</span><b className="mono">{nf2.format(BY[tk].div)} % par an</b></div>}
+        </>}
+      </div>
+      <p className="muted small">Pointillés sur le graphique : entrée, liquidation, stop, objectif et achat moyen ; trait vertical : ouverture.</p>
+      {hold && onSell && <button type="button" className="btn" disabled={!q || q.halt} onClick={() => onSell(hold)}>Vendre mes actions</button>}
+    </section>
   );
 }
 
